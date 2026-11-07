@@ -1,0 +1,6 @@
+PING 1.1.1.1 (1.1.1.1): 1472 data bytes
+ping: sendto: Message too long
+Request timeout for icmp_seq 0
+
+--- 1.1.1.1 ping statistics ---
+1 packets transmitted, 0 packets received, 100.0% packet loss

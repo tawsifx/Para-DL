@@ -1,0 +1,2 @@
+target_binary: valid on disk
+target_binary: satisfies its Designated Requirement

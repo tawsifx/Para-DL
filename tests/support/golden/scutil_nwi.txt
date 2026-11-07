@@ -1,0 +1,5 @@
+Network information
+  IPv4 network interface: en0
+  IPv6 network interface: none
+  flags: 0x00000003 (Reachability, Transient Connection)
+  reach: 0x00000002 (Reachable)

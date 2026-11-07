@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "parallel-dl"
+version = "4.0.0"
+description = "High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog"
+readme = "PARALLEL_DL_DEV_CONTEXT.md"
+requires-python = ">=3.11"
+dependencies = [
+    "rich>=13.0.0",
+    "httpx>=0.28.0",
+    "mutagen>=1.47.0",
+    "yt-dlp[default]>=2026.6.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-randomly>=3.15.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+]
+
+[project.scripts]
+pdl = "pdl.cli:main"
+parallel-dl = "pdl.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdl"]
+dev-mode-dirs = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-m 'not slow' --durations=15"
+markers = [
+    "unit: pure logic unit tests (fast, no external I/O)",
+    "integration: simulator-backed or local socket/SQLite tests",
+    "slow: end-to-end multi-second transfer scenarios and benchmarks",
+    "macos: tests exercising macOS-specific APIs or tools",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["src", "tests"]
+exclude = ["_original", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["pdl"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true

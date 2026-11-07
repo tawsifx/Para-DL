@@ -1,0 +1,42 @@
+# Default Candidate Targets for `pdl throttle`
+# Every built-in URL is treated as a CANDIDATE: validated at run time (HTTP status,
+# Range support, size, TLS) and silently dropped if unreachable.
+
+[groups.global-cdn]
+description = "Public global speed-test endpoints and M-Lab (ndt7)"
+targets = [
+  { id = "cloudflare-speed", label = "Cloudflare Global Speed Test", url = "https://speed.cloudflare.com/__down?bytes=26214400", sni_probe_allowed = true, sni_alt_host = "cloudflare.com", supports_upload = true },
+  { id = "hetzner-eu", label = "Hetzner Falkenstein Speed Test (EU)", url = "https://fsn1-speed.hetzner.com/100MB.bin", http_url = "http://fsn1-speed.hetzner.com/100MB.bin" },
+  { id = "hetzner-us", label = "Hetzner Ashburn Speed Test (US)", url = "https://ash-speed.hetzner.com/100MB.bin" },
+  { id = "ovh-sgp", label = "OVH Singapore Speed Test (APAC)", url = "https://proof.ovh.net/files/10Mb.dat", http_url = "http://proof.ovh.net/files/10Mb.dat" },
+  { id = "mlab-ndt7", label = "M-Lab NDT7 Nearest Server", url = "https://locate.measurementlab.net/v2/nearest/ndt/ndt7" },
+]
+
+[groups.domestic]
+description = "In-country and local-peering (BDIX) servers. Shipped EMPTY intentionally so no unverified guesses are made."
+# HOW TO ADD DOMESTIC / BDIX SERVERS:
+# Option 1 (CLI flag, repeatable):
+#   pdl throttle quick --domestic http://speedtest.bdix.example.com/100MB.bin --domestic http://ftp.local-isp.bd/test.iso
+# Option 2 (Custom targets.toml in $PDL_HOME/targets.toml or via --targets FILE):
+#   Add entries to `targets = [ { id = "bdix-1", label = "BDIX Mirror", url = "http://..." } ]` below.
+targets = []
+
+[groups.isp-cached]
+description = "Large CDN/cache-fronted services commonly served from local ISP caches (GGC / FNA)"
+targets = [
+  { id = "google-dl-cache", label = "Google Cache-Fronted Asset", url = "https://dl.google.com/dl/android/studio/ide-zips/2024.1.1.11/android-studio-2024.1.1.11-mac_arm.zip" },
+  { id = "fbcdn-static", label = "Meta / Facebook Static Edge CDN", url = "https://static.xx.fbcdn.net/rsrc.php/v3/y4/r/-PAXP-deijE.gif" },
+]
+
+[groups.problem-hosts]
+description = "Hosts that commonly feel slow or throttled for large developer/media downloads"
+targets = [
+  { id = "hf-hub-sample", label = "Hugging Face Hub LFS Asset", url = "https://huggingface.co/gpt2/resolve/main/model.safetensors" },
+  { id = "github-release-sample", label = "GitHub Release Binary Asset", url = "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-aarch64-apple-darwin.tar.gz" },
+]
+
+[groups.own-server]
+description = "User VPS running `pdl throttle server` for ground-truth port and payload sweeps"
+# Example:
+#   { id = "my-vps", label = "VPS Ground-Truth Server", url = "http://YOUR_VPS_IP:8765/down?bytes=16777216&type=random", alt_port = 8766, supports_upload = true }
+targets = []

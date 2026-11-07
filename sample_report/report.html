@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ISP Throttling Report — Duronto Internet</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #020617;
+    --card: #0f172a;
+    --border: #1e293b;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .container { max-width: 980px; margin: 0 auto; }
+  header {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  h1, h2, h3 { margin-top: 0; }
+  .meta { color: var(--muted); font-size: 0.92rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { color: var(--accent); }
+  .note-box {
+    border-left: 4px solid var(--accent);
+    background: #1e293b;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+  .chart-wrap { margin: 16px 0; }
+  code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ISP Throttling Diagnostic Report — Duronto Internet</h1>
+    <div class="meta">
+      ISP: <strong>Duronto Internet</strong> |
+      Mode: <code>full</code> |
+      Run ID: <code>full-20261108-duronto-sample</code> |
+      Subscribed Plan: 60.0 Mbps |
+      Budget Used: 145.0 MB / 3072.0 MB
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>1. Local vs International Throughput</h2>
+    <p>Domestic (658.5 Mbps) and ISP-cached (545.3 Mbps) routes are substantially faster than uncached international routes (40.3 Mbps). This indicates international bandwidth shaping or upstream transit bottlenecks while local BDIX/GGC peering runs near line rate.</p>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 680 220" width="100%" height="220" role="img" aria-label="Local vs International Throughput">
+<rect width="100%" height="100%" fill="#0f172a" rx="8"/>
+<text x="20" y="28" fill="#f8fafc" font-size="14" font-weight="bold">Local vs International Throughput (Mbps)</text>
+<text x="20" y="65" fill="#cbd5e1" font-size="12">Domestic (1x)</text>
+<rect x="180" y="50" width="392" height="20" fill="#10b981" rx="4"/>
+<text x="582" y="65" fill="#e2e8f0" font-size="12">658.51 Mbps</text>
+<text x="20" y="97" fill="#cbd5e1" font-size="12">Domestic (16x)</text>
+<rect x="180" y="82" width="400" height="20" fill="#059669" rx="4"/>
+<text x="590" y="97" fill="#e2e8f0" font-size="12">671.09 Mbps</text>
+<text x="20" y="129" fill="#cbd5e1" font-size="12">ISP-Cached (1x)</text>
+<rect x="180" y="114" width="324" height="20" fill="#3b82f6" rx="4"/>
+<text x="514" y="129" fill="#e2e8f0" font-size="12">545.26 Mbps</text>
+<text x="20" y="161" fill="#cbd5e1" font-size="12">International (1x)</text>
+<rect x="180" y="146" width="23" height="20" fill="#f59e0b" rx="4"/>
+<text x="213" y="161" fill="#e2e8f0" font-size="12">40.27 Mbps</text>
+<text x="20" y="193" fill="#cbd5e1" font-size="12">International (16x)</text>
+<rect x="180" y="178" width="291" height="20" fill="#d97706" rx="4"/>
+<text x="481" y="193" fill="#e2e8f0" font-size="12">489.89 Mbps</text>
+</svg>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Classifier Verdicts &amp; Notes</h2>
+    <table>
+      <thead>
+        <tr><th>Verdict Class</th><th>Confidence</th><th>Summary</th><th>Evidence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>per-flow cap</strong></td><td>95%</td><td>Each TCP connection to international CDNs is capped (~4.8 Mbps / 600 KB/s), while 16 parallel connections scale aggregate throughput 12.2x to 58.4 Mbps.</td><td><ul><li>1 connection to speed.cloudflare.com: 4.80 Mbps</li><li>16 connections to speed.cloudflare.com: 58.40 Mbps (12.17x scaling)</li><li>Per-flow rate at 16 streams: 3.65 Mbps (clean flow separation)</li></ul></td></tr><tr><td><strong>burst-then-throttle</strong></td><td>92%</td><td>International flows burst at 28.5 Mbps for ~1.0s (~2.9 MB token bucket) before collapsing to a sustained 4.8 Mbps ceiling.</td><td><ul><li>Initial burst on speed.cloudflare.com: 28.50 Mbps for 1.00s</li><li>Sustained rate after step drop: 4.80 Mbps (5.9x collapse)</li><li>Token bucket size: ~2.96 MB (refills to 85% within 30s idle gap)</li></ul></td></tr><tr><td><strong>international bandwidth limit</strong></td><td>96%</td><td>Domestic / BDIX peering throughput (78.5 Mbps) is 16.3x faster than single-connection international throughput (4.8 Mbps).</td><td><ul><li>Domestic/BDIX median: 78.50 Mbps (low latency 4.8 ms)</li><li>Uncached international median: 4.80 Mbps (latency 19.4 ms)</li><li>Paired ratio: 16.35x domestic advantage</li></ul></td></tr><tr><td><strong>loss-based policing</strong></td><td>86%</td><td>Hard packet-drop rate policing detected on international streams above token bucket (retransmit rate 2.11%, minimal RTT growth +2.7 ms).</td><td><ul><li>TCP retransmit rate delta: 2.10% (320 retransmits across 15.2k packets)</li><li>RTT under load (21.2 ms) vs idle (18.5 ms): minimal buffer queueing (+2.7 ms)</li><li>Throughput CoV: 0.12 (sawtooth drop pattern)</li></ul></td></tr>
+      </tbody>
+    </table>
+    <div class="note-box"><h4>ISP CDN edge caching detected (<code>cache_effect</code>)</h4><p>Target servers hosted inside local ISP cache nodes deliver near-line rates, masking international transit bottlenecks.</p><ul><li>Compare uncached international mirrors with domestic BDIX mirrors.</li></ul></div><div class="note-box"><h4>sparse time-of-day coverage (<code>insufficient_time_data</code>)</h4><p>Stored samples cover 14/48 matrix cells; time-of-day congestion significance test is gated until &gt;= 2 windows with &gt;= 3 samples are collected.</p><ul><li>run one sample around 21:00 on a weekday (evening peak window)</li><li>run one sample around 09:00 on a weekday (morning off-peak baseline)</li></ul></div>
+  </section>
+
+  <section class="card">
+    <h2>3. Throughput Time Series, Flow Scaling &amp; Time Coverage</h2>
+    <div class="chart-wrap"><svg viewBox="0 0 680 220" width="100%" height="220" role="img" aria-label="Single-Flow Time Series">
+<rect width="100%" height="100%" fill="#0f172a" rx="8"/>
+<text x="20" y="28" fill="#f8fafc" font-size="14" font-weight="bold">M2: Single-Flow Throughput Time Series (250 ms samples)</text>
+<line x1="60" y1="185" x2="650" y2="185" stroke="#334155" stroke-width="1"/>
+<text x="10" y="55" fill="#94a3b8" font-size="10">680.0M</text>
+<text x="10" y="185" fill="#94a3b8" font-size="10">0.0M</text>
+<polyline fill="none" stroke="#38bdf8" stroke-width="2" points="60.0,138.1 113.6,139.2 167.3,140.7 220.9,145.3 274.5,174.8 328.2,176.9 381.8,177.1 435.5,177.1 489.1,177.1 542.7,177.3 596.4,177.1 650.0,177.1"/>
+<text x="60" y="210" fill="#38bdf8" font-size="11">speed.cloudflare.com (international)</text>
+<polyline fill="none" stroke="#f43f5e" stroke-width="2" points="60.0,49.9 144.3,45.0 228.6,51.6 312.9,53.2 397.1,55.7 481.4,56.5 565.7,56.2 650.0,56.4"/>
+<text x="210" y="210" fill="#f43f5e" font-size="11">mirror.dhaka.ix.bd (domestic)</text>
+</svg></div>
+    <div class="chart-wrap"><svg viewBox="0 0 680 220" width="100%" height="220" role="img" aria-label="Flow-Scaling Curve">
+<rect width="100%" height="100%" fill="#0f172a" rx="8"/>
+<text x="20" y="28" fill="#f8fafc" font-size="14" font-weight="bold">M3: Multi-Connection Flow Scaling Curve (1..16 Streams)</text>
+<circle cx="60.0" cy="168.9" r="3.5" fill="#22c55e"/>
+<circle cx="99.3" cy="158.3" r="3.5" fill="#22c55e"/>
+<circle cx="178.0" cy="137.0" r="3.5" fill="#22c55e"/>
+<circle cx="335.3" cy="94.9" r="3.5" fill="#22c55e"/>
+<circle cx="650.0" cy="45.0" r="3.5" fill="#22c55e"/>
+<polyline fill="none" stroke="#22c55e" stroke-width="2" points="60.0,168.9 99.3,158.3 178.0,137.0 335.3,94.9 650.0,45.0"/>
+<text x="60" y="210" fill="#22c55e" font-size="11">speed.cloudflare.com (12.2x)</text>
+</svg></div>
+    <div class="chart-wrap"><svg viewBox="0 0 680 175" width="100%" height="175" role="img" aria-label="Time-of-Day Coverage Matrix">
+<rect width="100%" height="100%" fill="#0f172a" rx="8"/>
+<text x="20" y="26" fill="#f8fafc" font-size="14" font-weight="bold">M8: Time-of-Day Coverage Matrix (Status: insufficient time data)</text>
+<text x="20" y="70" fill="#cbd5e1" font-size="12">Weekday</text>
+<rect x="90" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 00:00 — no data</title></rect>
+<rect x="114" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 01:00 — no data</title></rect>
+<rect x="138" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 02:00 — no data</title></rect>
+<rect x="162" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 03:00 — no data</title></rect>
+<rect x="186" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 04:00 — no data</title></rect>
+<rect x="210" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 05:00 — no data</title></rect>
+<rect x="234" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 06:00 — no data</title></rect>
+<rect x="258" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 07:00 — no data</title></rect>
+<rect x="282" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 08:00 — no data</title></rect>
+<rect x="306" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 09:00 — no data</title></rect>
+<rect x="330" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 10:00 — no data</title></rect>
+<rect x="354" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 11:00 — no data</title></rect>
+<rect x="378" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 12:00 — no data</title></rect>
+<rect x="402" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 13:00 — no data</title></rect>
+<rect x="426" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 14:00 — no data</title></rect>
+<rect x="450" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 15:00 — no data</title></rect>
+<rect x="474" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 16:00 — no data</title></rect>
+<rect x="498" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 17:00 — no data</title></rect>
+<rect x="522" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 18:00 — no data</title></rect>
+<rect x="546" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 19:00 — no data</title></rect>
+<rect x="570" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 20:00 — no data</title></rect>
+<rect x="594" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 21:00 — no data</title></rect>
+<rect x="618" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 22:00 — no data</title></rect>
+<rect x="642" y="52" width="23" height="26" fill="#1e293b" rx="3"><title>Weekday 23:00 — no data</title></rect>
+<text x="20" y="112" fill="#cbd5e1" font-size="12">Weekend</text>
+<rect x="90" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 00:00 — no data</title></rect>
+<text x="92" y="134" fill="#64748b" font-size="9">00h</text>
+<rect x="114" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 01:00 — no data</title></rect>
+<rect x="138" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 02:00 — no data</title></rect>
+<rect x="162" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 03:00 — no data</title></rect>
+<text x="164" y="134" fill="#64748b" font-size="9">03h</text>
+<rect x="186" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 04:00 — no data</title></rect>
+<rect x="210" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 05:00 — no data</title></rect>
+<rect x="234" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 06:00 — no data</title></rect>
+<text x="236" y="134" fill="#64748b" font-size="9">06h</text>
+<rect x="258" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 07:00 — no data</title></rect>
+<rect x="282" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 08:00 — no data</title></rect>
+<rect x="306" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 09:00 — no data</title></rect>
+<text x="308" y="134" fill="#64748b" font-size="9">09h</text>
+<rect x="330" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 10:00 — no data</title></rect>
+<rect x="354" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 11:00 — no data</title></rect>
+<rect x="378" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 12:00 — no data</title></rect>
+<text x="380" y="134" fill="#64748b" font-size="9">12h</text>
+<rect x="402" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 13:00 — no data</title></rect>
+<rect x="426" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 14:00 — no data</title></rect>
+<rect x="450" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 15:00 — no data</title></rect>
+<text x="452" y="134" fill="#64748b" font-size="9">15h</text>
+<rect x="474" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 16:00 — no data</title></rect>
+<rect x="498" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 17:00 — no data</title></rect>
+<rect x="522" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 18:00 — no data</title></rect>
+<text x="524" y="134" fill="#64748b" font-size="9">18h</text>
+<rect x="546" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 19:00 — no data</title></rect>
+<rect x="570" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 20:00 — no data</title></rect>
+<rect x="594" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 21:00 — no data</title></rect>
+<text x="596" y="134" fill="#64748b" font-size="9">21h</text>
+<rect x="618" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 22:00 — no data</title></rect>
+<rect x="642" y="94" width="23" height="26" fill="#1e293b" rx="3"><title>Weekend 23:00 — no data</title></rect>
+<text x="20" y="162" fill="#94a3b8" font-size="11">Dark cells indicate "no data" (unmeasured hours). Blue/amber cells contain recorded probes.</text>
+</svg></div>
+  </section>
+
+  <section class="card">
+    <h2>4. What This Means for Downloads &amp; Recommended Profile</h2>
+    <ul>
+      <li><strong>Domestic Connections</strong>: <code>16</code></li>
+      <li><strong>International Connections</strong>: <code>16</code></li>
+      <li><strong>Stream Recycle Interval</strong>: <code>10s</code></li>
+      <li><strong>Multi-Host Mirrors</strong>: <code>True</code></li>
+      <li><strong>Watchdog Recovery Action</strong>: <code>tier2_pause_unpause</code></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>5. Neutral ISP Evidence Summary (Duronto Internet)</h2>
+    <h3>Measured Findings</h3>
+    <ul><li>Domestic (BDIX) throughput: 78.5 Mbps median (4.8 ms latency, 0% loss)</li><li>International single-stream throughput: 4.8 Mbps sustained ceiling</li><li>International 16-stream throughput: 58.4 Mbps aggregate (12.2x scaling)</li><li>International packet drop rate: 2.11% retransmits with negligible queue delay (+2.7 ms)</li></ul>
+    <h3>Neutral Questions for ISP Support</h3>
+    <ol><li>Does Duronto Internet apply a 5 Mbps per-TCP-session rate policer on upstream international IP transit?</li><li>Is international bandwidth allocated via a token bucket (burst limit ~25 Mbps for 1s, sustained 5 Mbps)?</li><li>Are specific BDIX routing optimizations available for high-throughput European/US CDN transit?</li></ol>
+  </section>
+</div>
+</body>
+</html>
