@@ -75,12 +75,12 @@
 
 With [uv](https://github.com/astral-sh/uv) (ultra-fast):
 ```bash
-uv tool install git+https://github.com/tawsifx/pdl.git
+uv tool install git+https://github.com/tawsifx/Para-DL.git
 ```
 
 Or with `pipx`:
 ```bash
-pipx install git+https://github.com/tawsifx/pdl.git
+pipx install git+https://github.com/tawsifx/Para-DL.git
 ```
 
 ---
@@ -98,14 +98,14 @@ brew install parallel-dl
 
 * **On Windows (PowerShell)**:
   ```powershell
-  git clone https://github.com/tawsifx/pdl.git $env:USERPROFILE\pdl
+  git clone https://github.com/tawsifx/Para-DL.git $env:USERPROFILE\pdl
   cd $env:USERPROFILE\pdl
   .\scripts\install-local.ps1
   ```
 
 * **On macOS / Linux (Bash/Zsh)**:
   ```bash
-  git clone https://github.com/tawsifx/pdl.git ~/pdl
+  git clone https://github.com/tawsifx/Para-DL.git ~/pdl
   cd ~/pdl
   ./scripts/install-local.sh
   ```

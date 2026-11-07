@@ -51,10 +51,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tawsifx/pdl"
-Documentation = "https://github.com/tawsifx/pdl#readme"
-Repository = "https://github.com/tawsifx/pdl.git"
-Issues = "https://github.com/tawsifx/pdl/issues"
+Homepage = "https://github.com/tawsifx/Para-DL"
+Documentation = "https://github.com/tawsifx/Para-DL#readme"
+Repository = "https://github.com/tawsifx/Para-DL.git"
+Issues = "https://github.com/tawsifx/Para-DL/issues"
 
 [project.scripts]
 paradl = "pdl.cli:main"

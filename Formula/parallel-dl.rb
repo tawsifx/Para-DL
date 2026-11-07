@@ -2,10 +2,10 @@ class ParallelDl < Formula
   include Language::Python::Virtualenv
 
   desc "High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog"
-  homepage "https://github.com/tawsifx/pdl"
-  url "https://github.com/tawsifx/pdl/archive/refs/tags/v1.0.0.tar.gz"
+  homepage "https://github.com/tawsifx/Para-DL"
+  url "https://github.com/tawsifx/Para-DL/archive/refs/tags/v1.0.0.tar.gz"
   license "MIT"
-  head "https://github.com/tawsifx/pdl.git", branch: "main"
+  head "https://github.com/tawsifx/Para-DL.git", branch: "main"
 
   depends_on "aria2"
   depends_on "ffmpeg"
