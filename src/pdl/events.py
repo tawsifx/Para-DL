@@ -11,6 +11,7 @@ from typing import Any
 
 from pdl.clock import Clock, get_clock
 from pdl.models import format_size
+from pdl import platform
 from pdl.platform import macos
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class ResilienceEventSource:
         wall_clock: Callable[[], float] | None = None,
         mono_clock: Callable[[], float] | None = None,
         clock: Clock | None = None,
-        net_watcher: macos.MacOSNetworkWatcher | None = None,
+        net_watcher: Any | None = None,
     ) -> None:
         self.net_watch = bool(net_watch)
         self.stall_timeout_sec = float(stall_timeout_sec)
@@ -62,10 +63,16 @@ class ResilienceEventSource:
         self.wall_clock = wall_clock or active_clock.now
         self.mono_clock = mono_clock or active_clock.monotonic
 
-        self.net_watcher = net_watcher or macos.MacOSNetworkWatcher(
-            enabled=self.net_watch,
-            mono_clock=self.mono_clock,
-        )
+        if net_watcher is not None:
+            self.net_watcher = net_watcher
+        elif platform.is_windows():
+            watcher_cls = platform.get_network_watcher_cls()
+            self.net_watcher = watcher_cls(on_change=lambda detail: self.simulate_net_change(detail))
+        else:
+            self.net_watcher = macos.MacOSNetworkWatcher(
+                enabled=self.net_watch,
+                mono_clock=self.mono_clock,
+            )
 
         now_m = self.mono_clock()
         now_w = self.wall_clock()
@@ -246,7 +253,7 @@ def check_free_disk_space(
 
     margin = margin_bytes if margin_bytes is not None else compute_disk_margin(remaining)
     required = remaining + margin
-    free_bytes = macos.get_free_disk_bytes(out_dir)
+    free_bytes = platform.get_current_platform_module().get_free_disk_bytes(out_dir)
 
     if free_bytes < required:
         msg = (
@@ -265,15 +272,15 @@ def check_power_policy(
     max_pause_polls: int = 2,
     poll_interval: float = 0.05,
 ) -> tuple[bool, str | None]:
-    """Enforce start-up power policy via `pmset -g batt` and Low Power Mode.
+    """Enforce start-up power policy via system power status and Low Power / Battery Saver mode.
 
     - `--require-ac`: fails immediately if not on AC power.
-    - `--pause-on-low-power`: pauses and re-polls; if Low Power Mode remains active, fails/defers cleanly.
+    - `--pause-on-low-power`: pauses and re-polls; if Low Power / Battery Saver remains active, fails/defers cleanly.
     """
     if not require_ac and not pause_on_low_power:
         return True, None
 
-    status = macos.get_power_status()
+    status = platform.get_power_status()
     if require_ac and not status.on_ac_power:
         pct_str = f" ({status.battery_percent}%)" if status.battery_percent is not None else ""
         return (
@@ -284,7 +291,7 @@ def check_power_policy(
     if pause_on_low_power and status.low_power_mode:
         for _ in range(max(0, int(max_pause_polls) - 1)):
             get_clock().sleep(poll_interval)
-            status = macos.get_power_status()
+            status = platform.get_power_status()
             if require_ac and not status.on_ac_power:
                 return (
                     False,
@@ -294,7 +301,7 @@ def check_power_policy(
                 return True, None
         return (
             False,
-            "Power policy guard paused transfer (--pause-on-low-power): macOS Low Power Mode is active.",
+            "Power policy guard paused transfer (--pause-on-low-power): Low Power / Battery Saver mode is active.",
         )
 
     return True, None

@@ -3,14 +3,26 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 
+def is_windows() -> bool:
+    """Return True when running on Windows (win32)."""
+    return sys.platform == "win32"
+
+
 def get_pdl_home() -> Path:
-    """Return the PDL state directory, honoring PDL_HOME env var (default ~/.config/pdl)."""
+    """Return the PDL state directory, honoring PDL_HOME env var (default ~/.config/pdl or %LOCALAPPDATA%/pdl)."""
     env_home = os.environ.get("PDL_HOME")
     if env_home and env_home.strip():
         return Path(env_home.strip()).expanduser().resolve()
+
+    if is_windows():
+        local_appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if local_appdata and local_appdata.strip():
+            return (Path(local_appdata.strip()) / "pdl").resolve()
+
     return (Path.home() / ".config" / "pdl").resolve()
 
 

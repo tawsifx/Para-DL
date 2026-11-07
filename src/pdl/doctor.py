@@ -16,7 +16,7 @@ from datetime import datetime
 from pdl import VERSION
 from pdl.auth import get_auth_status
 from pdl.models import ExitCode
-from pdl.platform import macos
+from pdl.platform import check_platform_utilities, is_windows
 from pdl.toolchain import TOOLCHAIN
 from pdl.ui import UI, print_plain
 
@@ -86,7 +86,7 @@ def run_doctor() -> int:
     ejs_ver = TOOLCHAIN.yt_dlp_ejs_version
     js_rt = TOOLCHAIN.js_runtime
     auth_status = get_auth_status()
-    mac_utils = macos.check_macos_utilities()
+    plat_utils = check_platform_utilities()
 
     fixes: list[str] = []
 
@@ -167,19 +167,21 @@ def run_doctor() -> int:
     if TOOLCHAIN.afconvert:
         core_items.append(ToolCheck("afconvert (CoreAudio)", "ready", TOOLCHAIN.afconvert, required=False))
 
-    # 2. macOS Platform & Security Utilities
-    mac_items: list[ToolCheck] = []
-    for u_name in ("caffeinate", "scutil", "pmset", "security", "codesign", "spctl", "xattr"):
-        u_info = mac_utils.get(u_name, {})
+    # 2. Platform & Security Utilities
+    plat_items: list[ToolCheck] = []
+    platform_name = "Windows" if is_windows() else "macOS"
+    for u_name, u_info in plat_utils.items():
         u_avail = u_info.get("available", False)
         u_path = u_info.get("path")
         u_fix = u_info.get("fix")
+        u_req = u_info.get("required", True)
         if u_avail:
-            mac_items.append(ToolCheck(f"{u_name} (macOS)", "ready", u_path or "built-in"))
+            plat_items.append(ToolCheck(f"{u_name} ({platform_name})", "ready", u_path or "built-in", required=u_req))
         else:
             if u_fix:
                 fixes.append(u_fix)
-            mac_items.append(ToolCheck(f"{u_name} (macOS)", "missing", "not found", fix=u_fix, required=True))
+            status_tag = "missing" if u_req else "optional_missing"
+            plat_items.append(ToolCheck(f"{u_name} ({platform_name})", status_tag, "not found", fix=u_fix, required=u_req))
 
     # 3. Authentication Checks
     auth_items: list[ToolCheck] = []
@@ -213,7 +215,8 @@ def run_doctor() -> int:
             },
             "ytdlp_ejs": {"version": ejs_ver},
             "auth": auth_status,
-            "macos_utilities": mac_utils,
+            "platform_utilities": plat_utils,
+            "macos_utilities": plat_utils,  # backward compatibility alias
             "core_tools": {c.name: {"status": c.status, "detail": c.detail, "fix": c.fix} for c in core_items},
             "fixes": list(dict.fromkeys(fixes)),
         }
@@ -246,7 +249,7 @@ def run_doctor() -> int:
     UI.print()
     UI.print_renderable(_render_table("Core Download & Media Engines", core_items))
     UI.print()
-    UI.print_renderable(_render_table("macOS Platform & Security Utilities", mac_items))
+    UI.print_renderable(_render_table(f"{platform_name} Platform & Security Utilities", plat_items))
     UI.print()
     UI.print_renderable(_render_table("Authentication Status (macOS Keychain / Env)", auth_items))
     UI.print()

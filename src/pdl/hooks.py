@@ -16,7 +16,7 @@ from typing import Any
 
 from pdl.models import format_size
 from pdl.paths import get_pdl_home
-from pdl.platform import macos
+from pdl.platform import display_notification
 from pdl.ui import UI, print_plain
 
 logger = logging.getLogger(__name__)
@@ -116,9 +116,9 @@ class HookRunner:
             if is_success:
                 size_str = format_size(bytes_dl) if bytes_dl > 0 else ""
                 msg = f"{file_name} ({size_str})" if size_str else file_name
-                macos.display_notification(title="pdl - Download Complete", message=msg)
+                display_notification(title="pdl - Download Complete", message=msg)
             else:
-                macos.display_notification(
+                display_notification(
                     title="pdl - Download Failed",
                     message=f"{file_name}: {error_msg}",
                 )
@@ -138,7 +138,7 @@ class HookRunner:
         """Built-in notification action when Watchdog v2 exhausts mitigation tiers."""
         if not enabled:
             return
-        macos.display_notification(
+        display_notification(
             title="pdl - Watchdog Alert",
             message=f"Watchdog gave up on {host}: {reason}",
         )
@@ -155,4 +155,14 @@ class HookRunner:
         if not enabled:
             return
         msg = f"Processed {total} job(s): {succeeded} succeeded, {failed} failed"
-        macos.display_notification(title="pdl - Queue Complete", message=msg)
+        display_notification(title="pdl - Queue Complete", message=msg)
+
+
+def notify_download_complete(url: str, path: Path, bytes_downloaded: int) -> None:
+    """Convenience helper to display a completion notification."""
+    HookRunner.run_result_actions(
+        {"target": url, "file_path": str(path), "bytes_downloaded": bytes_downloaded},
+        is_success=True,
+        notify=True,
+    )
+

@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from pdl.models import ExitCode
-from pdl.platform import macos
+from pdl.platform import (
+    delete_keychain_token,
+    has_keychain_token,
+    is_windows,
+    set_keychain_token,
+)
 from pdl.toolchain import TOOLCHAIN
 from pdl.ui import UI, print_plain
 
@@ -28,11 +33,12 @@ def get_auth_status() -> dict[str, dict[str, Any]]:
     status: dict[str, dict[str, Any]] = {}
 
     # Hugging Face
+    keychain_source_name = "credential_manager" if is_windows() else "keychain"
     hf_source = "none"
     if os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"):
         hf_source = "env"
-    elif macos.has_keychain_token("hf"):
-        hf_source = "keychain"
+    elif has_keychain_token("hf"):
+        hf_source = keychain_source_name
     elif (Path.home() / ".cache" / "huggingface" / "token").exists():
         hf_source = "cache_file"
 
@@ -47,8 +53,8 @@ def get_auth_status() -> dict[str, dict[str, Any]]:
     gh_source = "none"
     if os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"):
         gh_source = "env"
-    elif macos.has_keychain_token("github"):
-        gh_source = "keychain"
+    elif has_keychain_token("github"):
+        gh_source = keychain_source_name
     elif TOOLCHAIN.gh:
         gh_source = "gh_cli"
 
@@ -90,21 +96,21 @@ def set_auth_token(service: str, token: str | None = None) -> bool:
     # Mask token from logs and output immediately
     UI.register_secret(tok)
 
-    ok = macos.set_keychain_token(account=srv, token=tok, service="pdl")
+    ok = set_keychain_token(account=srv, token=tok, service="pdl")
+    store_name = "Windows Credential Store" if is_windows() else "macOS Login Keychain"
     if ok:
-        print_plain(f"  [green]✓ Successfully saved {srv} token in macOS Login Keychain (service: pdl).[/green]")
+        print_plain(f"  [green]✓ Successfully saved {srv} token in {store_name} (service: pdl).[/green]")
         return True
 
     print_plain(
-        f"  [error]✗ Failed to save {srv} token in Keychain via 'security -i'.[/error]\n"
-        "    Ensure the macOS security command is accessible and Login Keychain is unlocked.",
+        f"  [error]✗ Failed to save {srv} token in {store_name}.[/error]",
         force=True,
     )
     return False
 
 
 def remove_auth_token(service: str) -> bool:
-    """Remove service token from macOS Login Keychain."""
+    """Remove service token from platform credential store."""
     srv = service.lower().strip()
     if srv not in SUPPORTED_SERVICES:
         print_plain(
@@ -113,13 +119,14 @@ def remove_auth_token(service: str) -> bool:
         )
         return False
 
-    ok = macos.delete_keychain_token(account=srv, service="pdl")
+    ok = delete_keychain_token(account=srv, service="pdl")
+    store_name = "Windows Credential Store" if is_windows() else "macOS Login Keychain"
     if ok:
-        print_plain(f"  [green]✓ Removed {srv} token from macOS Login Keychain.[/green]")
+        print_plain(f"  [green]✓ Removed {srv} token from {store_name}.[/green]")
         return True
 
     print_plain(
-        f"  [yellow]• No {srv} token found in Keychain or already removed.[/yellow]",
+        f"  [yellow]• No {srv} token found in {store_name} or already removed.[/yellow]",
         force=True,
     )
     return True

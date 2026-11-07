@@ -6,8 +6,9 @@ import json
 import logging
 import os
 import shutil
+import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,14 @@ VALID_VIDEO_QUALITIES = {"best", "4k", "1440p", "1080p", "720p", "480p"}
 VALID_WATCHDOG_MODES = {m.value for m in WatchdogMode}
 
 
+def default_bin_dir() -> str:
+    if sys.platform == "win32":
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            return str(Path(local_appdata) / "Programs" / "pdl" / "bin")
+    return str(Path.home() / ".local/bin")
+
+
 @dataclass
 class PDLConfig:
     schema_version: int = CONFIG_SCHEMA_VERSION
@@ -32,7 +41,7 @@ class PDLConfig:
     video_quality: str = "best"
     auto_extract: bool = False
     auto_adb_push: bool = False
-    bin_dir: str = str(Path.home() / ".local/bin")
+    bin_dir: str = field(default_factory=default_bin_dir)
     adb_music_dir: str = "/storage/emulated/0/Music"
     adb_download_dir: str = "/storage/emulated/0/Download"
     max_download_limit: str | None = None
