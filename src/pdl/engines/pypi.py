@@ -152,12 +152,35 @@ class PyPIEngine:
             score += 30
 
         # Architecture scoring
-        if any(a in fn for a in arch_tags if a != "universal2"):
-            score += 20  # native architecture
-        elif "universal2" in fn:
-            score += 15  # multi-arch binary
-        elif "any" in fn:
-            score += 10  # architecture-independent
+        if plat == "win32":
+            if mach in ("arm64", "aarch64"):
+                if "win_arm64" in fn:
+                    score += 20  # native ARM64
+                elif "win_amd64" in fn:
+                    score += 5   # x64 emulation on ARM64 Windows 11
+                elif "win32" in fn:
+                    score += 2   # 32-bit x86 emulation
+                elif "any" in fn:
+                    score += 10
+            elif mach in ("x86", "i386", "i686"):
+                if "win32" in fn and "win_amd64" not in fn:
+                    score += 20  # native 32-bit
+                elif "any" in fn:
+                    score += 10
+            else:
+                if "win_amd64" in fn:
+                    score += 20  # native 64-bit x86_64
+                elif "win32" in fn:
+                    score += 5   # 32-bit x86 compatibility
+                elif "any" in fn:
+                    score += 10
+        else:
+            if any(a in fn for a in arch_tags if a != "universal2"):
+                score += 20  # native architecture
+            elif "universal2" in fn:
+                score += 15  # multi-arch binary
+            elif "any" in fn:
+                score += 10  # architecture-independent
 
         return score
 

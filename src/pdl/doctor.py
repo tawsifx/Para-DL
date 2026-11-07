@@ -113,14 +113,22 @@ def run_doctor() -> int:
     if TOOLCHAIN.aria2c:
         core_items.append(ToolCheck("aria2c (JSON-RPC 2.0)", "ready", TOOLCHAIN.aria2c))
     else:
-        fix = "paradl brew install aria2  # or: brew install aria2"
+        fix = (
+            "winget install aria2.aria2  # or: scoop install aria2"
+            if is_windows()
+            else "paradl brew install aria2  # or: brew install aria2"
+        )
         fixes.append(fix)
         core_items.append(ToolCheck("aria2c (JSON-RPC 2.0)", "missing", "not found", fix=fix, required=True))
 
     # yt-dlp
     if TOOLCHAIN.ytdlp:
         if ytdlp_outdated and ytdlp_age is not None:
-            fix = "paradl brew install yt-dlp  # or: paradl pip install -U yt-dlp / brew upgrade yt-dlp"
+            fix = (
+                "winget install yt-dlp.yt-dlp  # or: paradl pip install -U yt-dlp"
+                if is_windows()
+                else "paradl brew install yt-dlp  # or: paradl pip install -U yt-dlp / brew upgrade yt-dlp"
+            )
             fixes.append(fix)
             core_items.append(
                 ToolCheck(
@@ -135,7 +143,11 @@ def run_doctor() -> int:
             age_label = f" ({ytdlp_age}d old)" if ytdlp_age is not None else ""
             core_items.append(ToolCheck("yt-dlp (Media Stream Resolver)", "ready", f"v{ytdlp_ver}{age_label}"))
     else:
-        fix = "paradl brew install yt-dlp  # or: paradl pip install yt-dlp / brew install yt-dlp"
+        fix = (
+            "winget install yt-dlp.yt-dlp  # or: paradl pip install yt-dlp"
+            if is_windows()
+            else "paradl brew install yt-dlp  # or: paradl pip install yt-dlp / brew install yt-dlp"
+        )
         fixes.append(fix)
         core_items.append(ToolCheck("yt-dlp (Media Stream Resolver)", "missing", "not found", fix=fix, required=True))
 
@@ -151,7 +163,11 @@ def run_doctor() -> int:
     if js_rt:
         core_items.append(ToolCheck("JS Runtime (for EJS)", "ready", js_rt, required=False))
     else:
-        fix = "paradl brew install node  # or: paradl brew install deno"
+        fix = (
+            "winget install OpenJS.NodeJS  # or: scoop install nodejs"
+            if is_windows()
+            else "paradl brew install node  # or: paradl brew install deno"
+        )
         fixes.append(fix)
         core_items.append(ToolCheck("JS Runtime (for EJS)", "optional_missing", "not found", fix=fix, required=False))
 
@@ -159,7 +175,11 @@ def run_doctor() -> int:
     if TOOLCHAIN.ffmpeg:
         core_items.append(ToolCheck("ffmpeg (AV Transcoder)", "ready", TOOLCHAIN.ffmpeg, required=False))
     else:
-        fix = "paradl brew install ffmpeg  # or: brew install ffmpeg"
+        fix = (
+            "winget install Gyan.FFmpeg  # or: scoop install ffmpeg"
+            if is_windows()
+            else "paradl brew install ffmpeg  # or: brew install ffmpeg"
+        )
         fixes.append(fix)
         core_items.append(ToolCheck("ffmpeg (AV Transcoder)", "optional_missing", "not found", fix=fix, required=False))
 
@@ -189,7 +209,11 @@ def run_doctor() -> int:
     if hf_info.get("configured"):
         auth_items.append(ToolCheck("Hugging Face Hub Token", "ready", f"configured ({hf_info['source']})"))
     else:
-        fix = "paradl auth set hf  # or: export HF_TOKEN=<token>"
+        fix = (
+            'paradl auth set hf  # or: $env:HF_TOKEN="<token>"'
+            if is_windows()
+            else "paradl auth set hf  # or: export HF_TOKEN=<token>"
+        )
         fixes.append(fix)
         auth_items.append(
             ToolCheck("Hugging Face Hub Token", "optional_missing", "not configured", fix=fix, required=False)
@@ -199,7 +223,11 @@ def run_doctor() -> int:
     if gh_info.get("configured"):
         auth_items.append(ToolCheck("GitHub API Token", "ready", f"configured ({gh_info['source']})"))
     else:
-        fix = "paradl auth set github  # or: export GITHUB_TOKEN=<token>"
+        fix = (
+            'paradl auth set github  # or: $env:GITHUB_TOKEN="<token>"'
+            if is_windows()
+            else "paradl auth set github  # or: export GITHUB_TOKEN=<token>"
+        )
         fixes.append(fix)
         auth_items.append(ToolCheck("GitHub API Token", "optional_missing", "not configured", fix=fix, required=False))
 
@@ -246,12 +274,13 @@ def run_doctor() -> int:
             t.add_row(it.name, st, it.detail)
         return t
 
+    cred_store_name = "Windows Credential Manager" if is_windows() else "macOS Keychain"
     UI.print()
     UI.print_renderable(_render_table("Core Download & Media Engines", core_items))
     UI.print()
     UI.print_renderable(_render_table(f"{platform_name} Platform & Security Utilities", plat_items))
     UI.print()
-    UI.print_renderable(_render_table("Authentication Status (macOS Keychain / Env)", auth_items))
+    UI.print_renderable(_render_table(f"Authentication Status ({cred_store_name} / Env)", auth_items))
     UI.print()
 
     unique_fixes = list(dict.fromkeys(fixes))

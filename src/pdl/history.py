@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from pdl.paths import get_history_db_file, get_legacy_history_file, get_pdl_home
-from pdl.platform import macos
+from pdl import platform
 
 logger = logging.getLogger(__name__)
 
@@ -486,7 +486,7 @@ class HistoryManager:
             return
         host_low = profile.host.lower()
         hb = compute_hour_bucket() if profile.hour_bucket < 0 else int(profile.hour_bucket)
-        net_id = (profile.network_id or macos.get_network_id() or "default").strip() or "default"
+        net_id = (profile.network_id or platform.get_network_id() or "default").strip() or "default"
         conns = min(max(int(profile.connections), 1), 16)
         src_val = (profile.source or "watchdog").strip() or "watchdog"
 
@@ -572,7 +572,7 @@ class HistoryManager:
         host_low = host.lower()
         target_hb = compute_hour_bucket() if hour_bucket is None else int(hour_bucket)
         target_net = (
-            network_id if network_id is not None else (macos.get_network_id() or "default")
+            network_id if network_id is not None else (platform.get_network_id() or "default")
         ).strip() or "default"
 
         try:
@@ -771,7 +771,7 @@ class HistoryManager:
         if not strategy.host:
             return
         hb = compute_hour_bucket() if strategy.hour_bucket < 0 else int(strategy.hour_bucket)
-        net_id = (strategy.network_id or macos.get_network_id() or "default").strip() or "default"
+        net_id = (strategy.network_id or platform.get_network_id() or "default").strip() or "default"
         cls.save_learned_profile(
             LearnedProfile(
                 host=strategy.host.lower(),

@@ -11,7 +11,7 @@ from pdl.clock import get_clock
 from pdl.events import ResilienceEvent
 from pdl.history import HistoryManager, LearnedProfile, compute_hour_bucket
 from pdl.models import WatchdogMode, format_speed
-from pdl.platform import macos
+from pdl import platform
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ class WatchdogController:
         if self.hour_bucket is None:
             self.hour_bucket = compute_hour_bucket()
         if not self.network_id:
-            self.network_id = macos.get_network_id() or "default"
+            self.network_id = platform.get_network_id() or "default"
 
         if not self.supports_range:
             self.disabled_reason = "no_range_support"
@@ -311,7 +311,7 @@ class WatchdogController:
                             hour_bucket=int(
                                 self.hour_bucket if self.hour_bucket is not None else compute_hour_bucket()
                             ),
-                            network_id=str(self.network_id or macos.get_network_id() or "default"),
+                            network_id=str(self.network_id or platform.get_network_id() or "default"),
                             connections=self.connections,
                             ip_family=self.ip_family,
                             recovery_action=WatchdogActionType.PAUSE_UNPAUSE.value,

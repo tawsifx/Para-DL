@@ -67,7 +67,11 @@ class ResilienceEventSource:
             self.net_watcher = net_watcher
         elif platform.is_windows():
             watcher_cls = platform.get_network_watcher_cls()
-            self.net_watcher = watcher_cls(on_change=lambda detail: self.simulate_net_change(detail))
+            self.net_watcher = watcher_cls(
+                on_change=lambda detail: self.simulate_net_change(detail),
+                enabled=self.net_watch,
+                mono_clock=self.mono_clock,
+            )
         else:
             self.net_watcher = macos.MacOSNetworkWatcher(
                 enabled=self.net_watch,

@@ -25,6 +25,7 @@ from pdl.models import (
 )
 from pdl.net import get_http_client, probe_target
 from pdl.paths import get_logs_dir, get_pdl_home
+from pdl import platform
 from pdl.platform import macos
 from pdl.ui import UI, print_plain
 
@@ -556,7 +557,7 @@ class QueueManager:
         executed_jobs: list[QueueJob] = []
         overall_code = int(ExitCode.OK)
 
-        with macos.CaffeinateAssertion(enabled=caffeinate):
+        with platform.get_sleep_assertion(enabled=caffeinate):
             for job in runnable:
                 eff_at = at_override if at_override is not None else job.start_at
                 eff_when_fast = (

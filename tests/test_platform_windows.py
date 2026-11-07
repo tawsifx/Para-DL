@@ -100,6 +100,45 @@ There is 1 interface on the system:
             generated = windows.format_zone_identifier_text("https://github.com/astral-sh/uv", zone_id=None)
             self.assertIn("HostUrl=https://github.com/astral-sh/uv", generated)
 
+    def test_get_power_status_desktop_unknown_battery(self) -> None:
+        """Verify SYSTEM_POWER_STATUS with BatteryLifePercent=255 produces battery_percent=None, not -1."""
+        mock_kernel32 = MagicMock()
+        def fake_get_power(byref_arg):
+            byref_arg._obj.ACLineStatus = 1
+            byref_arg._obj.BatteryLifePercent = 255  # Unknown on AC desktop
+            byref_arg._obj.SystemStatusFlag = 0
+            return 1
+        mock_kernel32.GetSystemPowerStatus.side_effect = fake_get_power
+
+        with patch.object(windows, "get_kernel32", return_value=mock_kernel32):
+            status = windows.get_power_status()
+            self.assertTrue(status.on_ac_power)
+            self.assertIsNone(status.battery_percent)
+
+    def test_windows_network_watcher_interface(self) -> None:
+        """Verify WindowsNetworkWatcher implements poll_notifications, inject_notification, and backend."""
+        watcher = windows.WindowsNetworkWatcher(on_change=lambda d: None)
+        self.assertEqual(watcher.backend, "windows_netsh")
+        self.assertEqual(watcher.poll_notifications(), [])
+
+        watcher.inject_notification("network changed")
+        self.assertEqual(watcher.poll_notifications(), ["network changed"])
+        # Second poll should be empty (drained)
+        self.assertEqual(watcher.poll_notifications(), [])
+
+    def test_windows_credential_roundtrip(self) -> None:
+        """Verify Windows credential set, get, has, and delete roundtrip."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            store_file = Path(tmp_dir) / "credentials.json"
+            with patch.object(windows, "_get_dpapi_store_path", return_value=store_file), \
+                 patch.object(windows, "get_advapi32", return_value=None):
+                self.assertTrue(windows.set_keychain_token("hf", "hf_test_secret_token_123"))
+                self.assertTrue(windows.has_keychain_token("hf"))
+                self.assertEqual(windows.get_keychain_token("hf"), "hf_test_secret_token_123")
+                self.assertTrue(windows.delete_keychain_token("hf"))
+                self.assertFalse(windows.has_keychain_token("hf"))
+                self.assertIsNone(windows.get_keychain_token("hf"))
+
     def test_check_windows_utilities(self) -> None:
         """Verify check_windows_utilities audits powershell, curl, tar, winget."""
         with patch("shutil.which", side_effect=lambda name: f"C:\\Windows\\System32\\{name}.exe" if name in ("powershell", "curl", "tar") else None):

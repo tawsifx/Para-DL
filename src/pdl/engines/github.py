@@ -25,6 +25,7 @@ from pdl.models import (
     format_size,
 )
 from pdl.net import fetch_json_with_etag, request_with_retry
+from pdl import platform as pdl_platform
 from pdl.platform import macos
 from pdl.postproc.archive import ArchiveExtractor
 from pdl.postproc.checksum import ChecksumEngine
@@ -86,7 +87,7 @@ class GitHubEngine:
 
         if not _GH_TOKEN_PROBED:
             _GH_TOKEN_PROBED = True
-            kc_tok = macos.get_keychain_token("github")
+            kc_tok = pdl_platform.get_keychain_token("github")
             if kc_tok and kc_tok.strip():
                 _GH_TOKEN_CACHE = kc_tok.strip()
                 UI.register_secret(_GH_TOKEN_CACHE)
@@ -402,6 +403,7 @@ class GitHubEngine:
         anti_throttle: str | None = "4MBps",
         grace_period: int = 5,
         watchdog_mode: WatchdogMode | str = WatchdogMode.V2,
+        install_mode: bool = False,
     ) -> tuple[TransferResult, dict[str, Any] | None, list[dict[str, Any]]]:
         """Download GitHub release asset(s). Returns (TransferResult, chosen_asset_dict, all_assets)."""
         safe_conn = min(max(int(connections), 1), 16)
@@ -476,7 +478,7 @@ class GitHubEngine:
             candidate_assets = assets
 
         scored = sorted(
-            [(cls.score_asset_for_host(a["name"]), a) for a in candidate_assets],
+            [(cls.score_asset_for_host(a["name"], install_mode=install_mode), a) for a in candidate_assets],
             key=lambda x: x[0],
             reverse=True,
         )
@@ -775,6 +777,7 @@ class BinaryInstaller:
                 out_dir=tmp_path,
                 connections=min(max(connections, 1), 16),
                 interactive=False,
+                install_mode=True,
             )
 
             if not dl_res.success or not dl_res.file_path or not dl_res.file_path.exists():
@@ -921,9 +924,30 @@ class BinaryInstaller:
             shutil.copy2(target_bin, dest_bin)
             dest_bin.chmod(0o755)
 
-            # C2: Codesign verification & Gatekeeper (spctl) assessment
-            cs_valid, cs_detail = macos.codesign_verify(dest_bin)
-            spctl_ok, spctl_detail = macos.spctl_assess(dest_bin)
+            # C2: Codesign verification & Gatekeeper / Authenticode assessment
+            if pdl_platform.is_windows():
+                cs_valid = False
+                cs_detail = "unsigned"
+                try:
+                    ps_cmd = f"(Get-AuthenticodeSignature -LiteralPath '{dest_bin}').Status.ToString()"
+                    proc = subprocess.run(
+                        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=5.0,
+                    )
+                    if proc.returncode == 0 and proc.stdout.strip():
+                        auth_status = proc.stdout.strip()
+                        cs_valid = auth_status.lower() == "valid"
+                        cs_detail = f"Authenticode: {auth_status}"
+                except Exception:
+                    cs_detail = "Authenticode: check skipped"
+                spctl_ok = cs_valid
+                spctl_detail = "Windows SmartScreen / Authenticode"
+            else:
+                cs_valid, cs_detail = macos.codesign_verify(dest_bin)
+                spctl_ok, spctl_detail = macos.spctl_assess(dest_bin)
 
             UI.emit_event(
                 "install_security_check",
@@ -940,31 +964,35 @@ class BinaryInstaller:
             print_plain(f"  [dim]•[/dim] Codesign: [{cs_style}]{cs_detail}[/{cs_style}]")
             print_plain(f"  [dim]•[/dim] Gatekeeper (spctl): [{spctl_style}]{spctl_detail}[/{spctl_style}]")
 
-            # Offer ad-hoc signing ("codesign --force --sign -") only with an explicit --sign flag
+            # Offer ad-hoc signing ("codesign --force --sign -") only on macOS with an explicit --sign flag
             if sign:
-                sign_ok, sign_detail = macos.codesign_adhoc_sign(dest_bin)
-                if sign_ok:
-                    print_plain("  [green]✓ Applied ad-hoc code signature ('codesign --force --sign -')[/green]")
+                if pdl_platform.is_windows():
+                    print_plain("  [dim]• Ad-hoc signing is only applicable on macOS.[/dim]")
                 else:
-                    print_plain(f"  [warning]⚠ Ad-hoc signing warning: {sign_detail}[/warning]")
+                    sign_ok, sign_detail = macos.codesign_adhoc_sign(dest_bin)
+                    if sign_ok:
+                        print_plain("  [green]✓ Applied ad-hoc code signature ('codesign --force --sign -')[/green]")
+                    else:
+                        print_plain(f"  [warning]⚠ Ad-hoc signing warning: {sign_detail}[/warning]")
             else:
                 if not cs_valid or not spctl_ok:
-                    print_plain("    [dim]Tip: Pass '--sign' to 'pdl install' to apply an ad-hoc signature.[/dim]")
+                    if pdl_platform.is_macos():
+                        print_plain("    [dim]Tip: Pass '--sign' to 'pdl install' to apply an ad-hoc signature.[/dim]")
 
             # Remove the quarantine attribute ONLY for files pdl itself verified
             if verified_by_pdl:
-                macos.remove_quarantine(dest_bin)
+                pdl_platform.remove_quarantine(dest_bin)
                 print_plain("  [green]✓ Removed quarantine attribute (verified by pdl)[/green]")
             else:
                 print_plain(
                     "  [yellow]⚠ Preserved quarantine attribute (not cryptographically verified by pdl)[/yellow]"
                 )
 
-            # C2: Finder kMDItemWhereFroms extended attribute
+            # C2: Origin tracking (Zone.Identifier on Windows, kMDItemWhereFroms on macOS)
             if write_xattr:
                 dl_url = chosen_asset.get("browser_download_url") if chosen_asset else None
                 if dl_url:
-                    macos.set_where_froms(dest_bin, [dl_url])
+                    pdl_platform.set_where_froms(dest_bin, [dl_url])
 
             # Safe post-verification version check
             ver_text = ""

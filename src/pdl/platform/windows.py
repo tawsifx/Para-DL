@@ -125,10 +125,10 @@ CaffeinateAssertion = WindowsSleepAssertion
 
 class SYSTEM_POWER_STATUS(ctypes.Structure):
     _fields_ = [
-        ("ACLineStatus", ctypes.c_byte),
-        ("BatteryFlag", ctypes.c_byte),
-        ("BatteryLifePercent", ctypes.c_byte),
-        ("SystemStatusFlag", ctypes.c_byte),
+        ("ACLineStatus", ctypes.c_ubyte),
+        ("BatteryFlag", ctypes.c_ubyte),
+        ("BatteryLifePercent", ctypes.c_ubyte),
+        ("SystemStatusFlag", ctypes.c_ubyte),
         ("BatteryLifeTime", ctypes.c_ulong),
         ("BatteryFullLifeTime", ctypes.c_ulong),
     ]
@@ -242,7 +242,7 @@ def get_network_id() -> str:
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                "(Get-NetConnectionProfile | Select-Object -ExpandProperty Name)[0]",
+                "@(Get-NetConnectionProfile | Select-Object -ExpandProperty Name)[0]",
             ],
             capture_output=True,
             text=True,
@@ -267,17 +267,25 @@ class WindowsNetworkWatcher:
 
     def __init__(
         self,
-        on_change: Callable[[str], None],
+        on_change: Callable[[str], None] | None = None,
         poll_interval_sec: float = 3.0,
+        enabled: bool = True,
+        mono_clock: Callable[[], float] | None = None,
     ) -> None:
         self.on_change = on_change
         self.poll_interval_sec = max(1.0, float(poll_interval_sec))
+        self.enabled = bool(enabled)
+        self.backend: str = "windows_netsh" if self.enabled else "noop"
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_net_id: str | None = None
+        self._pending_notifications: list[str] = []
+        self._lock = threading.Lock()
+        if self.enabled:
+            self.start()
 
     def start(self) -> None:
-        if self._thread and self._thread.is_alive():
+        if not self.enabled or (self._thread and self._thread.is_alive()):
             return
         self._stop_event.clear()
         self._last_net_id = get_network_id()
@@ -290,6 +298,23 @@ class WindowsNetworkWatcher:
             self._thread.join(timeout=1.0)
         self._thread = None
 
+    def poll_notifications(self) -> list[str]:
+        """Drain and return queued network change notifications."""
+        with self._lock:
+            items = list(self._pending_notifications)
+            self._pending_notifications.clear()
+            return items
+
+    def inject_notification(self, detail: str) -> None:
+        """Inject a simulated or external network change notification."""
+        with self._lock:
+            self._pending_notifications.append(detail)
+        if self.on_change:
+            try:
+                self.on_change(detail)
+            except Exception as exc:
+                logger.debug("on_change callback error in inject_notification: %s", exc)
+
     def _run(self) -> None:
         while not self._stop_event.wait(self.poll_interval_sec):
             try:
@@ -297,10 +322,13 @@ class WindowsNetworkWatcher:
                 if self._last_net_id is not None and current_id != self._last_net_id:
                     detail = f"Network changed from '{self._last_net_id}' to '{current_id}'"
                     self._last_net_id = current_id
-                    try:
-                        self.on_change(detail)
-                    except Exception as exc:
-                        logger.debug("on_change callback error in WindowsNetworkWatcher: %s", exc)
+                    with self._lock:
+                        self._pending_notifications.append(detail)
+                    if self.on_change:
+                        try:
+                            self.on_change(detail)
+                        except Exception as exc:
+                            logger.debug("on_change callback error in WindowsNetworkWatcher: %s", exc)
                 else:
                     self._last_net_id = current_id
             except Exception as exc:
@@ -359,8 +387,8 @@ def unquarantine_zone_identifier_text(text: str) -> str:
     return "\r\n".join(lines) + "\r\n"
 
 
-def _ads_path(filepath: Path) -> Path:
-    return Path(f"{filepath}:Zone.Identifier")
+def _ads_path(filepath: Path) -> str:
+    return f"{filepath}:Zone.Identifier"
 
 
 def set_where_froms(filepath: Path, urls: list[str]) -> bool:
@@ -368,14 +396,15 @@ def set_where_froms(filepath: Path, urls: list[str]) -> bool:
     if not urls or not filepath.exists():
         return False
     primary_url = urls[0]
-    ads = _ads_path(filepath)
+    ads_file = _ads_path(filepath)
     try:
         existing_text = ""
-        if ads.exists():
-            try:
-                existing_text = ads.read_text(encoding="utf-8", errors="replace")
-            except Exception:
-                pass
+        try:
+            with open(ads_file, "r", encoding="utf-8", errors="replace") as f:
+                existing_text = f.read()
+        except (FileNotFoundError, OSError):
+            pass
+
         parsed = parse_zone_identifier_text(existing_text)
         zone_id = None
         if "zoneid" in parsed:
@@ -384,7 +413,8 @@ def set_where_froms(filepath: Path, urls: list[str]) -> bool:
             except ValueError:
                 pass
         new_text = format_zone_identifier_text(primary_url, zone_id=zone_id)
-        ads.write_text(new_text, encoding="utf-8")
+        with open(ads_file, "w", encoding="utf-8", newline="\r\n") as f:
+            f.write(new_text)
         return True
     except (OSError, PermissionError) as exc:
         logger.debug("Failed to write :Zone.Identifier stream to %s: %s", filepath, exc)
@@ -395,15 +425,15 @@ def get_where_froms(filepath: Path) -> list[str]:
     """Retrieve origin URLs recorded in `<filepath>:Zone.Identifier`."""
     if not filepath.exists():
         return []
-    ads = _ads_path(filepath)
+    ads_file = _ads_path(filepath)
     try:
-        if ads.exists():
-            text = ads.read_text(encoding="utf-8", errors="replace")
-            data = parse_zone_identifier_text(text)
-            url = data.get("hosturl") or data.get("HostUrl")
-            if url:
-                return [url]
-    except (OSError, PermissionError):
+        with open(ads_file, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        data = parse_zone_identifier_text(text)
+        url = data.get("hosturl") or data.get("HostUrl")
+        if url:
+            return [url]
+    except (FileNotFoundError, OSError, PermissionError):
         pass
     return []
 
@@ -412,15 +442,15 @@ def has_quarantine(filepath: Path) -> bool:
     """Return True if the file has an active Mark of the Web (ZoneId >= 3)."""
     if not filepath.exists():
         return False
-    ads = _ads_path(filepath)
+    ads_file = _ads_path(filepath)
     try:
-        if ads.exists():
-            text = ads.read_text(encoding="utf-8", errors="replace")
-            data = parse_zone_identifier_text(text)
-            z_id_str = data.get("zoneid") or data.get("ZoneId")
-            if z_id_str:
-                return int(z_id_str) >= 3
-    except (OSError, PermissionError, ValueError):
+        with open(ads_file, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        data = parse_zone_identifier_text(text)
+        z_id_str = data.get("zoneid") or data.get("ZoneId")
+        if z_id_str:
+            return int(z_id_str) >= 3
+    except (FileNotFoundError, OSError, PermissionError, ValueError):
         pass
     return False
 
@@ -429,20 +459,23 @@ def remove_quarantine(filepath: Path) -> bool:
     """Remove Mark of the Web (ZoneId) from `<filepath>:Zone.Identifier` while preserving HostUrl."""
     if not filepath.exists():
         return False
-    ads = _ads_path(filepath)
+    ads_file = _ads_path(filepath)
     try:
-        if not ads.exists():
+        try:
+            with open(ads_file, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except FileNotFoundError:
             return True
-        text = ads.read_text(encoding="utf-8", errors="replace")
+
         updated = unquarantine_zone_identifier_text(text)
         if updated.strip():
-            ads.write_text(updated, encoding="utf-8")
+            with open(ads_file, "w", encoding="utf-8", newline="\r\n") as f:
+                f.write(updated)
         else:
             # Delete empty stream if only ZoneId was present
             try:
-                os.remove(str(ads))
+                os.remove(ads_file)
             except OSError:
-                # Alternatively PowerShell Unblock-File
                 subprocess.run(
                     ["powershell.exe", "-NoProfile", "-NonInteractive", "Unblock-File", "-LiteralPath", str(filepath)],
                     capture_output=True,
@@ -458,9 +491,104 @@ def remove_quarantine(filepath: Path) -> bool:
 # Windows Credential Manager (WinCred & DPAPI Fallback)
 # ---------------------------------------------------------------------------
 
+CRED_TYPE_GENERIC = 1
+CRED_PERSIST_LOCAL_MACHINE = 2
+
+
+class FILETIME(ctypes.Structure):
+    _fields_ = [("dwLowDateTime", ctypes.c_ulong), ("dwHighDateTime", ctypes.c_ulong)]
+
+
+class CREDENTIAL_ATTRIBUTEW(ctypes.Structure):
+    _fields_ = [
+        ("Keyword", ctypes.c_wchar_p),
+        ("Flags", ctypes.c_ulong),
+        ("ValueSize", ctypes.c_ulong),
+        ("Value", ctypes.c_void_p),
+    ]
+
+
+class CREDENTIALW(ctypes.Structure):
+    _fields_ = [
+        ("Flags", ctypes.c_ulong),
+        ("Type", ctypes.c_ulong),
+        ("TargetName", ctypes.c_wchar_p),
+        ("Comment", ctypes.c_wchar_p),
+        ("LastWritten", FILETIME),
+        ("CredentialBlobSize", ctypes.c_ulong),
+        ("CredentialBlob", ctypes.c_void_p),
+        ("Persist", ctypes.c_ulong),
+        ("AttributeCount", ctypes.c_ulong),
+        ("Attributes", ctypes.POINTER(CREDENTIAL_ATTRIBUTEW)),
+        ("TargetAlias", ctypes.c_wchar_p),
+        ("UserName", ctypes.c_wchar_p),
+    ]
+
+
+PCREDENTIALW = ctypes.POINTER(CREDENTIALW)
+
 
 def _cred_target(service: str, account: str) -> str:
     return f"{service}/{account}"
+
+
+def _advapi32_write_token(target: str, username: str, secret: str) -> bool:
+    adv = get_advapi32()
+    if not adv:
+        return False
+    try:
+        cred = CREDENTIALW()
+        cred.Flags = 0
+        cred.Type = CRED_TYPE_GENERIC
+        cred.TargetName = target
+        cred.Comment = "parallel-dl authentication token"
+        cred.Persist = CRED_PERSIST_LOCAL_MACHINE
+        cred.UserName = username
+        blob_bytes = secret.encode("utf-16le")
+        cred.CredentialBlobSize = len(blob_bytes)
+        cred.CredentialBlob = ctypes.cast(ctypes.c_char_p(blob_bytes), ctypes.c_void_p)
+        adv.CredWriteW.argtypes = [ctypes.POINTER(CREDENTIALW), ctypes.c_ulong]
+        adv.CredWriteW.restype = ctypes.c_bool
+        return bool(adv.CredWriteW(ctypes.byref(cred), 0))
+    except Exception as exc:
+        logger.debug("CredWriteW error: %s", exc)
+        return False
+
+
+def _advapi32_read_token(target: str) -> str | None:
+    adv = get_advapi32()
+    if not adv:
+        return None
+    try:
+        pcred = PCREDENTIALW()
+        adv.CredReadW.argtypes = [ctypes.c_wchar_p, ctypes.c_ulong, ctypes.c_ulong, ctypes.POINTER(PCREDENTIALW)]
+        adv.CredReadW.restype = ctypes.c_bool
+        adv.CredFree.argtypes = [ctypes.c_void_p]
+        adv.CredFree.restype = None
+        if adv.CredReadW(target, CRED_TYPE_GENERIC, 0, ctypes.byref(pcred)):
+            try:
+                cred = pcred.contents
+                if cred.CredentialBlob and cred.CredentialBlobSize > 0:
+                    raw_bytes = ctypes.string_at(cred.CredentialBlob, cred.CredentialBlobSize)
+                    return raw_bytes.decode("utf-16le")
+            finally:
+                adv.CredFree(pcred)
+    except Exception as exc:
+        logger.debug("CredReadW error: %s", exc)
+    return None
+
+
+def _advapi32_delete_token(target: str) -> bool:
+    adv = get_advapi32()
+    if not adv:
+        return False
+    try:
+        adv.CredDeleteW.argtypes = [ctypes.c_wchar_p, ctypes.c_ulong, ctypes.c_ulong]
+        adv.CredDeleteW.restype = ctypes.c_bool
+        return bool(adv.CredDeleteW(target, CRED_TYPE_GENERIC, 0))
+    except Exception as exc:
+        logger.debug("CredDeleteW error: %s", exc)
+    return False
 
 
 def _get_dpapi_store_path() -> Path:
@@ -478,20 +606,11 @@ def set_keychain_token(account: str, token: str, service: str = "pdl") -> bool:
     if not account or not token:
         return False
 
-    # 1. Try Windows Credential Manager CLI cmdkey
     target = _cred_target(service, account)
-    try:
-        proc = subprocess.run(
-            ["cmdkey.exe", f"/generic:{target}", f"/user:{account}", f"/pass:{token}"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=3.0,
-        )
-        if proc.returncode == 0:
-            return True
-    except (OSError, subprocess.SubprocessError):
-        pass
+
+    # 1. Native Windows Credential Manager via advapi32.dll
+    if _advapi32_write_token(target, account, token):
+        return True
 
     # 2. User-scoped credential store fallback with restrictive permissions
     try:
@@ -517,9 +636,15 @@ def set_keychain_token(account: str, token: str, service: str = "pdl") -> bool:
 
 
 def get_keychain_token(account: str, service: str = "pdl") -> str | None:
-    """Retrieve token from secure user store."""
-    # Note: cmdkey.exe does not allow reading passwords for security reasons.
-    # Therefore, tokens stored via set_keychain_token are retrieved from the user-scoped store.
+    """Retrieve token from Windows Credential Manager or secure user store."""
+    target = _cred_target(service, account)
+
+    # 1. Try native advapi32 CredReadW
+    tok = _advapi32_read_token(target)
+    if tok:
+        return tok
+
+    # 2. Fallback to user-scoped credential store
     try:
         p = _get_dpapi_store_path()
         if p.exists():
@@ -535,19 +660,7 @@ def get_keychain_token(account: str, service: str = "pdl") -> str | None:
 def delete_keychain_token(account: str, service: str = "pdl") -> bool:
     """Delete credential from Windows Credential Manager and secure user store."""
     target = _cred_target(service, account)
-    deleted = False
-
-    try:
-        proc = subprocess.run(
-            ["cmdkey.exe", f"/delete:{target}"],
-            capture_output=True,
-            check=False,
-            timeout=3.0,
-        )
-        if proc.returncode == 0:
-            deleted = True
-    except (OSError, subprocess.SubprocessError):
-        pass
+    deleted = _advapi32_delete_token(target)
 
     try:
         p = _get_dpapi_store_path()

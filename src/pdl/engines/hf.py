@@ -22,7 +22,7 @@ from pdl.models import (
     WatchdogMode,
 )
 from pdl.net import fetch_json_with_etag, probe_http_url
-from pdl.platform import macos
+from pdl import platform
 from pdl.postproc.checksum import ChecksumEngine
 from pdl.ui import UI, print_plain
 
@@ -54,7 +54,7 @@ class HuggingFaceEngine:
     def get_token() -> str | None:
         token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
         if not token:
-            token = macos.get_keychain_token("hf")
+            token = platform.get_keychain_token("hf")
         if not token:
             token_file = Path.home() / ".cache" / "huggingface" / "token"
             if token_file.exists():

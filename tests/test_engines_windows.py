@@ -28,6 +28,14 @@ class TestEnginesWindows(unittest.TestCase):
         self.assertLessEqual(score_mac, 0, "macosx wheel should have score <= 0 on win32 target_plat")
         self.assertGreater(score_any, 0, "pure-python any wheel should be compatible")
 
+    def test_pypi_wheel_scoring_64bit_beats_32bit(self) -> None:
+        """Verify win_amd64 scores strictly higher than win32 on 64-bit Windows."""
+        win64_wheel = "numpy-2.1.0-cp312-cp312-win_amd64.whl"
+        win32_wheel = "numpy-2.1.0-cp312-cp312-win32.whl"
+        score64 = PyPIEngine.score_wheel_filename(win64_wheel, target_py="312", target_plat="win32", is_arm=False)
+        score32 = PyPIEngine.score_wheel_filename(win32_wheel, target_py="312", target_plat="win32", is_arm=False)
+        self.assertGreater(score64, score32, "win_amd64 must score strictly higher than win32 on 64-bit OS")
+
     def test_github_asset_scoring_windows(self) -> None:
         """Verify GitHub release asset scoring on Windows."""
         win_zip = "ripgrep-14.1.1-x86_64-pc-windows-msvc.zip"
