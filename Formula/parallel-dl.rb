@@ -3,7 +3,7 @@ class ParallelDl < Formula
 
   desc "High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog"
   homepage "https://github.com/tawsifx/pdl"
-  url "https://github.com/tawsifx/pdl/archive/refs/tags/v4.0.0.tar.gz"
+  url "https://github.com/tawsifx/pdl/archive/refs/tags/v1.0.0.tar.gz"
   license "MIT"
   head "https://github.com/tawsifx/pdl.git", branch: "main"
 

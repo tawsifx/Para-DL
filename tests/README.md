@@ -1,6 +1,6 @@
 # `pdl` Test Suite Guide & Conventions
 
-This directory contains the automated test suite for `parallel-dl` (`pdl` v4.0.0), a resilient parallel download manager on Apple Silicon macOS.
+This directory contains the automated test suite for `parallel-dl` (`paradl` v1.0.0), a resilient parallel download manager on Apple Silicon macOS.
 
 ---
 
