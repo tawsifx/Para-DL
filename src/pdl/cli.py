@@ -63,24 +63,26 @@ def build_parser(config: PDLConfig) -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="parallel-dl",
-        description="High-Performance Parallel Multichannel Downloader Suite [pdl].",
+        description="High-Performance Parallel Multichannel Downloader Suite [paradl / parallel-dl].",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Recipes:
-  pdl "Song Title Artist Name" -o ~/Music
-  pdl --mp3 "Artist Name Track" -o ~/Music
-  pdl --audio-codec native "Artist Name Track" -o ~/Music
-  pdl --quality 4k "https://www.youtube.com/watch?v=..."
-  pdl gh:BurntSushi/ripgrep
-  pdl install astral-sh/uv
-  pdl hf:TheBloke/Llama-2-7B-GGUF --asset "*Q4_K_M.gguf"
-  pdl ipsw:iPhone14,5 -c 16 -o ~/Downloads
-  pdl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -c 16
-  pdl netprobe "https://example.com/huge-file.iso"
-  pdl bench "https://example.com/huge-file.iso" --watchdog v1,v2,off --duration 60
-  pdl info "https://example.com/huge-file.iso"
-  pdl hash ./downloaded.tar.gz
-  pdl history
+  paradl "Song Title Artist Name" -o ~/Music
+  paradl --mp3 "Artist Name Track" -o ~/Music
+  paradl --audio-codec native "Artist Name Track" -o ~/Music
+  paradl --quality 4k "https://www.youtube.com/watch?v=..."
+  paradl gh:BurntSushi/ripgrep
+  paradl install astral-sh/uv
+  paradl pip install requests
+  paradl brew install wget
+  paradl hf:TheBloke/Llama-2-7B-GGUF --asset "*Q4_K_M.gguf"
+  paradl ipsw:iPhone14,5 -c 16 -o ~/Downloads
+  paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -c 16
+  paradl netprobe "https://example.com/huge-file.iso"
+  paradl bench "https://example.com/huge-file.iso" --watchdog v1,v2,off --duration 60
+  paradl info "https://example.com/huge-file.iso"
+  paradl hash ./downloaded.tar.gz
+  paradl history
         """,
     )
 
@@ -465,7 +467,7 @@ Recipes:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"parallel-dl (pdl) v{VERSION}",
+        version=f"parallel-dl (paradl) v{VERSION}",
     )
 
     return parser
@@ -497,7 +499,7 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
 
     # Fast path for --version
     if raw_args == ["--version"]:
-        sys.stdout.write(f"parallel-dl (pdl) v{VERSION}\n")
+        sys.stdout.write(f"parallel-dl (paradl) v{VERSION}\n")
         sys.stdout.flush()
         return int(ExitCode.OK)
 

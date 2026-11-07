@@ -60,8 +60,9 @@ dev = [
 ]
 
 [project.scripts]
-pdl = "pdl.cli:main"
+paradl = "pdl.cli:main"
 parallel-dl = "pdl.cli:main"
+pdl = "pdl.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdl"]

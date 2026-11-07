@@ -16,13 +16,13 @@ class ParallelDl < Formula
 
   def install
     virtualenv_install_with_resources
-    # Provide 'pdl' symlink alongside 'parallel-dl'
-    bin.install_symlink bin/"parallel-dl" => "pdl" unless (bin/"pdl").exist?
+    # Provide 'paradl' symlink alongside 'parallel-dl'
+    bin.install_symlink bin/"parallel-dl" => "paradl" unless (bin/"paradl").exist?
   end
 
   test do
     assert_match "parallel-dl", shell_output("#{bin}/parallel-dl --version")
-    assert_match "parallel-dl", shell_output("#{bin}/pdl --version")
-    assert_match "ready", shell_output("#{bin}/pdl doctor")
+    assert_match "parallel-dl", shell_output("#{bin}/paradl --version")
+    assert_match "ready", shell_output("#{bin}/paradl doctor")
   end
 end
