@@ -247,9 +247,9 @@ class GitHubEngine:
 
         return {"type": "generic", "url": t}
 
-    @staticmethod
-    def score_asset_for_host(filename: str) -> int:
-        """Score release asset filename for macOS host (ARM64 priority)."""
+    @classmethod
+    def score_asset_for_host(cls, filename: str, *, install_mode: bool = False) -> int:
+        """Score release asset filename for current host OS (macOS or Windows, ARM64 or x86_64 priority)."""
         fn = filename.lower()
         if any(
             fn.endswith(ext) for ext in (".sha256", ".sha256sum", ".sha512", ".md5", ".sig", ".asc", ".sbom", ".txt")
@@ -257,8 +257,39 @@ class GitHubEngine:
             return 0
 
         score = 0
+        sys_plat = platform.system().lower()
         machine = platform.machine().lower()
         is_arm = machine in ("arm64", "aarch64")
+
+        if sys_plat == "windows":
+            is_win = any(x in fn for x in ("windows", "win64", "win32", "pc-windows", "msvc", ".exe", ".msi"))
+            if is_win:
+                score += 40
+                if fn.endswith(".zip"):
+                    score += 25
+                elif fn.endswith(".exe"):
+                    score += 20 if not install_mode else 15
+                elif fn.endswith(".msi"):
+                    score += 15 if not install_mode else 0
+                elif fn.endswith((".tar.gz", ".tgz")):
+                    score += 10
+
+                if is_arm:
+                    if any(x in fn for x in ("arm64", "aarch64")):
+                        score += 35
+                    elif any(x in fn for x in ("x86_64", "x64", "amd64", "win64")):
+                        score += 5
+                else:
+                    if any(x in fn for x in ("x86_64", "x64", "amd64", "win64", "msvc")):
+                        score += 35
+                    elif any(x in fn for x in ("i686", "x86", "win32")):
+                        score += 15
+            else:
+                if any(x in fn for x in ("darwin", "macos", "apple", "linux", ".deb", ".rpm", ".dmg", ".pkg")):
+                    score = 0
+                elif fn.endswith(".zip"):
+                    score += 10
+            return score
 
         is_mac = any(x in fn for x in ("darwin", "macos", "apple", "osx", ".dmg", ".pkg"))
         if is_mac:
@@ -291,6 +322,8 @@ class GitHubEngine:
                 score += 5
 
         return score
+
+    score_release_asset = score_asset_for_host
 
     @classmethod
     def fetch_release_info(cls, owner: str, repo: str, tag: str = "latest") -> dict[str, Any] | None:

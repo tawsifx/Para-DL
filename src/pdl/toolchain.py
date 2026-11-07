@@ -50,14 +50,28 @@ class Toolchain:
         if not self._check_fallbacks:
             return None
 
-        # Also check current Python interpreter's bin directory
-        venv_cand = Path(sys.executable).resolve().parent / name
-        if venv_cand.exists() and os.access(venv_cand, os.X_OK):
-            return str(venv_cand)
+        is_win = sys.platform == "win32"
+
+        # Also check current Python interpreter's bin/Scripts directory
+        parent = Path(sys.executable).resolve().parent
+        for cand_dir in [parent, parent / "Scripts"]:
+            venv_cand = cand_dir / name
+            if is_win and not name.lower().endswith(".exe"):
+                venv_cand_exe = cand_dir / f"{name}.exe"
+                if venv_cand_exe.exists() and os.access(venv_cand_exe, os.X_OK):
+                    return str(venv_cand_exe)
+            if venv_cand.exists() and os.access(venv_cand, os.X_OK):
+                return str(venv_cand)
 
         for p in fallback_paths or []:
-            if p and os.path.exists(p) and os.access(p, os.X_OK):
-                return p
+            if not p:
+                continue
+            candidates = [p]
+            if is_win and not p.lower().endswith(".exe"):
+                candidates.append(f"{p}.exe")
+            for c in candidates:
+                if os.path.exists(c) and os.access(c, os.X_OK):
+                    return c
         return None
 
     @property
@@ -65,7 +79,15 @@ class Toolchain:
         if "aria2c" not in self._cache:
             self._cache["aria2c"] = self._find_bin(
                 "aria2c",
-                ["/opt/homebrew/bin/aria2c", "/usr/local/bin/aria2c", "/usr/bin/aria2c"],
+                [
+                    "/opt/homebrew/bin/aria2c",
+                    "/usr/local/bin/aria2c",
+                    "/usr/bin/aria2c",
+                    str(Path.home() / "scoop/shims/aria2c.exe"),
+                    "C:/ProgramData/chocolatey/bin/aria2c.exe",
+                    "C:/Program Files/aria2/aria2c.exe",
+                    str(Path.home() / "AppData/Local/Microsoft/WinGet/Links/aria2c.exe"),
+                ],
             )
         return self._cache["aria2c"]
 
@@ -78,6 +100,9 @@ class Toolchain:
                     str(Path.home() / ".local/bin/yt-dlp"),
                     "/opt/homebrew/bin/yt-dlp",
                     "/usr/local/bin/yt-dlp",
+                    str(Path.home() / "scoop/shims/yt-dlp.exe"),
+                    "C:/ProgramData/chocolatey/bin/yt-dlp.exe",
+                    str(Path.home() / "AppData/Local/Programs/yt-dlp/yt-dlp.exe"),
                 ],
             )
         return self._cache["ytdlp"]
@@ -105,7 +130,15 @@ class Toolchain:
         if "ffmpeg" not in self._cache:
             self._cache["ffmpeg"] = self._find_bin(
                 "ffmpeg",
-                ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"],
+                [
+                    "/opt/homebrew/bin/ffmpeg",
+                    "/usr/local/bin/ffmpeg",
+                    "/usr/bin/ffmpeg",
+                    str(Path.home() / "scoop/shims/ffmpeg.exe"),
+                    "C:/ProgramData/chocolatey/bin/ffmpeg.exe",
+                    "C:/Program Files/ffmpeg/bin/ffmpeg.exe",
+                    str(Path.home() / "AppData/Local/Microsoft/WinGet/Links/ffmpeg.exe"),
+                ],
             )
         return self._cache["ffmpeg"]
 
@@ -118,6 +151,7 @@ class Toolchain:
                     "/opt/homebrew/bin/adb",
                     "/usr/local/bin/adb",
                     str(Path.home() / "Library/Android/sdk/platform-tools/adb"),
+                    str(Path.home() / "AppData/Local/Android/Sdk/platform-tools/adb.exe"),
                 ],
             )
         return self._cache["adb"]
@@ -125,9 +159,19 @@ class Toolchain:
     @property
     def p7zip(self) -> str | None:
         if "p7zip" not in self._cache:
-            self._cache["p7zip"] = self._find_bin(
-                "7z", ["/opt/homebrew/bin/7z", "/usr/local/bin/7z"]
-            ) or self._find_bin("7za", ["/opt/homebrew/bin/7za", "/usr/local/bin/7za"])
+            self._cache["p7zip"] = (
+                self._find_bin(
+                    "7z",
+                    [
+                        "/opt/homebrew/bin/7z",
+                        "/usr/local/bin/7z",
+                        "C:/Program Files/7-Zip/7z.exe",
+                        str(Path.home() / "scoop/shims/7z.exe"),
+                        "C:/ProgramData/chocolatey/bin/7z.exe",
+                    ],
+                )
+                or self._find_bin("7za", ["/opt/homebrew/bin/7za", "/usr/local/bin/7za"])
+            )
         return self._cache["p7zip"]
 
     @property

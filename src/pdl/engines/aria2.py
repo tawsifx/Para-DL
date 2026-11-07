@@ -41,7 +41,7 @@ from pdl.models import (
     parse_rate,
 )
 from pdl.net import probe_range_support, re_resolve_dns
-from pdl.platform import macos
+from pdl import platform
 from pdl.postproc.checksum import ChecksumEngine
 from pdl.queue import check_when_fast_gate
 from pdl.toolchain import TOOLCHAIN
@@ -588,7 +588,7 @@ class Aria2Engine:
         )
 
         with (
-            macos.CaffeinateAssertion(enabled=caffeinate),
+            platform.get_sleep_assertion(enabled=caffeinate),
             ev_src,
             LiveTransferDisplay(title=title_label, total_bytes=total_expected) as live,
         ):
@@ -761,7 +761,7 @@ class Aria2Engine:
 
                         # Mid-transfer power policy check (--pause-on-low-power / --require-ac)
                         if require_ac or pause_on_low_power:
-                            pwr_state = macos.get_power_status()
+                            pwr_state = platform.get_power_status()
                             if require_ac and not pwr_state.on_ac_power:
                                 err_msg = (
                                     f"Power policy guard aborted transfer (--require-ac): "
@@ -781,7 +781,7 @@ class Aria2Engine:
                                 UI.emit_event(
                                     "watchdog_action",
                                     action="paused_low_power",
-                                    reason="Paused download due to macOS Low Power Mode (--pause-on-low-power)",
+                                    reason="Paused download due to Low Power / Battery Saver mode (--pause-on-low-power)",
                                 )
                                 for active_gid in list(gid_to_idx.keys()):
                                     try:
@@ -789,7 +789,7 @@ class Aria2Engine:
                                     except Exception:
                                         pass
                                 get_clock().sleep(min(poll_interval, 0.1))
-                                pwr_state_after = macos.get_power_status()
+                                pwr_state_after = platform.get_power_status()
                                 if not pwr_state_after.low_power_mode:
                                     for active_gid in list(gid_to_idx.keys()):
                                         try:
@@ -1018,7 +1018,7 @@ class Aria2Engine:
             for idx_f, f_p in enumerate(final_files):
                 src_url = items[idx_f].url if idx_f < len(items) else (items[0].url if items else "")
                 if src_url and f_p.is_file():
-                    macos.set_where_froms(f_p, [src_url])
+                    platform.set_where_froms(f_p, [src_url])
 
         return TransferResult(
             success=True,

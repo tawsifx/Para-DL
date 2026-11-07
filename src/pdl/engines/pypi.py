@@ -63,6 +63,35 @@ class PyPIEngine:
         return t, None
 
     @classmethod
+    def score_wheel_filename(
+        cls,
+        filename: str,
+        packagetype: str = "bdist_wheel",
+        *,
+        py_version: tuple[int, int] | None = None,
+        target_platform: str | None = None,
+        target_machine: str | None = None,
+        target_py: str | None = None,
+        target_plat: str | None = None,
+        is_arm: bool | None = None,
+    ) -> int:
+        """Alias helper for score_wheel with flexible parameter names."""
+        py_ver = py_version
+        if target_py and not py_ver:
+            if len(target_py) >= 2 and target_py.isdigit():
+                py_ver = (int(target_py[0]), int(target_py[1:]))
+        mach = target_machine
+        if is_arm is not None and not mach:
+            mach = "arm64" if is_arm else "amd64"
+        return cls.score_wheel(
+            filename,
+            packagetype,
+            py_version=py_ver,
+            target_platform=target_plat or target_platform,
+            target_machine=mach,
+        )
+
+    @classmethod
     def score_wheel(
         cls,
         filename: str,
@@ -91,9 +120,9 @@ class PyPIEngine:
         plat = (target_platform or sys.platform).lower()
         mach = (target_machine or platform.machine()).lower()
         if mach in ("arm64", "aarch64"):
-            arch_tags = ["arm64", "aarch64", "universal2"]
+            arch_tags = ["arm64", "aarch64", "universal2", "win_arm64"]
         else:
-            arch_tags = ["x86_64", "amd64", "universal2", "x86"]
+            arch_tags = ["x86_64", "amd64", "universal2", "x86", "win_amd64", "win32"]
 
         is_plat_compat = False
         if "any" in fn:
@@ -104,7 +133,7 @@ class PyPIEngine:
         elif plat.startswith("linux") and any(tag in fn for tag in ("manylinux", "musllinux", "linux")):
             if any(a in fn for a in arch_tags):
                 is_plat_compat = True
-        elif plat == "win32" and "win" in fn:
+        elif plat == "win32" and any(w in fn for w in ("win_amd64", "win_arm64", "win32", "win")):
             if any(a in fn for a in arch_tags):
                 is_plat_compat = True
 

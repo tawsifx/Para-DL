@@ -807,7 +807,7 @@ class PDLApp:
         from pdl.events import check_free_disk_space, check_power_policy
         from pdl.models import TransferResult
         from pdl.net import probe_targets_parallel
-        from pdl.platform import macos
+        from pdl import platform
         from pdl.postproc.adb import ADBDeviceSync
         from pdl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
         from pdl.postproc.checksum import ChecksumEngine
@@ -828,7 +828,7 @@ class PDLApp:
         total_items = len(probed_targets)
         overall_exit_code = int(ExitCode.OK)
 
-        with macos.CaffeinateAssertion(enabled=caffeinate):
+        with platform.get_sleep_assertion(enabled=caffeinate):
             for idx, (target, t_info) in enumerate(zip(targets, probed_targets, strict=True), 1):
                 if total_items > 1:
                     print_plain(f"\n  [accent]── [{idx}/{total_items}][/accent] [bold white]{target}[/bold white]")
@@ -989,7 +989,7 @@ class PDLApp:
                 if tx_res.success and out_file and out_file.exists() and not getattr(args, "no_xattr", False):
                     source_url = t_info.clean_url or t_info.raw
                     if source_url:
-                        macos.set_where_froms(out_file, [source_url])
+                        platform.set_where_froms(out_file, [source_url])
 
                 elapsed = time.time() - t0
                 file_sz = out_file.stat().st_size if (out_file and out_file.is_file()) else tx_res.bytes_downloaded
