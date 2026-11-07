@@ -580,7 +580,7 @@ def display_notification(
     title: str,
     message: str,
     subtitle: str | None = None,
-    sound: bool = True,
+    timeout: float = 3.0,
 ) -> bool:
     """Display a Windows 10/11 desktop toast notification via PowerShell."""
     if not is_effective_windows():

@@ -16,11 +16,14 @@ keywords = [
     "aria2",
     "anti-throttle",
     "multichannel",
+    "windows",
+    "windows-10",
+    "windows-11",
+    "macos",
+    "apple-silicon",
     "homebrew",
     "pypi",
-    "media-downloader",
-    "macos",
-    "apple-silicon"
+    "media-downloader"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -28,7 +31,11 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
     "Operating System :: MacOS",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

@@ -74,11 +74,11 @@ def display_notification(
     title: str,
     message: str,
     subtitle: str | None = None,
-    sound: bool = True,
+    timeout: float = 3.0,
 ) -> bool:
     """Display platform desktop notification."""
     return get_current_platform_module().display_notification(
-        title=title, message=message, subtitle=subtitle, sound=sound
+        title=title, message=message, subtitle=subtitle, timeout=timeout
     )
 
 
