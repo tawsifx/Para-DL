@@ -1,11 +1,37 @@
+# Python environment & caches
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+*.whl
+*.tar.gz
+
+# macOS OS files & artifacts
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Runtime temp files
 *.cookies
 *.aria2
+*.part
+
+# Internal context, notes & reports
+*CONTEXT*.md
+*REPORT*.md
+_original/
+sample_report/
+.agents/
+com.pdl.throttle.sample.plist

@@ -6,7 +6,35 @@ build-backend = "hatchling.build"
 name = "parallel-dl"
 version = "4.0.0"
 description = "High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog"
-readme = "PARALLEL_DL_DEV_CONTEXT.md"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Tawsif Rahman" }
+]
+keywords = [
+    "download-accelerator",
+    "aria2",
+    "anti-throttle",
+    "multichannel",
+    "homebrew",
+    "pypi",
+    "media-downloader",
+    "macos",
+    "apple-silicon"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet",
+    "Topic :: Utilities",
+]
 requires-python = ">=3.11"
 dependencies = [
     "rich>=13.0.0",
@@ -14,6 +42,12 @@ dependencies = [
     "mutagen>=1.47.0",
     "yt-dlp[default]>=2026.6.9",
 ]
+
+[project.urls]
+Homepage = "https://github.com/tawsifx/pdl"
+Documentation = "https://github.com/tawsifx/pdl#readme"
+Repository = "https://github.com/tawsifx/pdl.git"
+Issues = "https://github.com/tawsifx/pdl/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -48,7 +82,7 @@ markers = [
 target-version = "py312"
 line-length = 120
 src = ["src", "tests"]
-exclude = ["_original", ".venv"]
+exclude = [".venv", "dist", "build"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "UP"]

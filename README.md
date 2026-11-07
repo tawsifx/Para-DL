@@ -1,5 +1,9 @@
 # `parallel-dl` (`pdl`) v4.0.0
 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS%20ARM64-lightgrey.svg)](https://apple.com)
+
 > **High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog for macOS (Apple Silicon ARM64).**
 
 `parallel-dl` (invoked as `pdl` or `parallel-dl`) bypasses single-stream ISP bandwidth throttling by orchestrating **16 parallel range channels** via an in-process Aria2 JSON-RPC daemon, backed by an adaptive rolling-p90 watchdog and verified cryptographic checksums.
@@ -39,14 +43,26 @@
 
 ## Installation & Setup
 
-`parallel-dl` is managed via `uv tool` and symlinked into your PATH:
+### Option 1: Via Homebrew (Recommended for macOS)
 
 ```bash
-# Clone repository
+brew tap tawsifx/tap
+brew install parallel-dl
+```
+
+### Option 2: Via `uv tool` or `pipx`
+
+```bash
+uv tool install git+https://github.com/tawsifx/pdl.git
+# or with pipx:
+pipx install git+https://github.com/tawsifx/pdl.git
+```
+
+### Option 3: Local Development Setup
+
+```bash
 git clone https://github.com/tawsifx/pdl.git ~/pdl
 cd ~/pdl
-
-# Install globally via uv tool (editable development mode)
 uv tool install --editable .
 ```
 
@@ -140,8 +156,15 @@ pdl bench "https://example.com/large-file.bin" --duration 60
 
 ---
 
-## Developer Documentation
+## Architecture & Design
 
-For full architectural specifications, Watchdog v2 state machine diagrams, SQLite schema details, and engine protocol implementations, see:
-* [PARALLEL_DL_DEV_CONTEXT.md](file:///Users/tawsifx/pdl/PARALLEL_DL_DEV_CONTEXT.md)
-* [ISP_THROTTLING_CONTEXT_AND_REPORT.md](file:///Users/tawsifx/pdl/ISP_THROTTLING_CONTEXT_AND_REPORT.md)
+`parallel-dl` is structured into decoupled modules inside `src/pdl`:
+* `pdl.engines`: Specialized protocol accelerators (`Aria2Engine`, `MediaEngine`, `BrewEngine`, `PyPIEngine`, `GitHubEngine`, `HFEngine`, `IPSWEngine`, `CloudEngine`).
+* `pdl.throttle`: Network probes, throughput sampling, burst-series analysis, and adaptive socket recycle watchdog state machine.
+* `pdl.doctor`: Environment diagnostic, security posture, and toolchain validator.
+* `pdl.auth`: Secure token management backed by the macOS Keychain Services API.
+* `pdl.ui`: Rich live multi-progress rendering, diagnostic tables, and ANSI spinners.
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
