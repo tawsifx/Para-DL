@@ -1,2 +1,0 @@
-Now drawing from 'AC Power'
- -InternalBattery-0 (id=1234567)	98%; AC attached; not charging present: true

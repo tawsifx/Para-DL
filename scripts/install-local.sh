@@ -25,24 +25,25 @@ else
 fi
 
 UV_BIN_DIR="${HOME}/.local/bin"
-INSTALLED_PDL="${UV_BIN_DIR}/pdl"
+INSTALLED_PARADL="${UV_BIN_DIR}/paradl"
 INSTALLED_PARALLEL_DL="${UV_BIN_DIR}/parallel-dl"
-
-if [[ -x "${INSTALLED_PARALLEL_DL}" && ! -e "${INSTALLED_PDL}" ]]; then
-    ln -sf "${INSTALLED_PARALLEL_DL}" "${INSTALLED_PDL}"
-fi
+INSTALLED_PDL="${UV_BIN_DIR}/pdl"
 
 # Re-point /opt/homebrew/bin symlinks if present or writable
 if [[ -d "/opt/homebrew/bin" && -w "/opt/homebrew/bin" ]]; then
-    if [[ -x "${INSTALLED_PDL}" ]]; then
-        ln -sf "${INSTALLED_PDL}" "/opt/homebrew/bin/pdl"
-        echo "==> Updated symlink: /opt/homebrew/bin/pdl -> ${INSTALLED_PDL}"
+    if [[ -x "${INSTALLED_PARADL}" ]]; then
+        ln -sf "${INSTALLED_PARADL}" "/opt/homebrew/bin/paradl"
+        echo "==> Updated symlink: /opt/homebrew/bin/paradl -> ${INSTALLED_PARADL}"
     fi
     if [[ -x "${INSTALLED_PARALLEL_DL}" ]]; then
         ln -sf "${INSTALLED_PARALLEL_DL}" "/opt/homebrew/bin/parallel-dl"
         echo "==> Updated symlink: /opt/homebrew/bin/parallel-dl -> ${INSTALLED_PARALLEL_DL}"
     fi
+    if [[ -x "${INSTALLED_PDL}" ]]; then
+        ln -sf "${INSTALLED_PDL}" "/opt/homebrew/bin/pdl"
+        echo "==> Updated symlink: /opt/homebrew/bin/pdl -> ${INSTALLED_PDL}"
+    fi
 fi
 
 echo "==> Installation complete!"
-"${INSTALLED_PDL}" --version
+"${INSTALLED_PARADL}" --version

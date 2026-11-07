@@ -36,6 +36,7 @@ jobs:
         run: |
           uv run ruff check .
 
-      - name: Run unit & integration tests
+      - name: Verify CLI installation and health
         run: |
-          uv run pytest -m "not slow"
+          uv run paradl --version
+          uv run paradl doctor

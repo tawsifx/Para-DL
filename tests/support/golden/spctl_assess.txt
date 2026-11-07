@@ -1,2 +1,0 @@
-target_binary: accepted
-source=Notarized Developer ID

@@ -1,3 +1,0 @@
-PID	Status	Label
--	0	com.apple.metadata.mds
--	0	com.pdl.queue.scheduler

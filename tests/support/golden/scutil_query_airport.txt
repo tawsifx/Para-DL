@@ -1,7 +1,0 @@
-<dictionary> {
-  PrimaryInterface : en0
-  Router : 192.168.1.1
-}
-<dictionary> {
-  SSID_STR : StudioWiFi_5G
-}

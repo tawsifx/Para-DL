@@ -1,2 +1,0 @@
-                  interface  state        bytes_in     bytes_out
-aria2c.12345        en0      Established      1048576        32768
