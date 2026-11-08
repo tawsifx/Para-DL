@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
+from pdl.models import sanitize_filename
 from pdl.net import HttpProbeResult, probe_http_url, request_with_retry
 from pdl.paths import get_mirrors_file
 from pdl.ui import UI, print_plain
@@ -474,14 +475,15 @@ def find_or_fetch_metalink(
             base_names.append(url_base)
 
         for bname in base_names:
+            safe_bname = sanitize_filename(bname)[:180]
             for ext in (".meta4", ".metalink"):
-                cand = out_dir / f"{bname}{ext}"
-                if cand.is_file():
-                    try:
+                try:
+                    cand = out_dir / f"{safe_bname}{ext}"
+                    if cand.is_file():
                         parsed = parse_metalink_bytes(cand.read_bytes(), source=str(cand))
                         if parsed is not None:
                             return parsed
-                    except OSError:
-                        pass
+                except OSError:
+                    pass
 
     return None

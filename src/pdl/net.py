@@ -20,6 +20,7 @@ from pdl.models import (
     DIRECT_EXTENSIONS,
     TargetInfo,
     TargetType,
+    is_image_domain,
     is_media_domain,
     sanitize_filename,
 )
@@ -501,7 +502,61 @@ def probe_target(target: str, *, allow_network_probe: bool = True) -> TargetInfo
                 filename_hint=filename,
             )
 
-        # 6c. HTTP HEAD / Range Probe for unknown generic URLs
+        # 6c. Dedicated Image Generation / Image CDN services (e.g. image.pollinations.ai)
+        if is_image_domain(target):
+            raw_name = os.path.basename(url_without_params)
+            fname = sanitize_filename(raw_name)[:160]
+            if not any(fname.lower().endswith(im_ext) for im_ext in (".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                fname = f"{fname or 'image'}.jpg"
+
+            if allow_network_probe:
+                p_res = probe_http_url(target)
+                if p_res.ok:
+                    final_fname = p_res.filename or fname
+                    final_fname = sanitize_filename(final_fname)[:180]
+                    return TargetInfo(
+                        raw=target,
+                        target_type=TargetType.DIRECT,
+                        clean_url=p_res.final_url,
+                        filename_hint=final_fname,
+                        content_length=p_res.content_length,
+                        mime_type=p_res.content_type or "image/jpeg",
+                        accept_ranges=p_res.accept_ranges,
+                        etag_sha256=p_res.etag_sha256,
+                        expected_digest=f"sha256:{p_res.etag_sha256}" if p_res.etag_sha256 else None,
+                    )
+                if p_res.status_code >= 400:
+                    status = p_res.status_code
+                    status_desc = {
+                        401: "Unauthorized (Authentication required)",
+                        402: "Payment Required (Upstream credits/quota exhausted or payment required)",
+                        403: "Forbidden (Access denied by server)",
+                        404: "Not Found (Resource does not exist)",
+                        410: "Gone (Resource has been permanently removed)",
+                        429: "Too Many Requests (Rate limit exceeded)",
+                        500: "Internal Server Error",
+                        502: "Bad Gateway",
+                        503: "Service Unavailable",
+                    }.get(status, f"HTTP Error {status}")
+                    return TargetInfo(
+                        raw=target,
+                        target_type=TargetType.DIRECT,
+                        clean_url=target,
+                        filename_hint=fname,
+                        mime_type="image/jpeg",
+                        probe_error=f"HTTP Error {status}: {status_desc} for {target}",
+                        status_code=status,
+                    )
+
+            return TargetInfo(
+                raw=target,
+                target_type=TargetType.DIRECT,
+                clean_url=target,
+                filename_hint=fname,
+                mime_type="image/jpeg",
+            )
+
+        # 6d. HTTP HEAD / Range Probe for unknown generic URLs
         if allow_network_probe and target.startswith(("http://", "https://")):
             p_res = probe_http_url(target)
             if p_res.ok:
@@ -517,6 +572,7 @@ def probe_target(target: str, *, allow_network_probe: bool = True) -> TargetInfo
 
                 if is_direct:
                     fname = p_res.filename or os.path.basename(p_res.final_url.split("?", 1)[0]) or "downloaded_file"
+                    fname = sanitize_filename(fname)[:180]
                     return TargetInfo(
                         raw=target,
                         target_type=TargetType.DIRECT,
@@ -531,6 +587,26 @@ def probe_target(target: str, *, allow_network_probe: bool = True) -> TargetInfo
 
                 if "text/html" in content_type or ytdlp_extractor_claims_url(target):
                     return TargetInfo(raw=target, target_type=TargetType.STREAM, clean_url=target)
+            elif p_res.status_code >= 400:
+                status = p_res.status_code
+                status_desc = {
+                    401: "Unauthorized (Authentication required)",
+                    402: "Payment Required (Upstream credits/quota exhausted or payment required)",
+                    403: "Forbidden (Access denied by server)",
+                    404: "Not Found (Resource does not exist)",
+                    410: "Gone (Resource has been permanently removed)",
+                    429: "Too Many Requests (Rate limit exceeded)",
+                    500: "Internal Server Error",
+                    502: "Bad Gateway",
+                    503: "Service Unavailable",
+                }.get(status, f"HTTP Error {status}")
+                return TargetInfo(
+                    raw=target,
+                    target_type=TargetType.DIRECT,
+                    clean_url=target,
+                    probe_error=f"HTTP Error {status}: {status_desc} for {target}",
+                    status_code=status,
+                )
 
         return TargetInfo(raw=target, target_type=TargetType.STREAM, clean_url=target)
 

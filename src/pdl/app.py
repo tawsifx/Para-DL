@@ -846,7 +846,22 @@ class PDLApp:
                 t0 = time.time()
                 # Start-up guard: Free-disk check when content_length is already known
                 disk_ok, disk_err = check_free_disk_space(out_dir, t_info.content_length)
-                if not disk_ok:
+
+                if t_info.probe_error:
+                    print_plain(f"  [error]✗ {t_info.probe_error}[/error]", force=True)
+                    UI.emit_event(
+                        "error",
+                        reason="http_error",
+                        status_code=t_info.status_code,
+                        message=t_info.probe_error,
+                        target=target,
+                    )
+                    tx_res = TransferResult(
+                        success=False,
+                        error=t_info.probe_error,
+                        exit_code=int(ExitCode.FAILURE),
+                    )
+                elif not disk_ok:
                     err_msg = disk_err or "Insufficient free disk space."
                     print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
                     UI.emit_event("error", reason="insufficient_disk_space", message=err_msg)

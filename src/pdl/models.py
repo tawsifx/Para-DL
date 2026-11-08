@@ -117,6 +117,33 @@ MEDIA_DOMAINS: tuple[str, ...] = (
     "x.com",
 )
 
+# Known image generation / image CDN domains
+IMAGE_DOMAINS: tuple[str, ...] = (
+    "image.pollinations.ai",
+    "images.unsplash.com",
+    "i.imgur.com",
+    "i.redd.it",
+    "cdn.discordapp.com",
+)
+
+
+def is_image_domain(url: str) -> bool:
+    """Return True if url's hostname matches an image generation or image CDN service."""
+    try:
+        parsed = urlparse(url.strip())
+        host = (parsed.hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    if not host:
+        return False
+    if (host == "pollinations.ai" or host.endswith(".pollinations.ai")) and ("image" in host or "/prompt/" in url):
+        return True
+    for domain in IMAGE_DOMAINS:
+        d = domain.lower().rstrip(".")
+        if host == d or host.endswith("." + d):
+            return True
+    return False
+
 
 def is_media_domain(url: str) -> bool:
     """Return True if url's hostname matches or is a subdomain of any MEDIA_DOMAINS entry."""
@@ -255,6 +282,8 @@ class TargetInfo:
     ipsw_meta: dict[str, Any] | None = None
     pypi_meta: dict[str, Any] | None = None
     brew_meta: dict[str, Any] | None = None
+    probe_error: str | None = None
+    status_code: int | None = None
 
 
 @dataclass
