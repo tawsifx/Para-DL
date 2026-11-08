@@ -360,7 +360,7 @@ class LocalVsInternationalResult:
 class MeasurementDataset:
     """Complete input to the pure rule-based classifier."""
 
-    isp: str = "Duronto Internet"
+    isp: str = "Unknown ISP"
     mode: str = "quick"
     plan_mbps: float | None = None
     m0_sanity: SanityResult = field(default_factory=SanityResult)
@@ -435,7 +435,7 @@ class ClassificationResult:
     verdicts: list[Verdict] = field(default_factory=list)
     notes: list[VerdictNote] = field(default_factory=list)
     recommended_profile: RecommendedProfile = field(default_factory=RecommendedProfile)
-    isp_evidence: ISPEvidenceSummary = field(default_factory=lambda: ISPEvidenceSummary(isp="Duronto Internet"))
+    isp_evidence: ISPEvidenceSummary = field(default_factory=lambda: ISPEvidenceSummary(isp="Unknown ISP"))
     time_of_day_status: str = "insufficient time data"
     next_best_hours: list[str] = field(default_factory=list)
     primary_evidence_mode: str = "paired_same_moment"
@@ -458,7 +458,7 @@ class ThrottleReport:
     schema_version: str = REPORT_SCHEMA_VERSION
     run_id: str = ""
     mode: str = "quick"
-    isp: str = "Duronto Internet"
+    isp: str = "Unknown ISP"
     plan_mbps: float | None = None
     timestamp: str = ""
     budget: BudgetSummary = field(

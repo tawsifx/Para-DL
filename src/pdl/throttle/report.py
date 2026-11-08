@@ -346,7 +346,7 @@ def generate_markdown_report(report: ThrottleReport) -> str:
             "### How to Run a Clean Test",
             "1. Connect via **Ethernet** or stand close to your 5 GHz Wi-Fi router with no VPN or proxy active.",
             "2. Pause active downloads, video streams, cloud backups, and software updates before starting.",
-            '3. Run `pdl throttle quick --isp "Duronto Internet"` for a 3-minute paired baseline, or `pdl throttle sample` at different hours of the day.',
+            "3. Run `pdl throttle quick` for a 3-minute paired baseline, or `pdl throttle sample` at different hours of the day.",
             "4. Run `pdl throttle coverage` to see which time-of-day buckets still need samples.",
             "",
             "### How to Read the Verdict",
@@ -802,7 +802,7 @@ def report_from_dict(data: dict[str, Any]) -> ThrottleReport:
     )
 
     dataset = MeasurementDataset(
-        isp=str(data.get("isp", "Duronto Internet")),
+        isp=str(data.get("isp", "Unknown ISP")),
         mode=str(data.get("mode", "quick")),
         plan_mbps=data.get("plan_mbps"),
         m0_sanity=m0,
@@ -840,7 +840,7 @@ def report_from_dict(data: dict[str, Any]) -> ThrottleReport:
         schema_version=str(data.get("schema_version", "1.0")),
         run_id=str(data.get("run_id", "rebuilt")),
         mode=str(data.get("mode", "quick")),
-        isp=str(data.get("isp", "Duronto Internet")),
+        isp=str(data.get("isp", "Unknown ISP")),
         plan_mbps=data.get("plan_mbps"),
         timestamp=str(data.get("timestamp", "")),
         budget=budget,

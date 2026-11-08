@@ -102,11 +102,16 @@ def build_throttle_parser(config: PDLConfig) -> argparse.ArgumentParser:
         default=None,
         help="Subscribed ISP plan speed in Mbps (e.g. 50).",
     )
+    isp_help = (
+        f"ISP display name for headers and evidence summary (default: '{config.isp}')."
+        if config.isp and config.isp.lower() != "auto"
+        else "ISP display name for headers and evidence summary (default: auto-detected from network)."
+    )
     parser.add_argument(
         "--isp",
         dest="isp",
-        default=config.isp,
-        help=f"ISP display name for headers and evidence summary (default: '{config.isp}').",
+        default=None,
+        help=isp_help,
     )
     parser.add_argument(
         "--via-proxy",
@@ -234,7 +239,7 @@ def generate_throttle_launchd_plist(
     dest_path: Path | None = None,
     *,
     label: str = "com.pdl.throttle.sample",
-    isp: str = "Duronto Internet",
+    isp: str | None = None,
 ) -> Path:
     """Generate (never load) a macOS LaunchAgent plist for sparse opportunistic sampling.
 
@@ -259,10 +264,10 @@ def generate_throttle_launchd_plist(
         "pdl.cli",
         "throttle",
         "sample",
-        "--isp",
-        isp,
-        "--non-interactive",
     ]
+    if isp and str(isp).strip().lower() != "auto":
+        prog_args.extend(["--isp", str(isp).strip()])
+    prog_args.append("--non-interactive")
 
     plist_dict: dict[str, Any] = {
         "Label": label,
@@ -605,6 +610,13 @@ def run_throttle_cli(argv: Sequence[str], config: PDLConfig) -> int:
 
     UI.json_mode = bool(args.json_mode)
     UI.non_interactive = bool(args.non_interactive)
+
+    # Resolve effective ISP: CLI flag --isp > config.isp (if not 'auto') > auto-detection
+    chosen_isp = getattr(args, "isp", None)
+    if not chosen_isp or str(chosen_isp).strip().lower() == "auto":
+        args.isp = config.get_effective_isp()
+    else:
+        args.isp = str(chosen_isp).strip()
 
     sub = args.subcommand
     if sub == "targets":

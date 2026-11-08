@@ -55,7 +55,15 @@ class PDLConfig:
     stall_timeout: float = 30.0
     require_ac: bool = False
     pause_on_low_power: bool = False
-    isp: str = "Duronto Internet"
+    isp: str = "auto"
+
+    def get_effective_isp(self) -> str:
+        """Return configured ISP if explicitly set, or auto-detect from active network."""
+        if self.isp and self.isp.strip().lower() != "auto":
+            return self.isp.strip()
+        from pdl.net import detect_isp
+
+        return detect_isp()
 
     def validate(self) -> None:
         """Validate all configuration fields and normalize values. Raises ValueError on bad input."""
@@ -173,6 +181,10 @@ class PDLConfig:
             if hasattr(cls, k):
                 known_kwargs[k] = v
         known_kwargs["schema_version"] = CONFIG_SCHEMA_VERSION
+
+        # Migrate legacy hardcoded default "Duronto Internet" to dynamic auto-detection
+        if known_kwargs.get("isp") == "Duronto Internet":
+            known_kwargs["isp"] = "auto"
 
         try:
             cfg = cls(**known_kwargs)

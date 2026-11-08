@@ -547,3 +547,132 @@ def probe_targets_parallel(targets: list[str], *, allow_network_probe: bool = Tr
     with ThreadPoolExecutor(max_workers=min(len(targets), 8)) as pool:
         futures = [pool.submit(probe_target, t, allow_network_probe=allow_network_probe) for t in targets]
         return [f.result() for f in futures]
+
+
+_CUSTOM_ISP_DETECTOR: Any = None
+_CACHED_ISP: tuple[float, str] | None = None
+_ISP_CACHE_TTL_SEC = 300.0
+
+
+def set_isp_detector(detector: Any) -> None:
+    """Set custom ISP detector function for unit testing or deterministic overrides."""
+    global _CUSTOM_ISP_DETECTOR
+    _CUSTOM_ISP_DETECTOR = detector
+
+
+def reset_isp_detector() -> None:
+    """Reset custom ISP detector function."""
+    global _CUSTOM_ISP_DETECTOR
+    _CUSTOM_ISP_DETECTOR = None
+
+
+def clean_isp_name(raw: str) -> str:
+    """Clean and normalize raw ISP or organization name."""
+    if not raw:
+        return ""
+    # Strip leading AS numbers like "AS149048 " or "AS13335 - "
+    cleaned = re.sub(r"^AS\d+\s*[-_:]*\s*", "", raw.strip(), flags=re.IGNORECASE)
+    cleaned = cleaned.strip("\"' \t\r\n")
+    return cleaned
+
+
+def detect_isp(*, timeout: float = 2.5, force_refresh: bool = False) -> str:
+    """Auto-detect the user's active Internet Service Provider (ISP).
+
+    Queries IP geolocation and ASN endpoints with short timeouts and graceful
+    multi-tier fallback (ip-api.com -> ipinfo.io -> Cloudflare trace + RDAP -> Unknown ISP).
+    Caches successful results for 5 minutes.
+    """
+    global _CACHED_ISP
+
+    if _CUSTOM_ISP_DETECTOR is not None:
+        try:
+            res = _CUSTOM_ISP_DETECTOR()
+            if res and isinstance(res, str):
+                return res.strip()
+        except Exception as exc:
+            logger.debug("Custom ISP detector error: %s", exc)
+
+    now = time.monotonic()
+    if not force_refresh and _CACHED_ISP is not None:
+        cached_ts, cached_name = _CACHED_ISP
+        if (now - cached_ts) < _ISP_CACHE_TTL_SEC and cached_name:
+            return cached_name
+
+    import httpx
+
+    # Tier 1: ip-api.com (returns explicit 'isp' field and 'org')
+    try:
+        with httpx.Client(timeout=min(timeout, 2.0), follow_redirects=True) as client:
+            resp = client.get("http://ip-api.com/json")
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict) and data.get("status") == "success":
+                    raw_isp = str(data.get("isp") or data.get("org") or "").strip()
+                    cleaned = clean_isp_name(raw_isp)
+                    if cleaned and cleaned.lower() not in ("unknown", "private", "local"):
+                        _CACHED_ISP = (now, cleaned)
+                        return cleaned
+    except Exception as exc:
+        logger.debug("ISP auto-detection tier 1 (ip-api) failed: %s", exc)
+
+    # Tier 2: ipinfo.io (returns 'org' with AS and org name)
+    try:
+        with httpx.Client(timeout=min(timeout, 2.0), follow_redirects=True) as client:
+            resp = client.get("https://ipinfo.io/json")
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict):
+                    raw_org = str(data.get("org") or "").strip()
+                    cleaned = clean_isp_name(raw_org)
+                    if cleaned and cleaned.lower() not in ("unknown", "private", "local"):
+                        _CACHED_ISP = (now, cleaned)
+                        return cleaned
+    except Exception as exc:
+        logger.debug("ISP auto-detection tier 2 (ipinfo) failed: %s", exc)
+
+    # Tier 3: Cloudflare trace to find public IP -> RDAP query
+    try:
+        with httpx.Client(timeout=min(timeout, 2.0), follow_redirects=True) as client:
+            resp = client.get("https://1.1.1.1/cdn-cgi/trace")
+            if resp.status_code == 200:
+                ip = ""
+                for line in resp.text.splitlines():
+                    if line.startswith("ip="):
+                        ip = line.split("=", 1)[1].strip()
+                        break
+                if ip:
+                    rdap_resp = client.get(f"https://rdap.org/ip/{ip}")
+                    if rdap_resp.status_code == 200:
+                        rdata = rdap_resp.json()
+                        if isinstance(rdata, dict):
+                            candidate = ""
+                            for ent in rdata.get("entities", []) or []:
+                                if isinstance(ent, dict):
+                                    vcard = ent.get("vcardArray", [])
+                                    if len(vcard) > 1 and isinstance(vcard[1], list):
+                                        for entry in vcard[1]:
+                                            if isinstance(entry, list) and len(entry) >= 4 and entry[0] == "fn":
+                                                candidate = str(entry[3]).strip()
+                                                break
+                                    if candidate:
+                                        break
+                            if not candidate:
+                                remarks = rdata.get("remarks", [])
+                                if remarks and isinstance(remarks, list) and isinstance(remarks[0], dict):
+                                    descs = remarks[0].get("description", [])
+                                    if descs and isinstance(descs, list):
+                                        candidate = str(descs[0]).strip()
+                            if not candidate:
+                                candidate = str(rdata.get("name") or "").strip()
+                            cleaned = clean_isp_name(candidate)
+                            if cleaned and cleaned.lower() not in ("unknown", "private", "local"):
+                                _CACHED_ISP = (now, cleaned)
+                                return cleaned
+    except Exception as exc:
+        logger.debug("ISP auto-detection tier 3 (trace+rdap) failed: %s", exc)
+
+    fallback = "Unknown ISP"
+    _CACHED_ISP = (now, fallback)
+    return fallback
+
