@@ -60,6 +60,21 @@ class PyPIEngine:
             pkg = m.group(1).strip()
             ver = m.group(3).strip() if (m.group(2) in ("==", "@") and m.group(3)) else None
             return pkg, ver
+
+        try:
+            from packaging.requirements import Requirement
+
+            req = Requirement(t)
+            pkg = req.name
+            ver = None
+            for s in req.specifier:
+                if s.operator == "==":
+                    ver = s.version
+                    break
+            return pkg, ver
+        except Exception:
+            pass
+
         return t, None
 
     @classmethod
@@ -238,6 +253,36 @@ class PyPIEngine:
         meta["requires_dist"] = [str(r) for r in (info.get("requires_dist") or []) if r]
 
         urls = data.get("urls", [])
+
+        # Check if the target has version specifiers (e.g. <1.4 or >=2.0)
+        try:
+            from packaging.requirements import Requirement
+            from packaging.version import Version
+
+            t_clean = target.strip()
+            if t_clean.lower().startswith(("pip:", "pip/", "pypi:", "pypi/")):
+                t_clean = t_clean.split(":", 1)[-1].split("/", 1)[-1].strip()
+            req_parsed = Requirement(t_clean)
+            if req_parsed.specifier:
+                curr_v = info.get("version", "")
+                if curr_v and Version(curr_v) not in req_parsed.specifier:
+                    releases = data.get("releases", {})
+                    matched_releases: list[tuple[Any, str]] = []
+                    for v_str in releases:
+                        try:
+                            v_obj = Version(v_str)
+                            if v_obj in req_parsed.specifier and not v_obj.is_prerelease:
+                                matched_releases.append((v_obj, v_str))
+                        except Exception:
+                            continue
+                    if matched_releases:
+                        matched_releases.sort(key=lambda x: x[0])
+                        chosen_ver = matched_releases[-1][1]
+                        urls = releases.get(chosen_ver, [])
+                        meta["version"] = chosen_ver
+        except Exception as exc:
+            logger.debug("Specifier resolution check skipped for %s: %s", pkg_name, exc)
+
         if not urls:
             return None
 
@@ -330,6 +375,45 @@ class PyPIEngine:
         return res
 
     @classmethod
+    def extract_wheel_dependencies(
+        cls,
+        wheel_path: Path,
+        *,
+        target_env: dict[str, str] | None = None,
+    ) -> list[str]:
+        """Extract required dependencies from a local .whl file, evaluating PEP 508 environment markers."""
+        if not str(wheel_path).endswith(".whl") or not wheel_path.is_file():
+            return []
+
+        import zipfile
+        from packaging.requirements import Requirement
+
+        reqs: list[str] = []
+        try:
+            with zipfile.ZipFile(wheel_path, "r") as zf:
+                for name in zf.namelist():
+                    if name.endswith(".dist-info/METADATA"):
+                        content = zf.read(name).decode("utf-8", errors="replace")
+                        for line in content.splitlines():
+                            if line.startswith("Requires-Dist:"):
+                                raw_req = line.split(":", 1)[1].strip()
+                                try:
+                                    r = Requirement(raw_req)
+                                    if r.marker:
+                                        m_str = str(r.marker)
+                                        if "extra ==" in m_str or "extra==" in m_str:
+                                            continue
+                                        if not r.marker.evaluate(target_env):
+                                            continue
+                                    reqs.append(str(r))
+                                except Exception:
+                                    pass
+                        break
+        except Exception as exc:
+            logger.debug("Failed to read metadata from wheel %s: %s", wheel_path, exc)
+        return reqs
+
+    @classmethod
     def install(
         cls,
         target: str,
@@ -338,7 +422,7 @@ class PyPIEngine:
         assume_yes: bool = False,
         python_bin: str | None = None,
     ) -> TransferResult:
-        """Download package wheel via 16 parallel channels, verify SHA-256, and install via uv/pip."""
+        """Download package wheel and all transitive dependencies via 16 parallel channels, then install offline."""
         from pdl.net import probe_target
 
         # Detect installer: uv pip install > python3 -m pip install
@@ -390,11 +474,48 @@ class PyPIEngine:
 
             wheel_file = dl_res.file_path
 
-            # Pre-fetch transitive dependencies into the temporary wheelhouse
-            dep_specs: list[tuple[str, str | None]] = []
-            req_spec = f"{pkg}=={ver}" if ver else pkg
+            # Detect installed packages in target environment to avoid redundant downloads
+            installed_pkgs: set[str] = set()
             if uv_bin:
                 try:
+                    cmd_l = [uv_bin, "pip", "list"]
+                    if py_exec and os.path.exists(py_exec):
+                        cmd_l.extend(["--python", py_exec])
+                    list_proc = subprocess.run(
+                        cmd_l, capture_output=True, text=True, timeout=4.0, check=False
+                    )
+                    if list_proc.returncode == 0:
+                        for row in list_proc.stdout.splitlines()[2:]:
+                            parts = row.split()
+                            if parts:
+                                installed_pkgs.add(parts[0].lower().replace("_", "-"))
+                except Exception:
+                    pass
+
+            downloaded_pkgs: set[str] = {pkg.lower().replace("_", "-")}
+            for f in tmp_path.glob("*.whl"):
+                m_f = re.match(r"^([A-Za-z0-9_\-\.]+?)-", f.name)
+                if m_f:
+                    downloaded_pkgs.add(m_f.group(1).lower().replace("_", "-"))
+
+            # Seed dependency queue
+            queue: list[str] = []
+
+            # 1. Inspect root package
+            if wheel_file.suffix.lower() == ".whl":
+                queue.extend(cls.extract_wheel_dependencies(wheel_file))
+            else:
+                for r in meta.get("requires_dist") or []:
+                    queue.append(r)
+                if "setuptools" not in installed_pkgs and "setuptools" not in downloaded_pkgs:
+                    queue.append("setuptools")
+                if "wheel" not in installed_pkgs and "wheel" not in downloaded_pkgs:
+                    queue.append("wheel")
+
+            # 2. Fast compile check
+            if uv_bin:
+                try:
+                    req_spec = f"{pkg}=={ver}" if ver else pkg
                     cmd_comp = [uv_bin, "pip", "compile", "-"]
                     if py_exec and os.path.exists(py_exec):
                         cmd_comp.extend(["--python", py_exec])
@@ -402,7 +523,7 @@ class PyPIEngine:
                         cmd_comp,
                         input=f"{req_spec}\n".encode(),
                         capture_output=True,
-                        timeout=8.0,
+                        timeout=5.0,
                         check=False,
                     )
                     if compile_proc.returncode == 0:
@@ -411,94 +532,133 @@ class PyPIEngine:
                             if line and not line.startswith("#") and "==" in line:
                                 d_pkg, d_ver = line.split("==", 1)
                                 if d_pkg.strip().lower() != pkg.lower():
-                                    dep_specs.append((d_pkg.strip(), d_ver.strip()))
+                                    queue.append(f"{d_pkg.strip()}=={d_ver.strip()}")
                 except Exception as exc:
-                    logger.debug("uv pip compile failed: %s", exc)
+                    logger.debug("Fast uv pip compile skipped: %s", exc)
 
-            if not dep_specs:
-                for r in meta.get("requires_dist") or []:
-                    if "extra ==" in r:
+            # 3. Breadth-First-Search: pre-fetch ALL transitive dependencies recursively
+            visited_reqs: set[str] = set()
+            while queue:
+                current_batch: list[str] = []
+                while queue:
+                    r_str = queue.pop(0).strip()
+                    if not r_str or r_str in visited_reqs:
                         continue
-                    m_req = re.match(r"^([A-Za-z0-9_\-\.]+)", r.strip())
-                    if m_req:
-                        d_name = m_req.group(1).strip()
-                        if d_name.lower() != pkg.lower():
-                            dep_specs.append((d_name, None))
-
-            if dep_specs:
-                installed_pkgs: set[str] = set()
-                if uv_bin:
+                    visited_reqs.add(r_str)
                     try:
-                        cmd_l = [uv_bin, "pip", "list"]
-                        if py_exec and os.path.exists(py_exec):
-                            cmd_l.extend(["--python", py_exec])
-                        list_proc = subprocess.run(
-                            cmd_l, capture_output=True, text=True, timeout=4.0, check=False
-                        )
-                        if list_proc.returncode == 0:
-                            for row in list_proc.stdout.splitlines()[2:]:
-                                parts = row.split()
-                                if parts:
-                                    installed_pkgs.add(parts[0].lower().replace("_", "-"))
+                        from packaging.requirements import Requirement
+                        r_obj = Requirement(r_str)
+                        if r_obj.marker:
+                            m_str = str(r_obj.marker)
+                            if "extra ==" in m_str or "extra==" in m_str:
+                                continue
+                            if not r_obj.marker.evaluate():
+                                continue
+                        r_norm = r_obj.name.lower().replace("_", "-")
+                        if r_norm == pkg.lower().replace("_", "-") or r_norm in installed_pkgs or r_norm in downloaded_pkgs:
+                            continue
+                        current_batch.append(str(r_obj))
                     except Exception:
-                        pass
+                        m_plain = re.match(r"^([A-Za-z0-9_\-\.]+)", r_str)
+                        if m_plain:
+                            d_name = m_plain.group(1).lower().replace("_", "-")
+                            if d_name != pkg.lower().replace("_", "-") and d_name not in installed_pkgs and d_name not in downloaded_pkgs:
+                                current_batch.append(r_str)
 
-                missing_deps = [
-                    (d_p, d_v) for d_p, d_v in dep_specs if d_p.lower().replace("_", "-") not in installed_pkgs
-                ]
-                if missing_deps:
-                    dep_label = ", ".join(d_p for d_p, _ in missing_deps[:6])
-                    if len(missing_deps) > 6:
-                        dep_label += f" (+{len(missing_deps) - 6} more)"
-                    print_plain(
-                        f"  [dim]•[/dim] [white]Pre-fetching {len(missing_deps)} Python dependency wheel(s) with 16 parallel channels:[/white] [cyan]{dep_label}[/cyan]"
-                    )
-                    for d_pkg, d_ver in missing_deps:
-                        try:
-                            dep_target = f"pip:{d_pkg}=={d_ver}" if d_ver else f"pip:{d_pkg}"
-                            dep_info = probe_target(dep_target, py_version=target_py_ver)
-                            if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
-                                engine.execute(dep_info, tmp_path, connections=connections)
-                        except Exception as dep_exc:
-                            logger.debug("Failed to pre-fetch wheel for dependency %s: %s", d_pkg, dep_exc)
+                if not current_batch:
+                    break
 
-            if uv_bin:
-                installer_cmd = [uv_bin, "pip", "install", "--find-links", str(tmp_path)]
-                if py_exec and os.path.exists(py_exec):
-                    installer_cmd.extend(["--python", py_exec])
-                installer_cmd.append(str(wheel_file))
-                installer_desc = "uv pip install (--find-links)"
-            else:
-                installer_cmd = [py_exec, "-m", "pip", "install", "--find-links", str(tmp_path), str(wheel_file)]
-                installer_desc = f"{os.path.basename(py_exec)} -m pip install (--find-links)"
+                batch_label = ", ".join(current_batch[:6])
+                if len(current_batch) > 6:
+                    batch_label += f" (+{len(current_batch) - 6} more)"
+                print_plain(
+                    f"  [dim]•[/dim] [white]Pre-fetching {len(current_batch)} Python dependency wheel(s) with 16 parallel channels:[/white] [cyan]{batch_label}[/cyan]"
+                )
+
+                for dep_req in current_batch:
+                    try:
+                        dep_target = f"pip:{dep_req}"
+                        dep_info = probe_target(dep_target, py_version=target_py_ver)
+                        if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
+                            res_dep = engine.execute(dep_info, tmp_path, connections=connections)
+                            if res_dep.success and res_dep.file_path and res_dep.file_path.is_file():
+                                d_meta = dep_info.pypi_meta or {}
+                                d_pkg_name = d_meta.get("package", "").lower().replace("_", "-")
+                                if d_pkg_name:
+                                    downloaded_pkgs.add(d_pkg_name)
+                                if res_dep.file_path.suffix.lower() == ".whl":
+                                    sub_deps = cls.extract_wheel_dependencies(res_dep.file_path)
+                                    for sd in sub_deps:
+                                        if sd not in visited_reqs:
+                                            queue.append(sd)
+                    except Exception as dep_exc:
+                        logger.debug("Failed to pre-fetch wheel for dependency %s: %s", dep_req, dep_exc)
+
+            # Strict offline installation: enforce --no-index to prevent single-stream offloading
+            installer_base = (
+                [uv_bin, "pip", "install", "--no-index", "--find-links", str(tmp_path)]
+                if uv_bin
+                else [py_exec, "-m", "pip", "install", "--no-index", "--find-links", str(tmp_path)]
+            )
+            if uv_bin and py_exec and os.path.exists(py_exec):
+                installer_base.extend(["--python", py_exec])
+
+            installer_desc = (
+                "uv pip install (--no-index --find-links)"
+                if uv_bin
+                else f"{os.path.basename(py_exec)} -m pip install (--no-index --find-links)"
+            )
 
             print_plain(f"  [dim]•[/dim] [white]Installing via {installer_desc}...[/white]")
-            try:
-                proc = subprocess.run(
-                    installer_cmd,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if proc.returncode != 0:
-                    err_msg = proc.stderr.strip() or f"{installer_desc} failed with exit code {proc.returncode}"
-                    print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
+
+            max_attempts = 3
+            for attempt in range(1, max_attempts + 1):
+                cmd = [*installer_base, str(wheel_file)]
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                if proc.returncode == 0:
+                    print_plain(f"  [green]✓ Successfully installed {pkg} {ver} into Python environment![/green]")
                     return TransferResult(
-                        success=False,
-                        error=err_msg,
-                        exit_code=int(ExitCode.FAILURE),
+                        success=True,
+                        file_path=wheel_file,
+                        bytes_downloaded=dl_res.bytes_downloaded,
+                        checksum_verified=dl_res.checksum_verified,
+                        checksum_algo=dl_res.checksum_algo,
+                        checksum_digest=dl_res.checksum_digest,
+                        exit_code=int(ExitCode.OK),
                     )
-                print_plain(f"  [green]✓ Successfully installed {pkg} {ver} into Python environment![/green]")
-                return TransferResult(
-                    success=True,
-                    file_path=wheel_file,
-                    bytes_downloaded=dl_res.bytes_downloaded,
-                    checksum_verified=dl_res.checksum_verified,
-                    checksum_algo=dl_res.checksum_algo,
-                    checksum_digest=dl_res.checksum_digest,
-                    exit_code=int(ExitCode.OK),
+
+                # Check if a missing dependency was reported in error output
+                err_text = proc.stderr.strip()
+                missing_candidates = re.findall(
+                    r"(?:require|depends on|found for)\s+([A-Za-z0-9_\-\.]+)",
+                    err_text,
+                    re.IGNORECASE,
                 )
-            except Exception as exc:
-                msg = f"Installation error: {exc}"
-                print_plain(f"  [error]{msg}[/error]", force=True)
-                return TransferResult(success=False, error=msg, exit_code=int(ExitCode.FAILURE))
+                missing_candidates = [
+                    c for c in missing_candidates
+                    if c.lower().replace("_", "-") not in downloaded_pkgs
+                    and not c.startswith(("-", "http", "202", "19", "pip", "uv"))
+                ]
+                if missing_candidates and attempt < max_attempts:
+                    rec_pkg = missing_candidates[0]
+                    print_plain(
+                        f"  [dim]•[/dim] [yellow]Recovering missing dependency via 16 parallel channels:[/yellow] [cyan]{rec_pkg}[/cyan]"
+                    )
+                    try:
+                        rec_info = probe_target(f"pip:{rec_pkg}", py_version=target_py_ver)
+                        if rec_info.target_type == TargetType.PYPI and rec_info.clean_url:
+                            engine.execute(rec_info, tmp_path, connections=connections)
+                            downloaded_pkgs.add(rec_pkg.lower().replace("_", "-"))
+                            continue
+                    except Exception as rec_exc:
+                        logger.debug("Auto-recovery download failed for %s: %s", rec_pkg, rec_exc)
+
+                err_msg = err_text or f"{installer_desc} failed with exit code {proc.returncode}"
+                print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
+                return TransferResult(
+                    success=False,
+                    error=err_msg,
+                    exit_code=int(ExitCode.FAILURE),
+                )
+
+        return TransferResult(success=False, error="Installation failed", exit_code=int(ExitCode.FAILURE))
