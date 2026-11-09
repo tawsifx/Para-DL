@@ -118,7 +118,9 @@ class BrewEngine:
     @classmethod
     def resolve_ghcr_direct_url(cls, blob_url: str, formula: str) -> tuple[str, dict[str, str], int | None]:
         """Obtain anonymous pull token from GHCR and follow redirect to signed CDN URL."""
-        token_url = f"https://ghcr.io/token?service=ghcr.io&scope=repository:homebrew/core/{formula}:pull"
+        repo_match = re.search(r"ghcr\.io/v2/([^/]+/[^/]+(?:/[^/]+)*)/blobs/", blob_url)
+        repo = repo_match.group(1) if repo_match else f"homebrew/core/{formula.replace('@', '/')}"
+        token_url = f"https://ghcr.io/token?service=ghcr.io&scope=repository:{repo}:pull"
         headers: dict[str, str] = {}
         data, _hdrs, status = fetch_json_with_etag(token_url, timeout=4.5)
         if status == 200 and isinstance(data, dict):
