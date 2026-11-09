@@ -73,12 +73,15 @@ class WatchdogController:
     apply_learned_profile: bool = True
     revalidation_ticks: int = 2
     now_epoch: float | None = None
+    sustained_throttle_threshold: int = 10
 
     # Runtime state
     initial_connections: int = 16
     cycle_count: int = 0
     warm_up_complete: bool = False
     low_speed_consecutive: int = 0
+    sustained_low_speed_cycles: int = 0
+    sustained_throttle_detected: bool = False
     speed_samples: list[float] = field(default_factory=list)
     last_recycle_elapsed: float = -999.0
     current_cooldown: float = 0.0
@@ -144,6 +147,8 @@ class WatchdogController:
         """Reset rolling speed samples, hysteresis counters, and tracking."""
         self.speed_samples.clear()
         self.low_speed_consecutive = 0
+        self.sustained_low_speed_cycles = 0
+        self.sustained_throttle_detected = False
         self.warm_up_complete = False
 
     def handle_resilience_event(
@@ -296,7 +301,18 @@ class WatchdogController:
         # ------------------------------------------------------------------
         if speed_bps < threshold:
             self.low_speed_consecutive += 1
-            if self.low_speed_consecutive >= 2:
+            self.sustained_low_speed_cycles += 1
+            if self.sustained_low_speed_cycles >= self.sustained_throttle_threshold:
+                self.sustained_throttle_detected = True
+            # Under sustained ISP throttling, reduce recycle frequency to avoid
+            # tearing down working connections when the bandwidth cap is the
+            # limiting factor, not a per-flow issue.
+            recycle_interval = (
+                self.sustained_throttle_threshold
+                if self.sustained_throttle_detected
+                else 2
+            )
+            if self.low_speed_consecutive >= recycle_interval:
                 self.low_speed_consecutive = 0
                 self.cycle_count += 1
                 self.last_recycle_elapsed = elapsed_sec
@@ -327,6 +343,7 @@ class WatchdogController:
                     reason=(
                         f"Speed {format_speed(speed_bps)} < {format_speed(threshold)} floor; "
                         f"cycling {self.connections} RPC sockets"
+                        + (" (sustained throttle)" if self.sustained_throttle_detected else "")
                     ),
                     threshold_bps=threshold,
                     rolling_p90_bps=p90,
@@ -335,6 +352,10 @@ class WatchdogController:
                 )
         else:
             self.low_speed_consecutive = 0
+            # Speed recovered above threshold: clear sustained throttle detection
+            if self.sustained_throttle_detected:
+                self.sustained_low_speed_cycles = 0
+                self.sustained_throttle_detected = False
 
         return WatchdogDecision(
             action=WatchdogActionType.NONE,
