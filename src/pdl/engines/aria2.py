@@ -327,14 +327,34 @@ class Aria2RpcDaemon:
             text=True,
         )
         _ACTIVE_PROCESSES.add(self._proc)
+
+        # M9: Continuously drain stderr in a background thread to prevent pipe buffer deadlocks
+        self._stderr_lines: list[str] = []
+
+        def _drain_stderr() -> None:
+            if self._proc and self._proc.stderr:
+                try:
+                    for line in self._proc.stderr:
+                        if len(self._stderr_lines) < 100:
+                            self._stderr_lines.append(line)
+                        else:
+                            self._stderr_lines.pop(0)
+                            self._stderr_lines.append(line)
+                except Exception:
+                    pass
+
+        self._drain_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        self._drain_thread.start()
+
         self._http_client = httpx.Client(timeout=5.0)
 
         # Wait up to 3s for RPC server to accept requests
         deadline = time.time() + 3.0
         while time.time() < deadline:
             if self._proc.poll() is not None:
-                stderr_out = self._proc.stderr.read() if self._proc.stderr else ""
-                raise RuntimeError(f"aria2c daemon exited early: {stderr_out.strip()}")
+                self._drain_thread.join(timeout=0.2)
+                stderr_out = "".join(self._stderr_lines).strip()
+                raise RuntimeError(f"aria2c daemon exited early: {stderr_out}")
             try:
                 self.call("aria2.getVersion")
                 return
@@ -728,6 +748,7 @@ class Aria2Engine:
         t_start = time.time()
         all_speed_samples: list[float] = []
         completed_items: set[int] = set()
+        completed_paths: dict[int, Path] = {}
 
         # Adaptive polling state: faster when volatile, slower when stable
         _poll_interval = poll_interval
@@ -869,6 +890,7 @@ class Aria2Engine:
                                 files_meta = st.get("files", [])
                                 if files_meta and files_meta[0].get("path"):
                                     actual_p = Path(files_meta[0]["path"])
+                                    completed_paths[idx] = actual_p
                                     if not items[idx].filename:
                                         items[idx].filename = actual_p.name
                                 if len_b > 0 and items[idx].expected_length is None:
@@ -1130,22 +1152,30 @@ class Aria2Engine:
         # Resolve final files and verify expected lengths + integrity hints
         final_files: list[Path] = []
         total_bytes = 0
-        verified_flag: bool | None = None
-        verified_algo: str | None = None
-        verified_digest: str | None = None
+        item_verified_flags: list[bool | None] = []
+        item_algos: list[str | None] = []
+        item_digests: list[str | None] = []
 
-        for it in items:
-            f_path = it.out_dir / (it.filename or "download")
-            if not f_path.exists():
+        for idx, it in enumerate(items):
+            actual_reported = completed_paths.get(idx)
+            if actual_reported and actual_reported.is_file():
+                f_path = actual_reported
+            else:
+                f_path = it.out_dir / (it.filename or "download")
+
+            if not f_path.is_file():
                 candidates = [
                     p
                     for p in sorted(it.out_dir.glob("*"), key=os.path.getmtime, reverse=True)
-                    if not p.name.endswith(".aria2")
+                    if p.is_file()
+                    and not p.name.endswith(".aria2")
+                    and os.path.getmtime(p) >= (t_start - 1.0)
+                    and (it.expected_length is None or p.stat().st_size == it.expected_length)
                 ]
                 if candidates:
                     f_path = candidates[0]
 
-            if not f_path.exists():
+            if not f_path.is_file():
                 return TransferResult(
                     success=False,
                     duration=duration,
@@ -1162,15 +1192,44 @@ class Aria2Engine:
                 except OSError:
                     pass
 
-            if f_path.is_file():
-                actual_sz = f_path.stat().st_size
-                total_bytes += actual_sz
+            actual_sz = f_path.stat().st_size
+            total_bytes += actual_sz
 
-                # Phase 2: Final size integrity check against expected length
-                if it.expected_length is not None and it.expected_length > 0 and actual_sz != it.expected_length:
-                    err_msg = (
-                        f"Size mismatch for {f_path.name}: expected {it.expected_length} bytes, got {actual_sz} bytes"
-                    )
+            # Phase 2: Final size integrity check against expected length
+            if it.expected_length is not None and it.expected_length > 0 and actual_sz != it.expected_length:
+                err_msg = (
+                    f"Size mismatch for {f_path.name}: expected {it.expected_length} bytes, got {actual_sz} bytes"
+                )
+                print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
+                return TransferResult(
+                    success=False,
+                    file_path=f_path,
+                    bytes_downloaded=actual_sz,
+                    duration=duration,
+                    recycle_count=watchdog.cycle_count,
+                    error=err_msg,
+                    exit_code=int(ExitCode.VERIFICATION_FAILED),
+                )
+
+            # Phase 0 #12: Automatic server integrity hint verification (HF ETag SHA-256 / GitHub digest)
+            if it.expected_digest:
+                matched, algo, digest = ChecksumEngine.verify(f_path, it.expected_digest)
+                item_verified_flags.append(matched)
+                item_algos.append(algo)
+                item_digests.append(digest)
+                UI.emit_event(
+                    "verification",
+                    file=str(f_path),
+                    algorithm=algo,
+                    expected=it.expected_digest,
+                    computed=digest,
+                    verified=matched,
+                    source="server_integrity_hint",
+                )
+                if matched:
+                    print_plain(f"  [green]✓ Verified server integrity digest ({algo.upper()})[/green]")
+                else:
+                    err_msg = f"Server integrity digest mismatch for {f_path.name}: expected {it.expected_digest}, got {digest}"
                     print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
                     return TransferResult(
                         success=False,
@@ -1178,42 +1237,16 @@ class Aria2Engine:
                         bytes_downloaded=actual_sz,
                         duration=duration,
                         recycle_count=watchdog.cycle_count,
+                        checksum_verified=False,
+                        checksum_algo=algo,
+                        checksum_digest=digest,
                         error=err_msg,
                         exit_code=int(ExitCode.VERIFICATION_FAILED),
                     )
-
-                # Phase 0 #12: Automatic server integrity hint verification (HF ETag SHA-256 / GitHub digest)
-                if it.expected_digest:
-                    matched, algo, digest = ChecksumEngine.verify(f_path, it.expected_digest)
-                    verified_flag = matched
-                    verified_algo = algo
-                    verified_digest = digest
-                    UI.emit_event(
-                        "verification",
-                        file=str(f_path),
-                        algorithm=algo,
-                        expected=it.expected_digest,
-                        computed=digest,
-                        verified=matched,
-                        source="server_integrity_hint",
-                    )
-                    if matched:
-                        print_plain(f"  [green]✓ Verified server integrity digest ({algo.upper()})[/green]")
-                    else:
-                        err_msg = f"Server integrity digest mismatch for {f_path.name}: expected {it.expected_digest}, got {digest}"
-                        print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
-                        return TransferResult(
-                            success=False,
-                            file_path=f_path,
-                            bytes_downloaded=actual_sz,
-                            duration=duration,
-                            recycle_count=watchdog.cycle_count,
-                            checksum_verified=False,
-                            checksum_algo=algo,
-                            checksum_digest=digest,
-                            error=err_msg,
-                            exit_code=int(ExitCode.VERIFICATION_FAILED),
-                        )
+            else:
+                item_verified_flags.append(None)
+                item_algos.append(None)
+                item_digests.append(None)
 
             final_files.append(f_path)
 
@@ -1226,6 +1259,22 @@ class Aria2Engine:
                 src_url = items[idx_f].url if idx_f < len(items) else (items[0].url if items else "")
                 if src_url and f_p.is_file():
                     platform.set_where_froms(f_p, [src_url])
+
+        if len(items) == 1:
+            verified_flag = item_verified_flags[0] if item_verified_flags else None
+            verified_algo = item_algos[0] if item_algos else None
+            verified_digest = item_digests[0] if item_digests else None
+        else:
+            has_any = any(v is not None for v in item_verified_flags)
+            if not has_any:
+                verified_flag = None
+            elif all(v is True for v in item_verified_flags):
+                verified_flag = True
+            else:
+                verified_flag = False
+            unique_algos = {a for a in item_algos if a}
+            verified_algo = unique_algos.pop() if len(unique_algos) == 1 else None
+            verified_digest = None
 
         return TransferResult(
             success=True,

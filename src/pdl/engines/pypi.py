@@ -238,13 +238,8 @@ class PyPIEngine:
 
         data, _hdrs, status = fetch_json_with_etag(api_url, timeout=4.5)
         if status != 200 or not isinstance(data, dict):
-            # If specific version 404s, try fallback to latest
-            if version and status == 404:
-                api_url = f"https://pypi.org/pypi/{norm_name}/json"
-                data, _hdrs, status = fetch_json_with_etag(api_url, timeout=4.5)
-            if status != 200 or not isinstance(data, dict):
-                logger.debug("PyPI API lookup failed for %s (status %s)", pkg_name, status)
-                return None
+            logger.debug("PyPI API lookup failed for %s (status %s)", pkg_name, status)
+            return None
 
         info = data.get("info", {})
         meta["package"] = info.get("name", pkg_name)

@@ -158,7 +158,10 @@ class ArchiveExtractor:
             ):
                 with tarfile.open(archive_path, "r:*") as tf:
                     cls.validate_tar(tf, dest_dir)
-                    tf.extractall(dest_dir, filter="data")
+                    try:
+                        tf.extractall(dest_dir, filter="data")
+                    except TypeError:
+                        tf.extractall(dest_dir)
                     for tar_member in tf.getmembers():
                         out_f = dest_dir / tar_member.name
                         if out_f.exists() and out_f.is_file() and not out_f.is_symlink():
@@ -211,6 +214,28 @@ class ArchiveExtractor:
                     return False, None, []
 
             elif lower_name.endswith(".7z") and TOOLCHAIN.p7zip:
+                # Validate members before extraction to prevent path traversal
+                list_cmd = [TOOLCHAIN.p7zip, "l", "-slt", str(archive_path)]
+                list_res = subprocess.run(
+                    list_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    check=False,
+                )
+                if list_res.returncode != 0:
+                    print_plain("  [error]7z archive inspection failed.[/error]")
+                    return False, None, []
+                for line in list_res.stdout.splitlines():
+                    if line.startswith("Path = "):
+                        m_name = line[7:].strip()
+                        if m_name and m_name != str(archive_path) and m_name != archive_path.name:
+                            cls._validate_relative_member_path(m_name, dest_dir)
+                    elif line.startswith("SymLink = "):
+                        m_target = line[10:].strip()
+                        if m_target:
+                            cls._validate_link_target("symlink", m_target, dest_dir)
+
                 cmd = [TOOLCHAIN.p7zip, "x", f"-o{dest_dir}", "-y", str(archive_path)]
                 res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
                 if res.returncode != 0:

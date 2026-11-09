@@ -186,32 +186,45 @@ class LiveTransferDisplay:
         self.watchdog_state = "Active"
         self._live: Any = None
         self._last_json_emit = 0.0
+        self._last_non_terminal_emit = 0.0
 
     def __enter__(self) -> LiveTransferDisplay:
         if not UI.json_mode and not UI.quiet:
             con = UI.get_console()
-            if con is not None and con.is_terminal:
-                try:
-                    from rich.live import Live
+            if con is not None:
+                if con.is_terminal:
+                    try:
+                        from rich.live import Live
 
-                    self._live = Live(
-                        self._build_renderable(),
-                        console=con,
-                        refresh_per_second=4,
-                        transient=True,
-                    )
-                    self._live.start(refresh=True)
-                except ImportError:
-                    self._live = None
+                        self._live = Live(
+                            self._build_renderable(),
+                            console=con,
+                            refresh_per_second=8,
+                            transient=False,
+                        )
+                        self._live.start(refresh=True)
+                    except ImportError:
+                        self._live = None
+                else:
+                    con.print(self._build_renderable())
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if self._live is not None:
             try:
+                if exc_type is None and self.total_bytes > 0 and self.downloaded_bytes < self.total_bytes:
+                    self.downloaded_bytes = self.total_bytes
+                self._live.update(self._build_renderable(), refresh=True)
                 self._live.stop()
             except Exception as exc:
                 logger.debug("Live display exit error: %s", exc)
             self._live = None
+        elif not UI.json_mode and not UI.quiet and exc_type is None:
+            con = UI.get_console()
+            if con is not None:
+                if self.total_bytes > 0 and self.downloaded_bytes < self.total_bytes:
+                    self.downloaded_bytes = self.total_bytes
+                con.print(self._build_renderable())
 
     def update(
         self,
@@ -255,6 +268,13 @@ class LiveTransferDisplay:
 
         if self._live is not None:
             self._live.update(self._build_renderable())
+        elif not UI.json_mode and not UI.quiet:
+            con = UI.get_console()
+            if con is not None:
+                is_done = self.total_bytes > 0 and self.downloaded_bytes >= self.total_bytes
+                if force_event or (now - self._last_non_terminal_emit >= 0.8) or is_done:
+                    self._last_non_terminal_emit = now
+                    con.print(self._build_renderable())
 
     def _build_renderable(self) -> Any:
         from rich.text import Text
@@ -268,8 +288,17 @@ class LiveTransferDisplay:
             eta_str = "--:--"
 
         bar_width = 24
-        filled = int(min(max(pct / 100.0, 0.0), 1.0) * bar_width)
-        bar = "█" * filled + "░" * (bar_width - filled)
+        if self.total_bytes > 0:
+            filled = int(min(max(pct / 100.0, 0.0), 1.0) * bar_width)
+            bar = "█" * filled + "░" * (bar_width - filled)
+            pct_str = f"{pct:5.1f}%  "
+        else:
+            pos = int((time.time() * 8) % bar_width)
+            bar_chars = ["░"] * bar_width
+            for offset in range(4):
+                bar_chars[(pos + offset) % bar_width] = "█"
+            bar = "".join(bar_chars)
+            pct_str = " ---.-%  "
 
         size_part = (
             f"{format_size(self.downloaded_bytes)} / {format_size(self.total_bytes)}"
@@ -281,7 +310,7 @@ class LiveTransferDisplay:
         txt.append("  ", style="dim")
         txt.append(f"{self.title[:32]} ", style="bold white")
         txt.append(f"[{bar}] ", style="cyan")
-        txt.append(f"{pct:5.1f}%  ", style="bold bright_cyan")
+        txt.append(pct_str, style="bold bright_cyan")
         txt.append(f"{size_part}  ", style="dim white")
         txt.append(f"{format_speed(self.speed_bps)}  ", style="green")
         txt.append(f"ETA {eta_str}  ", style="dim")

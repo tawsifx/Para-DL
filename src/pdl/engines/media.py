@@ -380,9 +380,9 @@ class MediaEngine:
         if TOOLCHAIN.ffmpeg:
             codec_args_map: dict[str, list[str]] = {
                 "mp3": ["-vn", "-c:a", "libmp3lame", "-b:a", "256k"],
-                "flac": ["-vn", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"],
+                "flac": ["-vn", "-c:a", "flac"],
                 "opus": ["-vn", "-c:a", "libopus", "-b:a", "192k"],
-                "wav": ["-vn", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"],
+                "wav": ["-vn", "-c:a", "pcm_s16le"],
                 "aac": ["-vn", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"],
                 "lossless": ["-vn", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart"],
             }
@@ -393,9 +393,15 @@ class MediaEngine:
                 stderr=subprocess.DEVNULL,
                 check=False,
             )
-            if proc.returncode == 0 and final_file.exists():
+            if proc.returncode == 0 and final_file.exists() and final_file.stat().st_size > 0:
                 mode_tag = "aac" if requested_codec in ("lossless", "aac") else requested_codec
                 return final_file, classify_audio_production(requested_codec, source_acodec, mode_tag)
+
+            if final_file.exists() and final_file.stat().st_size == 0:
+                try:
+                    final_file.unlink()
+                except OSError:
+                    pass
 
         # Last-resort move if neither afconvert nor ffmpeg succeeded
         fallback_path = out_dir / f"{safe_stem}{raw_file.suffix or '.m4a'}"

@@ -378,8 +378,8 @@ def parse_metalink_bytes(raw_bytes: bytes, *, source: str = "metalink") -> Metal
     decoded = raw_bytes.decode("utf-8", errors="replace")
     # Defend against XXE and entity expansion attacks in untrusted mirror responses
     decoded_lower = decoded.lower()
-    if "<!entity" in decoded_lower or "<!doctype" in decoded_lower:
-        logger.warning("Rejected Metalink XML containing DOCTYPE or ENTITY declaration from %s", source)
+    if "<!entity" in decoded_lower:
+        logger.warning("Rejected Metalink XML containing ENTITY declaration from %s", source)
         return None
 
     try:

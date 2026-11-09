@@ -186,7 +186,7 @@ class GitHubEngine:
                 "url": t,
             }
 
-        m = re.search(r"github\.com/([^/]+)/([^/]+)/releases(?:/tag/([^/?#]+)|/latest)?(?:/)?$", t)
+        m = re.search(r"github\.com/([^/]+)/([^/]+)/releases(?:/tag/([^/?#]+)|/latest)?(?:/)?(?:\?[^#]*)?(?:#.*)?$", t)
         if m:
             owner, repo, tag = m.groups()
             return {
@@ -236,7 +236,7 @@ class GitHubEngine:
                 "url": t,
             }
 
-        m = re.search(r"github\.com/([^/]+)/([^/?#]+?)(?:\.git)?(?:/)?$", t)
+        m = re.search(r"github\.com/([^/]+)/([^/?#]+?)(?:\.git)?(?:/)?(?:\?[^#]*)?(?:#.*)?$", t)
         if m:
             owner, repo = m.groups()
             return {

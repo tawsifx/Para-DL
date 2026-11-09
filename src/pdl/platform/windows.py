@@ -374,9 +374,7 @@ def format_zone_identifier_text(host_url: str | None, zone_id: int | None = None
 
 def unquarantine_zone_identifier_text(text: str) -> str:
     """Remove ZoneId from Zone.Identifier INI while preserving HostUrl."""
-    data = parse_zone_identifier_text(text)
-    data.pop("zoneid", None)
-    data.pop("ZoneId", None)
+    data = {k: v for k, v in parse_zone_identifier_text(text).items() if k.lower() != "zoneid"}
     if not data:
         return ""
     lines = ["[ZoneTransfer]"]

@@ -24,18 +24,12 @@ STALE_PROFILE_SECONDS = STALE_PROFILE_DAYS * 86400.0
 
 
 def compute_hour_bucket(hour_or_dt: int | datetime | None = None) -> int:
-    """Compute a 4-hour time-of-day bucket (0..5) from a datetime or hour integer.
-
-    If an explicit integer bucket in 0..5 is passed, returns it directly; if an hour 6..23
-    is passed, maps it via `hour // 4`.
-    """
+    """Compute a 4-hour time-of-day bucket (0..5) from a datetime or hour integer (0..23)."""
     if hour_or_dt is None:
         return datetime.now().hour // 4
     if isinstance(hour_or_dt, datetime):
         return hour_or_dt.hour // 4
     h = int(hour_or_dt)
-    if 0 <= h <= 5:
-        return h
     return (h % 24) // 4
 
 

@@ -115,7 +115,7 @@ class HuggingFaceEngine:
         )
         if m_file:
             ds_prefix, repo_id, revision, filepath = m_file.groups()
-            filepath = filepath.split("?", 1)[0]
+            filepath = filepath.split("?", 1)[0].split("#", 1)[0]
             return {
                 "repo_id": repo_id,
                 "repo_type": "dataset" if ds_prefix else "model",
@@ -124,7 +124,21 @@ class HuggingFaceEngine:
                 "is_direct_file": True,
             }
 
-        m_repo = re.search(r"huggingface\.co/(?:(datasets)/)?([^/]+/[^/?#]+)(?:/)?$", t)
+        m_tree = re.search(
+            r"huggingface\.co/(?:(datasets)/)?([^/]+/[^/]+)/tree/([^/]+)(?:/(.+))?",
+            t,
+        )
+        if m_tree:
+            ds_prefix, repo_id, revision, subpath = m_tree.groups()
+            subpath = subpath.split("?", 1)[0].split("#", 1)[0] if subpath else None
+            return {
+                "repo_id": repo_id,
+                "repo_type": "dataset" if ds_prefix else "model",
+                "subpath": subpath,
+                "revision": revision,
+            }
+
+        m_repo = re.search(r"huggingface\.co/(?:(datasets)/)?([^/]+/[^/?#]+)(?:/)?(?:\?[^#]*)?(?:#.*)?$", t)
         if m_repo:
             ds_prefix, repo_id = m_repo.groups()
             return {
@@ -226,6 +240,15 @@ class HuggingFaceEngine:
             valid_files = [s for s in valid_files if _matches_asset_pattern(s.get("rfilename", ""), pattern)]
 
         if not valid_files:
+            if pattern or subpath:
+                filter_desc = f"pattern {pattern!r}" if pattern else f"subpath {subpath!r}"
+                err_msg = f"No files matched {filter_desc} in repository {repo_id}."
+                print_plain(f"  [error]✗ {err_msg}[/error]", force=True)
+                return TransferResult(
+                    success=False,
+                    error=err_msg,
+                    exit_code=int(ExitCode.FAILURE),
+                )
             print_plain("  [warning]No files matched filter. Showing repository files:[/warning]")
             valid_files = [s for s in siblings if not s.get("rfilename", "").startswith(".")]
 

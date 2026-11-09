@@ -30,6 +30,98 @@ _DATA_FLAGS = {
     "--form-string",
 }
 
+_CURL_VALUE_FLAGS = {
+    # Proxy
+    "-x",
+    "--proxy",
+    "-U",
+    "--proxy-user",
+    "--proxy-cacert",
+    "--proxy-capath",
+    "--proxy-cert",
+    "--proxy-cert-type",
+    "--proxy-key",
+    "--proxy-key-type",
+    "--proxy-pass",
+    "--proxy-ciphers",
+    "--proxy-tls-max",
+    "--proxy-service-name",
+    "--noproxy",
+    # Network / connection timeouts and limits
+    "--connect-timeout",
+    "-m",
+    "--max-time",
+    "--retry",
+    "--retry-delay",
+    "--retry-max-time",
+    "--limit-rate",
+    "-y",
+    "--speed-time",
+    "-Y",
+    "--speed-limit",
+    "--interface",
+    "--dns-servers",
+    "--dns-interface",
+    "--dns-ipv4-addr",
+    "--dns-ipv6-addr",
+    "--resolve",
+    "--connect-to",
+    # SSL / TLS
+    "--cacert",
+    "--capath",
+    "-E",
+    "--cert",
+    "--cert-type",
+    "--key",
+    "--key-type",
+    "--pass",
+    "--ciphers",
+    "--tls-max",
+    "--tls-min",
+    "--pinnedpubkey",
+    # Auth
+    "-u",
+    "--user",
+    "--oauth2-bearer",
+    # Output / files
+    "-o",
+    "--output",
+    "--output-dir",
+    "-c",
+    "--cookie-jar",
+    "-D",
+    "--dump-header",
+    "-w",
+    "--write-out",
+    "-T",
+    "--upload-file",
+    # Headers / requests
+    "-H",
+    "--header",
+    "-A",
+    "--user-agent",
+    "-e",
+    "--referer",
+    "-b",
+    "--cookie",
+    "-X",
+    "--request",
+    # Range / resume
+    "-r",
+    "--range",
+    "-C",
+    "--continue-at",
+    "-z",
+    "--time-cond",
+    # Config / proto
+    "-K",
+    "--config",
+    "--proto",
+    "--proto-redir",
+    "--proto-default",
+    "--unix-socket",
+}
+
 _UNSAFE_FILENAME_CHARS = re.compile(r'[/\\:\x00-\x1f\x7f*?"<>|]')
 
 
@@ -44,6 +136,7 @@ class ParsedCurl:
     referer: str | None = None
     compressed: bool = False
     output_filename: str | None = None
+    proxy: str | None = None
 
 
 def sanitize_filename(name: str) -> str:
@@ -81,6 +174,7 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
     referer: str | None = None
     compressed = False
     output_filename: str | None = None
+    proxy: str | None = None
 
     idx = 0
     num_tokens = len(tokens)
@@ -102,12 +196,34 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
             idx += 1
             continue
 
-        # Headers
-        if tok in ("-H", "--header"):
+        # Proxy via -x / --proxy / --proxy= / -x<url>
+        if tok in ("-x", "--proxy") or tok.startswith("--proxy="):
+            if "=" in tok:
+                proxy = tok.split("=", 1)[1].strip()
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing proxy argument.")
+                proxy = tokens[idx].strip()
+                idx += 1
+            continue
+        if tok.startswith("-x") and len(tok) > 2:
+            proxy = tok[2:].strip()
             idx += 1
-            if idx >= num_tokens:
-                raise ValueError(f"Flag '{tok}' missing header argument.")
-            hdr_val = tokens[idx]
+            continue
+
+        # Headers
+        if tok in ("-H", "--header") or tok.startswith("--header="):
+            if "=" in tok and tok.startswith("--"):
+                hdr_val = tok.split("=", 1)[1]
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing header argument.")
+                hdr_val = tokens[idx]
+                idx += 1
             if ":" in hdr_val:
                 h_name, h_val = hdr_val.split(":", 1)
                 h_name_clean = h_name.strip()
@@ -126,15 +242,22 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
                     referer = h_val_clean
                 else:
                     headers[h_name_clean] = h_val_clean
-            idx += 1
             continue
 
         # Cookies via -b / --cookie
-        if tok in ("-b", "--cookie"):
-            idx += 1
-            if idx >= num_tokens:
-                raise ValueError(f"Flag '{tok}' missing cookie argument.")
-            c_val = tokens[idx]
+        if tok in ("-b", "--cookie") or tok.startswith(("--cookie=", "-b")):
+            if tok.startswith("--cookie="):
+                c_val = tok.split("=", 1)[1]
+                idx += 1
+            elif tok.startswith("-b") and len(tok) > 2:
+                c_val = tok[2:]
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing cookie argument.")
+                c_val = tokens[idx]
+                idx += 1
             if "=" in c_val:
                 for part in c_val.split(";"):
                     if "=" in part:
@@ -153,25 +276,38 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
                                     cookies[fields[5]] = fields[6]
                 except OSError:
                     pass
-            idx += 1
             continue
 
         # User-Agent
-        if tok in ("-A", "--user-agent"):
-            idx += 1
-            if idx >= num_tokens:
-                raise ValueError(f"Flag '{tok}' missing user-agent argument.")
-            user_agent = tokens[idx].strip()
-            idx += 1
+        if tok in ("-A", "--user-agent") or tok.startswith(("--user-agent=", "-A")):
+            if tok.startswith("--user-agent="):
+                user_agent = tok.split("=", 1)[1].strip()
+                idx += 1
+            elif tok.startswith("-A") and len(tok) > 2:
+                user_agent = tok[2:].strip()
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing user-agent argument.")
+                user_agent = tokens[idx].strip()
+                idx += 1
             continue
 
         # Referer
-        if tok in ("-e", "--referer"):
-            idx += 1
-            if idx >= num_tokens:
-                raise ValueError(f"Flag '{tok}' missing referer argument.")
-            referer = tokens[idx].strip()
-            idx += 1
+        if tok in ("-e", "--referer") or tok.startswith(("--referer=", "-e")):
+            if tok.startswith("--referer="):
+                referer = tok.split("=", 1)[1].strip()
+                idx += 1
+            elif tok.startswith("-e") and len(tok) > 2:
+                referer = tok[2:].strip()
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing referer argument.")
+                referer = tokens[idx].strip()
+                idx += 1
             continue
 
         # Compressed
@@ -181,11 +317,31 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
             continue
 
         # Output filename
-        if tok in ("-o", "--output"):
+        if tok in ("-o", "--output") or tok.startswith(("--output=", "-o")):
+            if tok.startswith("--output="):
+                output_filename = sanitize_filename(tok.split("=", 1)[1])
+                idx += 1
+            elif tok.startswith("-o") and len(tok) > 2:
+                output_filename = sanitize_filename(tok[2:])
+                idx += 1
+            else:
+                idx += 1
+                if idx >= num_tokens:
+                    raise ValueError(f"Flag '{tok}' missing output argument.")
+                output_filename = sanitize_filename(tokens[idx])
+                idx += 1
+            continue
+
+        # Any known value-taking flag with separate argument
+        if tok in _CURL_VALUE_FLAGS:
             idx += 1
             if idx >= num_tokens:
-                raise ValueError(f"Flag '{tok}' missing output argument.")
-            output_filename = sanitize_filename(tokens[idx])
+                raise ValueError(f"Flag '{tok}' missing argument.")
+            idx += 1
+            continue
+
+        # Any option with inline value (e.g. --option=value)
+        if tok.startswith("-") and "=" in tok:
             idx += 1
             continue
 
@@ -196,7 +352,7 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
             idx += 1
             continue
 
-        # Unrecognized flags without parameters (e.g. -s, -S, -k, -L)
+        # Unrecognized boolean flags without parameters (e.g. -s, -S, -k, -L)
         idx += 1
 
     if not url:
@@ -218,6 +374,7 @@ def parse_curl_command(cmd_string: str) -> ParsedCurl:
         referer=referer,
         compressed=compressed,
         output_filename=output_filename,
+        proxy=proxy,
     )
 
 

@@ -311,6 +311,7 @@ def probe_range_support(
     client = get_http_client()
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept-Encoding": "identity",
         "Range": "bytes=0-0",
     }
     if headers:
@@ -359,6 +360,7 @@ def probe_http_url(
     """Probe a URL via HEAD, falling back to Range: bytes=0-0 GET on 403/405 or missing metadata."""
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept-Encoding": "identity",
     }
     if headers:
         req_headers.update(headers)
@@ -873,6 +875,5 @@ def detect_isp(*, timeout: float = 2.5, force_refresh: bool = False) -> str:
         logger.debug("ISP auto-detection tier 3 (trace+rdap) failed: %s", exc)
 
     fallback = "Unknown ISP"
-    _CACHED_ISP = (now, fallback)
     return fallback
 
