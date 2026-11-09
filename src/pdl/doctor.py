@@ -171,6 +171,25 @@ def run_doctor() -> int:
         fixes.append(fix)
         core_items.append(ToolCheck("JS Runtime (for EJS)", "optional_missing", "not found", fix=fix, required=False))
 
+    # npm (Node Package Manager)
+    npm_bin = TOOLCHAIN.npm
+    npm_ver = TOOLCHAIN.npm_version
+    if npm_bin and npm_ver:
+        core_items.append(
+            ToolCheck("npm (Node Package Manager)", "ready", f"v{npm_ver} ({npm_bin})", required=False)
+        )
+    elif npm_bin:
+        core_items.append(ToolCheck("npm (Node Package Manager)", "ready", npm_bin, required=False))
+    else:
+        fix = (
+            "winget install OpenJS.NodeJS"
+            if is_windows()
+            else "paradl brew install node  # or: nvm install --lts"
+        )
+        core_items.append(
+            ToolCheck("npm (Node Package Manager)", "optional_missing", "not found", fix=fix, required=False)
+        )
+
     # ffmpeg
     if TOOLCHAIN.ffmpeg:
         core_items.append(ToolCheck("ffmpeg (AV Transcoder)", "ready", TOOLCHAIN.ffmpeg, required=False))
@@ -242,6 +261,10 @@ def run_doctor() -> int:
                 "path": TOOLCHAIN.ytdlp,
             },
             "ytdlp_ejs": {"version": ejs_ver},
+            "npm": {
+                "version": npm_ver,
+                "path": npm_bin,
+            },
             "auth": auth_status,
             "platform_utilities": plat_utils,
             "macos_utilities": plat_utils,  # backward compatibility alias

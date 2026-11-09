@@ -264,6 +264,66 @@ class Toolchain:
             self._cache["node"] = chosen
         return self._cache["node"]
 
+    @staticmethod
+    def get_npm_version(npm_path: str) -> str | None:
+        """Get version string for an npm binary path (e.g., '12.2.2')."""
+        try:
+            proc = subprocess.run(
+                [npm_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=2.5,
+                check=False,
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                return proc.stdout.strip().splitlines()[0].lstrip("vV")
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.debug("Failed to probe npm version for %s: %s", npm_path, exc)
+        return None
+
+    @property
+    def npm(self) -> str | None:
+        """Return path to npm binary."""
+        if "npm" not in self._cache:
+            candidates: list[str] = []
+            which_npm = shutil.which("npm")
+            if which_npm:
+                candidates.append(which_npm)
+            if self._check_fallbacks:
+                for p in [
+                    "/opt/homebrew/bin/npm",
+                    "/usr/local/bin/npm",
+                    "/usr/bin/npm",
+                    str(Path.home() / ".nvm/current/bin/npm"),
+                    str(Path.home() / "AppData/Roaming/npm/npm.cmd"),
+                    "C:/Program Files/nodejs/npm.cmd",
+                ]:
+                    if os.path.exists(p) and os.access(p, os.X_OK) and p not in candidates:
+                        candidates.append(p)
+                for _ver, nvm_bin in self.find_nvm_nodes():
+                    cand_npm = nvm_bin.parent / ("npm.cmd" if sys.platform == "win32" else "npm")
+                    s_bin = str(cand_npm)
+                    if cand_npm.exists() and os.access(cand_npm, os.X_OK) and s_bin not in candidates:
+                        candidates.append(s_bin)
+
+            chosen: str | None = None
+            for cand in candidates:
+                if os.path.exists(cand) and os.access(cand, os.X_OK):
+                    chosen = cand
+                    break
+            self._cache["npm"] = chosen
+        return self._cache["npm"]
+
+    @property
+    def npm_version(self) -> str | None:
+        """Return installed npm version if available."""
+        if "npm_version" not in self._cache:
+            ver: str | None = None
+            if self.npm:
+                ver = self.get_npm_version(self.npm)
+            self._cache["npm_version"] = ver
+        return self._cache["npm_version"]
+
     @property
     def quickjs(self) -> str | None:
         if "quickjs" not in self._cache:
@@ -302,6 +362,24 @@ class Toolchain:
                     continue
             if ver is None and importlib.util.find_spec("yt_dlp_ejs") is not None:
                 ver = "installed"
+            if ver is None and self.npm:
+                try:
+                    proc = subprocess.run(
+                        [self.npm, "list", "-g", "yt-dlp-ejs", "--depth=0", "--json"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2.0,
+                        check=False,
+                    )
+                    if proc.returncode == 0 and proc.stdout.strip():
+                        import json as _json
+
+                        npm_pkg_data = _json.loads(proc.stdout)
+                        pkg_info = npm_pkg_data.get("dependencies", {}).get("yt-dlp-ejs")
+                        if pkg_info and "version" in pkg_info:
+                            ver = pkg_info["version"]
+                except Exception:
+                    pass
             self._cache["yt_dlp_ejs_version"] = ver
         return self._cache["yt_dlp_ejs_version"]
 
