@@ -336,7 +336,12 @@ def fetch_json_with_etag(
         return None, {}, 0
 
 
-def probe_target(target: str, *, allow_network_probe: bool = True) -> TargetInfo:
+def probe_target(
+    target: str,
+    *,
+    allow_network_probe: bool = True,
+    py_version: tuple[int, int] | None = None,
+) -> TargetInfo:
     """Classify any raw target string into a TargetInfo with identical order to v3.1.0-pro."""
     from pdl.engines.brew import BrewEngine
     from pdl.engines.cloud import CloudResolver
@@ -368,7 +373,7 @@ def probe_target(target: str, *, allow_network_probe: bool = True) -> TargetInfo
 
     # 3. Python / PyPI packages (pip:<pkg>, pypi:<pkg>, pypi.org/project/...)
     if PyPIEngine.is_pypi(target):
-        pypi_data = PyPIEngine.resolve(target, allow_network=allow_network_probe)
+        pypi_data = PyPIEngine.resolve(target, allow_network=allow_network_probe, py_version=py_version)
         if pypi_data and pypi_data.get("url"):
             sha = pypi_data.get("sha256")
             return TargetInfo(

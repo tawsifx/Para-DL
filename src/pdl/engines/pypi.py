@@ -125,7 +125,8 @@ class PyPIEngine:
             arch_tags = ["x86_64", "amd64", "universal2", "x86", "win_amd64", "win32"]
 
         is_plat_compat = False
-        if "any" in fn:
+        is_universal = fn.endswith("-any.whl") or "none-any" in fn
+        if is_universal:
             is_plat_compat = True
         elif plat == "darwin" and "macosx" in fn:
             if any(a in fn for a in arch_tags):
@@ -146,7 +147,7 @@ class PyPIEngine:
             score += 60  # exact CPython version match (e.g. cp312)
         elif "abi3" in fn:
             score += 50  # stable CPython ABI
-        elif "py3-none-any" in fn or "py2.py3-none-any" in fn:
+        elif "py3-none-any" in fn or "py2.py3-none-any" in fn or is_universal:
             score += 40  # universal pure-python wheel
         elif py_maj in fn:
             score += 30
@@ -160,32 +161,38 @@ class PyPIEngine:
                     score += 5   # x64 emulation on ARM64 Windows 11
                 elif "win32" in fn:
                     score += 2   # 32-bit x86 emulation
-                elif "any" in fn:
+                elif is_universal:
                     score += 10
             elif mach in ("x86", "i386", "i686"):
                 if "win32" in fn and "win_amd64" not in fn:
                     score += 20  # native 32-bit
-                elif "any" in fn:
+                elif is_universal:
                     score += 10
             else:
                 if "win_amd64" in fn:
                     score += 20  # native 64-bit x86_64
                 elif "win32" in fn:
                     score += 5   # 32-bit x86 compatibility
-                elif "any" in fn:
+                elif is_universal:
                     score += 10
         else:
             if any(a in fn for a in arch_tags if a != "universal2"):
                 score += 20  # native architecture
             elif "universal2" in fn:
                 score += 15  # multi-arch binary
-            elif "any" in fn:
+            elif is_universal:
                 score += 10  # architecture-independent
 
         return score
 
     @classmethod
-    def resolve(cls, target: str, *, allow_network: bool = True) -> dict[str, Any] | None:
+    def resolve(
+        cls,
+        target: str,
+        *,
+        allow_network: bool = True,
+        py_version: tuple[int, int] | None = None,
+    ) -> dict[str, Any] | None:
         """Resolve PyPI package target into metadata, direct CDN URL, and SHA-256 digest."""
         pkg_name, version = cls.parse_pypi_target(target)
         if not pkg_name:
@@ -240,7 +247,7 @@ class PyPIEngine:
         for cand in urls:
             fname = cand.get("filename", "")
             ptype = cand.get("packagetype", "")
-            sc = cls.score_wheel(fname, ptype)
+            sc = cls.score_wheel(fname, ptype, py_version=py_version)
             if sc > best_score:
                 best_score = sc
                 best_cand = cand
@@ -334,7 +341,30 @@ class PyPIEngine:
         """Download package wheel via 16 parallel channels, verify SHA-256, and install via uv/pip."""
         from pdl.net import probe_target
 
-        t_info = probe_target(target)
+        # Detect installer: uv pip install > python3 -m pip install
+        uv_bin = shutil.which("uv")
+        py_exec = python_bin or (
+            os.path.join(os.environ["VIRTUAL_ENV"], "bin", "python")
+            if os.environ.get("VIRTUAL_ENV")
+            else sys.executable
+        )
+        target_py_ver: tuple[int, int] | None = None
+        if py_exec and os.path.exists(py_exec):
+            try:
+                proc = subprocess.run(
+                    [py_exec, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2.0,
+                    check=False,
+                )
+                if proc.returncode == 0:
+                    parts = proc.stdout.strip().split(".")
+                    target_py_ver = (int(parts[0]), int(parts[1]))
+            except Exception:
+                pass
+
+        t_info = probe_target(target, py_version=target_py_ver)
         if t_info.target_type != TargetType.PYPI or not t_info.clean_url:
             msg = f"Failed to resolve PyPI package: {target}"
             print_plain(f"  [error]{msg}[/error]", force=True)
@@ -359,14 +389,6 @@ class PyPIEngine:
                 return dl_res
 
             wheel_file = dl_res.file_path
-
-            # Detect installer: uv pip install > python3 -m pip install
-            uv_bin = shutil.which("uv")
-            py_exec = python_bin or (
-                os.path.join(os.environ["VIRTUAL_ENV"], "bin", "python")
-                if os.environ.get("VIRTUAL_ENV")
-                else sys.executable
-            )
 
             # Pre-fetch transitive dependencies into the temporary wheelhouse
             dep_specs: list[tuple[str, str | None]] = []
@@ -434,7 +456,7 @@ class PyPIEngine:
                     for d_pkg, d_ver in missing_deps:
                         try:
                             dep_target = f"pip:{d_pkg}=={d_ver}" if d_ver else f"pip:{d_pkg}"
-                            dep_info = probe_target(dep_target)
+                            dep_info = probe_target(dep_target, py_version=target_py_ver)
                             if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
                                 engine.execute(dep_info, tmp_path, connections=connections)
                         except Exception as dep_exc:
