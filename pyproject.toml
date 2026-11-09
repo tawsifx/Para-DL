@@ -100,15 +100,9 @@ lint.ignore = [
     "B008",   # function calls in default args (intentional in some places)
     "UP007",  # union type annotations (we use X | Y)
 ]
-lint.unused-function-alias = ["cast"]
 format.quote-style = "double"
-format.markdown-code-fences = true
 format.docstring-code-format = true
 isort.known-first-party = ["pdl"]
-
-[tool.ruff.lint.perflint-ignores]
-# Allow specific performance rules where intentional
-list = []
 
 [tool.mypy]
 python_version = "3.11"
@@ -117,6 +111,3 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 disallow_any_generics = true
 strict_equality = true
-plugins = [
-    "pydantic.mypy",
-]
