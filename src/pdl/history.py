@@ -69,6 +69,8 @@ class HostStrategy:
     hour_bucket: int = -1
     network_id: str = ""
     updated_epoch: float = 0.0
+    avg_rtt_ms: float = 0.0
+    packet_loss_pct: float = 0.0
 
 
 @dataclass
@@ -88,6 +90,8 @@ class LearnedProfile:
     updated_at: str = ""
     updated_epoch: float = 0.0
     source: str = "watchdog"
+    avg_rtt_ms: float = 0.0
+    packet_loss_pct: float = 0.0
 
     @property
     def best_action(self) -> str:
@@ -191,10 +195,21 @@ class HistoryManager:
                 speed_after REAL NOT NULL DEFAULT 0.0,
                 supports_range INTEGER,
                 throttle_class TEXT,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                avg_rtt_ms REAL NOT NULL DEFAULT 0.0,
+                packet_loss_pct REAL NOT NULL DEFAULT 0.0
             );
             """
         )
+        # Migration: add RTT/loss columns to existing host_strategies tables
+        try:
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(host_strategies)").fetchall()}
+            if "avg_rtt_ms" not in cols:
+                conn.execute("ALTER TABLE host_strategies ADD COLUMN avg_rtt_ms REAL NOT NULL DEFAULT 0.0")
+            if "packet_loss_pct" not in cols:
+                conn.execute("ALTER TABLE host_strategies ADD COLUMN packet_loss_pct REAL NOT NULL DEFAULT 0.0")
+        except sqlite3.Error:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS learned_profiles (
@@ -220,6 +235,10 @@ class HistoryManager:
             cols = {r["name"] for r in conn.execute("PRAGMA table_info(learned_profiles)").fetchall()}
             if "source" not in cols:
                 conn.execute("ALTER TABLE learned_profiles ADD COLUMN source TEXT NOT NULL DEFAULT 'watchdog'")
+            if "avg_rtt_ms" not in cols:
+                conn.execute("ALTER TABLE learned_profiles ADD COLUMN avg_rtt_ms REAL NOT NULL DEFAULT 0.0")
+            if "packet_loss_pct" not in cols:
+                conn.execute("ALTER TABLE learned_profiles ADD COLUMN packet_loss_pct REAL NOT NULL DEFAULT 0.0")
         except sqlite3.Error:
             pass
         conn.execute(
@@ -477,6 +496,8 @@ class HistoryManager:
             updated_at=str(row["updated_at"]),
             updated_epoch=float(row["updated_epoch"]),
             source=str(row["source"]) if "source" in row_keys and row["source"] else "watchdog",
+            avg_rtt_ms=float(row["avg_rtt_ms"]) if "avg_rtt_ms" in row_keys else 0.0,
+            packet_loss_pct=float(row["packet_loss_pct"]) if "packet_loss_pct" in row_keys else 0.0,
         )
 
     @classmethod
@@ -509,8 +530,9 @@ class HistoryManager:
                     """
                     INSERT OR REPLACE INTO learned_profiles
                     (host, hour_bucket, network_id, connections, ip_family, recovery_action,
-                     speed_before, speed_after, supports_range, throttle_class, updated_at, updated_epoch, source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     speed_before, speed_after, supports_range, throttle_class, updated_at, updated_epoch, source,
+                     avg_rtt_ms, packet_loss_pct)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         host_low,
@@ -526,14 +548,16 @@ class HistoryManager:
                         now_str,
                         now_epoch,
                         src_val,
+                        float(profile.avg_rtt_ms),
+                        float(profile.packet_loss_pct),
                     ),
                 )
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO host_strategies
                     (host, best_action, connections, ip_family, speed_before, speed_after,
-                     supports_range, throttle_class, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     supports_range, throttle_class, updated_at, avg_rtt_ms, packet_loss_pct)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         host_low,
@@ -545,6 +569,8 @@ class HistoryManager:
                         sup_range_db,
                         profile.throttle_class,
                         now_str,
+                        float(profile.avg_rtt_ms),
+                        float(profile.packet_loss_pct),
                     ),
                 )
                 conn.commit()
@@ -763,6 +789,8 @@ class HistoryManager:
                 hour_bucket=best.hour_bucket,
                 network_id=best.network_id,
                 updated_epoch=best.updated_epoch,
+                avg_rtt_ms=best.avg_rtt_ms,
+                packet_loss_pct=best.packet_loss_pct,
             )
         return None
 
@@ -786,6 +814,8 @@ class HistoryManager:
                 throttle_class=strategy.throttle_class,
                 updated_at=strategy.updated_at,
                 updated_epoch=strategy.updated_epoch,
+                avg_rtt_ms=float(strategy.avg_rtt_ms),
+                packet_loss_pct=float(strategy.packet_loss_pct),
             )
         )
 
@@ -805,6 +835,8 @@ class HistoryManager:
                         supports_range=None if r["supports_range"] is None else bool(r["supports_range"]),
                         throttle_class=r["throttle_class"],
                         updated_at=r["updated_at"],
+                        avg_rtt_ms=float(r["avg_rtt_ms"]) if "avg_rtt_ms" in r.keys() else 0.0,
+                        packet_loss_pct=float(r["packet_loss_pct"]) if "packet_loss_pct" in r.keys() else 0.0,
                     )
                     for r in rows
                 ]

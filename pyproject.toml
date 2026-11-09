@@ -62,6 +62,61 @@ paradl = "pdl.cli:main"
 parallel-dl = "pdl.cli:main"
 pdl = "pdl.cli:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.9.0",
+    "mypy>=1.11.0",
+    "httpx[http2]>=0.28.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdl"]
 dev-mode-dirs = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
+lint.select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort imports
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "PLE",    # pylint errors
+    "PLW",    # pylint warnings
+    "PERF",   # pylint performance
+    "RET",    # flake8-return
+    "RUF",    # ruff-specific
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "UP",     # pyupgrade
+]
+lint.ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function calls in default args (intentional in some places)
+    "UP007",  # union type annotations (we use X | Y)
+]
+lint.unused-function-alias = ["cast"]
+format.quote-style = "double"
+format.markdown-code-fences = true
+format.docstring-code-format = true
+isort.known-first-party = ["pdl"]
+
+[tool.ruff.lint.perflint-ignores]
+# Allow specific performance rules where intentional
+list = []
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+strict_equality = true
+plugins = [
+    "pydantic.mypy",
+]

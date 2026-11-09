@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import mmap
 import re
 import sys
 import time
@@ -21,6 +22,9 @@ _BSD_CHECKSUM_RE = re.compile(
     r"^(MD5|SHA1|SHA256|SHA-256|SHA512|SHA-512|BLAKE2b)\s*\(([^)]+)\)\s*=\s*([0-9a-fA-F]+)$",
     re.IGNORECASE,
 )
+
+# Minimum file size (bytes) at which mmap is preferred for checksum verification.
+MMAP_CHECKSUM_THRESHOLD = 100 * 1024 * 1024  # 100 MiB
 
 
 class ChecksumEngine:
@@ -44,11 +48,21 @@ class ChecksumEngine:
             else:
                 raise ValueError(f"Unsupported hash algorithm: {a}")
 
-        buf_size = 1024 * 1024  # 1 MiB streaming buffer
-        with open(file_path, "rb") as f:
-            while chunk := f.read(buf_size):
-                for h in hashers.values():
-                    h.update(chunk)
+        file_size = file_path.stat().st_size
+        use_mmap = file_size >= MMAP_CHECKSUM_THRESHOLD
+
+        if use_mmap:
+            # mmap avoids userspace copies for large files; kernel page cache handles I/O.
+            with open(file_path, "rb") as f:
+                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    for h in hashers.values():
+                        h.update(mm)
+        else:
+            buf_size = 1024 * 1024  # 1 MiB streaming buffer
+            with open(file_path, "rb") as f:
+                while chunk := f.read(buf_size):
+                    for h in hashers.values():
+                        h.update(chunk)
 
         return {name: h.hexdigest() for name, h in hashers.items()}
 

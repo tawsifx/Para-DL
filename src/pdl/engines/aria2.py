@@ -11,6 +11,7 @@ import signal
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -28,6 +29,7 @@ from pdl.events import (
     check_free_disk_space,
     check_power_policy,
 )
+from pdl.history import HistoryManager
 from pdl.mirrors import MetalinkCompanion, MirrorManager
 from pdl.models import (
     DownloadItem,
@@ -40,7 +42,7 @@ from pdl.models import (
     format_speed,
     parse_rate,
 )
-from pdl.net import probe_range_support, re_resolve_dns
+from pdl.net import probe_range_support, resolve_dns
 from pdl import platform
 from pdl.postproc.checksum import ChecksumEngine
 from pdl.queue import check_when_fast_gate
@@ -98,6 +100,142 @@ def cleanup_children_and_temps(*, remove_partial_raw: bool = False) -> None:
 atexit.register(cleanup_children_and_temps)
 
 
+# ---------------------------------------------------------------------------
+# Persistent aria2c Daemon Pool
+# ---------------------------------------------------------------------------
+# Reuses aria2c JSON-RPC daemon instances across transfers to eliminate
+# per-download process startup overhead. Daemons are keyed by (ip_family, http3)
+# and shut down after an idle timeout.
+
+
+class _DaemonPoolEntry:
+    """Tracks a pooled aria2c daemon with last-used timestamp and in-use flag."""
+
+    def __init__(self, daemon: Aria2RpcDaemon) -> None:
+        self.daemon = daemon
+        self.last_used = time.monotonic()
+        self.in_use = False
+
+
+class Aria2DaemonPool:
+    """Thread-safe pool of reusable aria2c JSON-RPC daemon instances.
+
+    Daemons are keyed by (ip_family, http3). Acquiring a daemon either returns
+    an existing idle one or starts a new one. Releasing returns it to the pool
+    without stopping the process. Idle daemons are shut down after
+    ``idle_timeout_sec`` seconds.
+    """
+
+    def __init__(self, idle_timeout_sec: float = 60.0) -> None:
+        self.idle_timeout_sec = idle_timeout_sec
+        self._entries: dict[tuple[str, bool], _DaemonPoolEntry] = {}
+        self._lock = threading.Lock()
+        self._started = False
+
+    def _startup(self) -> None:
+        if not self._started:
+            atexit.register(self.shutdown_all)
+            self._started = True
+
+    def acquire(
+        self,
+        *,
+        aria2c_bin: str,
+        max_concurrent_downloads: int,
+        ip_family: str,
+        limit_rate: str | None,
+        check_integrity: bool,
+        http3: bool,
+    ) -> Aria2RpcDaemon:
+        """Acquire a daemon from the pool, starting a new one if needed."""
+        self._startup()
+        key = (ip_family, http3)
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is not None and entry.daemon._proc is not None and entry.daemon._proc.poll() is None:
+                # Reuse existing healthy daemon
+                entry.in_use = True
+                entry.last_used = time.monotonic()
+                return entry.daemon
+
+            # Stop any dead/stale daemon for this key
+            if entry is not None:
+                try:
+                    entry.daemon.stop(graceful=False)
+                except Exception:
+                    pass
+                del self._entries[key]
+
+            # Start a new daemon
+            daemon = Aria2RpcDaemon(
+                aria2c_bin=aria2c_bin,
+                max_concurrent_downloads=max_concurrent_downloads,
+                ip_family=ip_family,
+                limit_rate=limit_rate,
+                check_integrity=check_integrity,
+                http3=http3,
+            )
+            daemon.start()
+            entry = _DaemonPoolEntry(daemon)
+            entry.in_use = True
+            entry.last_used = time.monotonic()
+            self._entries[key] = entry
+            return daemon
+
+    def release(self, daemon: Aria2RpcDaemon) -> None:
+        """Return a daemon to the pool without stopping it."""
+        with self._lock:
+            for entry in self._entries.values():
+                if entry.daemon is daemon:
+                    entry.in_use = False
+                    entry.last_used = time.monotonic()
+                    break
+
+    def cleanup_idle(self) -> None:
+        """Shut down daemons that have been idle beyond the timeout."""
+        now = time.monotonic()
+        with self._lock:
+            for key, entry in list(self._entries.items()):
+                if not entry.in_use and (now - entry.last_used) > self.idle_timeout_sec:
+                    try:
+                        entry.daemon.stop(graceful=False)
+                    except Exception:
+                        pass
+                    del self._entries[key]
+
+    def shutdown_all(self) -> None:
+        """Stop all pooled daemons (called at exit)."""
+        with self._lock:
+            for entry in list(self._entries.values()):
+                try:
+                    entry.daemon.stop(graceful=False)
+                except Exception:
+                    pass
+            self._entries.clear()
+
+
+_DAEMON_POOL: Aria2DaemonPool | None = None
+
+
+def get_daemon_pool() -> Aria2DaemonPool:
+    """Return the module-level daemon pool, creating it on first use."""
+    global _DAEMON_POOL
+    if _DAEMON_POOL is None:
+        _DAEMON_POOL = Aria2DaemonPool()
+    return _DAEMON_POOL
+
+
+def shutdown_daemon_pool() -> None:
+    """Shut down all pooled daemons."""
+    global _DAEMON_POOL
+    if _DAEMON_POOL is not None:
+        _DAEMON_POOL.shutdown_all()
+        _DAEMON_POOL = None
+
+
+atexit.register(shutdown_daemon_pool)
+
+
 def _pick_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
@@ -115,6 +253,7 @@ class Aria2RpcDaemon:
         ip_family: str = "auto",
         limit_rate: str | None = None,
         check_integrity: bool = False,
+        http3: bool = False,
     ) -> None:
         self.aria2c_bin = aria2c_bin
         self.port = _pick_free_port()
@@ -124,6 +263,7 @@ class Aria2RpcDaemon:
         self.ip_family = ip_family
         self.limit_rate = format_rate_for_aria2(limit_rate)
         self.check_integrity = check_integrity
+        self.http3 = http3
         self._proc: subprocess.Popen[Any] | None = None
         self._conf_path: Path | None = None
         self._http_client: Any = None
@@ -166,6 +306,9 @@ class Aria2RpcDaemon:
         if self.check_integrity:
             conf_lines.append("check-integrity=true")
             conf_lines.append("realtime-chunk-checksum=true")
+
+        if self.http3:
+            conf_lines.append("http3=true")
 
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write("\n".join(conf_lines) + "\n")
@@ -345,6 +488,8 @@ class Aria2Engine:
         when_fast_retest_interval_sec: float = 15.0,
         when_fast_prober: Callable[[str], float] | None = None,
         event_source: ResilienceEventSource | None = None,
+        http3: bool = False,
+        doh_endpoint: str | None = None,
     ) -> TransferResult:
         merged_mirrors = list(target_info.mirrors)
         for m in mirrors or []:
@@ -389,6 +534,8 @@ class Aria2Engine:
             when_fast_retest_interval_sec=when_fast_retest_interval_sec,
             when_fast_prober=when_fast_prober,
             event_source=event_source,
+            http3=http3,
+            doh_endpoint=doh_endpoint,
         )
 
     @classmethod
@@ -418,6 +565,8 @@ class Aria2Engine:
         when_fast_retest_interval_sec: float = 15.0,
         when_fast_prober: Callable[[str], float] | None = None,
         event_source: ResilienceEventSource | None = None,
+        http3: bool = False,
+        doh_endpoint: str | None = None,
     ) -> TransferResult:
         aria2c_bin = TOOLCHAIN.aria2c
         if not aria2c_bin:
@@ -580,6 +729,11 @@ class Aria2Engine:
         all_speed_samples: list[float] = []
         completed_items: set[int] = set()
 
+        # Adaptive polling state: faster when volatile, slower when stable
+        _poll_interval = poll_interval
+        _last_speed: float | None = None
+        _stable_ticks = 0
+
         title_label = items[0].filename or os.path.basename(first_url.split("?", 1)[0]) or f"{len(items)} file(s)"
 
         ev_src = event_source or ResilienceEventSource(
@@ -595,19 +749,45 @@ class Aria2Engine:
             while len(completed_items) < len(items):
                 remaining_indices = [i for i in range(len(items)) if i not in completed_items]
                 curr_conc = min(len(remaining_indices), max_conc)
-                # Global connection budget across concurrent files capped at safe_conn (<= 16)
-                per_file_conn = max(1, watchdog.connections // max(curr_conc, 1)) if supports_range else 1
 
-                daemon = Aria2RpcDaemon(
+                # --- Adaptive concurrency based on per-host RTT/loss ---
+                # Read learned host strategy (RTT, loss) to tune connection count.
+                # High RTT or loss reduces concurrent flows to avoid head-of-line blocking
+                # and socket contention; clean paths can use the full budget.
+                parsed_host = (urlparse(first_url).hostname or "").lower()
+                host_strategy = HistoryManager.get_host_strategy(parsed_host) if parsed_host else None
+                avg_rtt_ms = host_strategy.avg_rtt_ms if host_strategy else 0.0
+                pkt_loss_pct = host_strategy.packet_loss_pct if host_strategy else 0.0
+
+                # Start from watchdog connection budget, then adapt:
+                #   RTT > 100ms  -> scale down toward 4 conns (high latency)
+                #   Loss > 5%    -> scale down toward 4 conns (unstable path)
+                #   RTT < 50ms & Loss < 1% -> keep full budget (clean path)
+                budget = watchdog.connections if supports_range else 1
+                if supports_range and budget > 1:
+                    rtt_factor = 1.0
+                    if avg_rtt_ms > 100.0:
+                        rtt_factor = max(0.25, 1.0 - (avg_rtt_ms - 100.0) / 500.0)
+                    loss_factor = 1.0
+                    if pkt_loss_pct > 5.0:
+                        loss_factor = max(0.25, 1.0 - (pkt_loss_pct - 5.0) / 20.0)
+                    adaptive_factor = min(rtt_factor, loss_factor)
+                    budget = max(4, int(budget * adaptive_factor))
+
+                # Global connection budget across concurrent files capped at safe_conn (<= 16)
+                per_file_conn = max(1, budget // max(curr_conc, 1)) if supports_range else 1
+
+                # Acquire a pooled daemon (reuses existing process instead of spawning a new one)
+                daemon = get_daemon_pool().acquire(
                     aria2c_bin=aria2c_bin,
-                    max_concurrent_downloads=curr_conc,
+                    max_concurrent_downloads=max_conc,
                     ip_family=watchdog.ip_family,
                     limit_rate=limit_rate,
                     check_integrity=bool(item_metalinks),
+                    http3=http3,
                 )
+                gid_to_idx: dict[str, int] = {}
                 try:
-                    daemon.start()
-                    gid_to_idx: dict[str, int] = {}
 
                     for idx in remaining_indices:
                         it = items[idx]
@@ -863,8 +1043,8 @@ class Aria2Engine:
 
                                 if decision.action == WatchdogActionType.RESILIENCE_RECYCLE:
                                     # Every resilience event (WAKE, NET_CHANGE, STALL) triggers the same action:
-                                    # 1. Re-resolve DNS
-                                    re_resolve_dns(parsed_host)
+                                    # 1. Re-resolve DNS (via DoH if configured)
+                                    resolve_dns(parsed_host, doh_endpoint=doh_endpoint)
                                     # 2. Reset the speed baseline
                                     all_speed_samples.clear()
                                     watchdog.reset_speed_baseline()
@@ -912,11 +1092,38 @@ class Aria2Engine:
                                     restart_daemon_needed = True
                                     break
 
-                        # Sleep before next poll tick if transfers are still active
+                        # Sleep before next poll tick if transfers are still active.
+                        # Adaptive polling: slow down when stable, speed up when volatile.
                         if gid_to_idx and not restart_daemon_needed:
-                            get_clock().sleep(poll_interval)
+                            if global_speed > 0 and _last_speed is not None:
+                                speed_delta = abs(global_speed - _last_speed) / max(_last_speed, 1.0)
+                                if speed_delta < 0.10:
+                                    _stable_ticks += 1
+                                    if _stable_ticks >= 5 and _poll_interval < 1.0:
+                                        _poll_interval = min(1.0, _poll_interval + 0.1)
+                                else:
+                                    _stable_ticks = 0
+                                    if _poll_interval > 0.2:
+                                        _poll_interval = max(0.2, _poll_interval - 0.1)
+                            _last_speed = global_speed
+                            get_clock().sleep(_poll_interval)
                 finally:
-                    daemon.stop(graceful=True)
+                    # Release daemon back to pool instead of stopping it.
+                    # If restart is needed, force-stop and remove from pool.
+                    if restart_daemon_needed:
+                        try:
+                            daemon.stop(graceful=False)
+                        except Exception:
+                            pass
+                        # Remove from pool so a fresh one is acquired next iteration
+                        pool = get_daemon_pool()
+                        with pool._lock:
+                            for key, entry in list(pool._entries.items()):
+                                if entry.daemon is daemon:
+                                    del pool._entries[key]
+                                    break
+                    else:
+                        get_daemon_pool().release(daemon)
 
         duration = max(time.time() - t_start, 0.001)
 
@@ -1067,4 +1274,6 @@ class Aria2Engine:
             when_fast_bps=float(options.get("when_fast_bps", 0.0) or 0.0),
             when_fast_retest_interval_sec=float(options.get("when_fast_retest_interval_sec", 15.0) or 15.0),
             when_fast_prober=options.get("when_fast_prober"),
+            http3=bool(options.get("http3", False)),
+            doh_endpoint=options.get("doh_endpoint"),
         )

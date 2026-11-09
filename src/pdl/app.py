@@ -898,6 +898,8 @@ class PDLApp:
                         "sponsorblock": bool(getattr(args, "sponsorblock", False)),
                         "ejs_remote": bool(getattr(args, "ejs_remote", False)),
                         "player_client": self.config.ytdlp_player_client,
+                        "http3": bool(getattr(args, "http3", False)),
+                        "doh_endpoint": self.config.doh_endpoint,
                     }
 
                     if t_info.target_type == TargetType.HF:
@@ -1247,6 +1249,8 @@ class PDLApp:
                 pause_on_low_power=getattr(args, "pause_on_low_power", False),
                 write_xattr=not getattr(args, "no_xattr", False),
                 notify=getattr(args, "notify", False),
+                http3=bool(getattr(args, "http3", False)),
+                doh_endpoint=self.config.doh_endpoint,
             )
             return int(res.exit_code)
         finally:

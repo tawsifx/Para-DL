@@ -349,11 +349,17 @@ Recipes:
         help="Duration in seconds for 'pdl netprobe' or 'pdl bench' (default: 60).",
     )
     parser.add_argument(
-        "--http3",
         "--http3-probe",
         dest="http3_probe",
         action="store_true",
         help="Probe optional HTTP/3 support via curl during 'pdl netprobe'.",
+    )
+    parser.add_argument(
+        "--http3",
+        dest="http3",
+        action="store_true",
+        default=False,
+        help="Enable HTTP/3 (QUIC) for aria2c transfers when supported by the server.",
     )
     parser.add_argument(
         "--push",
@@ -630,7 +636,7 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
             return handle_auth_command(action, service)
         elif sub == "netprobe":
             if not rest:
-                print_plain("  [error]Usage: pdl netprobe <url> [--duration 60] [--http3][/error]", force=True)
+                print_plain("  [error]Usage: pdl netprobe <url> [--duration 60] [--http3-probe][/error]", force=True)
                 return int(ExitCode.USAGE)
             args.netprobe_url = rest[0]
         elif sub == "bench":

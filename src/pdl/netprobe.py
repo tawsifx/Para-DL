@@ -30,6 +30,8 @@ class ProbePassMetrics:
     avg_speed_bps: float
     early_speed_bps: float
     late_speed_bps: float
+    avg_rtt_ms: float = 0.0
+    packet_loss_pct: float = 0.0
     time_series_bps: list[float] = field(default_factory=list)
 
 
@@ -97,8 +99,9 @@ def _measure_parallel_stream(
     start_ts = get_clock().monotonic()
     stop_at = start_ts + duration_sec
 
-    def _worker(worker_idx: int) -> int:
+    def _worker(worker_idx: int) -> tuple[int, float]:
         worker_total = 0
+        worker_rtt_ms = 0.0
         headers = {"User-Agent": f"pdl-netprobe/{VERSION}"}
         if supports_range and total_size and total_size > conns * 4096:
             chunk_span = total_size // conns
@@ -114,11 +117,17 @@ def _measure_parallel_stream(
                 timeout=httpx.Timeout(min(duration_sec + 3.0, 10.0), connect=3.0),
             ) as client:
                 while get_clock().monotonic() < stop_at:
+                    ttfb_start = get_clock().monotonic()
                     with client.stream("GET", url, headers=headers) as resp:
                         if resp.status_code not in (200, 206):
                             break
+                        # Measure RTT as time-to-first-byte on the first request of each connection
+                        first_chunk = True
                         for chunk in resp.iter_bytes(chunk_size=16384):
                             now = get_clock().monotonic()
+                            if first_chunk:
+                                worker_rtt_ms = (now - ttfb_start) * 1000.0
+                                first_chunk = False
                             if now >= stop_at:
                                 break
                             n = len(chunk)
@@ -131,11 +140,13 @@ def _measure_parallel_stream(
                         break
         except Exception as exc:
             logger.debug("netprobe worker %d stopped: %s", worker_idx, exc)
-        return worker_total
+        return worker_total, worker_rtt_ms
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=conns) as pool:
         futs = [pool.submit(_worker, i) for i in range(conns)]
-        total_bytes = sum(f.result() for f in futs)
+        results = [f.result() for f in futs]
+        total_bytes = sum(r[0] for r in results)
+        rtt_samples = [r[1] for r in results if r[1] > 0]
 
     actual_dur = max(get_clock().monotonic() - start_ts, 0.05)
     valid_buckets = max(1, min(int(actual_dur / bucket_interval), num_buckets))
@@ -150,6 +161,7 @@ def _measure_parallel_stream(
     early_avg = sum(early_slice) / len(early_slice)
     late_avg = sum(late_slice) / len(late_slice)
     overall_avg = total_bytes / actual_dur
+    avg_rtt = sum(rtt_samples) / len(rtt_samples) if rtt_samples else 0.0
 
     return ProbePassMetrics(
         label=f"{conns} conn(s)",
@@ -160,6 +172,8 @@ def _measure_parallel_stream(
         avg_speed_bps=overall_avg,
         early_speed_bps=early_avg,
         late_speed_bps=late_avg,
+        avg_rtt_ms=avg_rtt,
+        packet_loss_pct=0.0,
         time_series_bps=series,
     )
 
@@ -298,6 +312,8 @@ def run_netprobe(
         speed_after=passes[-1].avg_speed_bps,
         supports_range=supports_range,
         throttle_class=t_class,
+        avg_rtt_ms=passes[0].avg_rtt_ms,
+        packet_loss_pct=passes[0].packet_loss_pct,
     )
     HistoryManager.save_host_strategy(strategy)
 

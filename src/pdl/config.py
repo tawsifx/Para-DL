@@ -56,6 +56,7 @@ class PDLConfig:
     require_ac: bool = False
     pause_on_low_power: bool = False
     isp: str = "auto"
+    doh_endpoint: str | None = None
 
     def get_effective_isp(self) -> str:
         """Return configured ISP if explicitly set, or auto-detect from active network."""
@@ -151,6 +152,13 @@ class PDLConfig:
         if not isinstance(self.isp, str) or not self.isp.strip():
             raise ValueError("isp must be a non-empty string")
         self.isp = self.isp.strip()
+
+        if self.doh_endpoint is not None:
+            if not isinstance(self.doh_endpoint, str) or not self.doh_endpoint.strip():
+                raise ValueError("doh_endpoint must be a URL string or null")
+            self.doh_endpoint = self.doh_endpoint.strip()
+            if not self.doh_endpoint.startswith(("http://", "https://")):
+                raise ValueError(f"doh_endpoint must be an http/https URL, got {self.doh_endpoint!r}")
 
     @classmethod
     def _backup_corrupt_file(cls, cfg_file: Path, exc: Exception) -> None:

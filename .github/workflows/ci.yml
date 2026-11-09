@@ -7,18 +7,37 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint-and-type:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dev dependencies
+        run: uv sync --group dev
+
+      - name: Run ruff (lint + format check)
+        run: uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
+
+      - name: Run mypy (type check)
+        run: uv run mypy src/pdl/
+
+  test-macos:
+    name: Tests (macOS)
     runs-on: macos-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: |
-          brew install aria2 ffmpeg
+        run: brew install aria2 ffmpeg
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v3
@@ -29,10 +48,60 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          uv sync
+        run: uv sync --group dev
 
-      - name: Verify CLI installation and health
+      - name: Run test suite
+        run: uv run pytest tests/ -v --cov=src/pdl --cov-report=term-missing --cov-fail-under=80
+
+  test-windows:
+    name: Tests (Windows)
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
         run: |
-          uv run paradl --version
-          uv run paradl doctor
+          winget install aria2.aria2 Gyan.FFmpeg || true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run test suite
+        run: uv run pytest tests/ -v --cov=src/pdl --cov-report=term-missing --cov-fail-under=80
+
+  bench:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: lint-and-type
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run benchmarks
+        run: uv run pytest tests/bench/ --benchmark-only --benchmark-json=benchmark.json || true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark.json
+          retention-days: 30

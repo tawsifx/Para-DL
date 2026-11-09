@@ -233,16 +233,34 @@ def format_rate_for_aria2(rate_str: str | None) -> str | None:
 
 
 def sanitize_filename(name: str) -> str:
-    """Sanitize a filename by replacing unsafe characters."""
+    """Sanitize a filename by replacing unsafe characters and blocking traversal/reserved names."""
     for ch in ["/", "\\", ":", "*", "?", '"', "<", ">", "|", "\0"]:
         name = name.replace(ch, "_")
-    return name.strip()[:200] or "download"
+    cleaned = name.strip()[:200]
+    # Guard against dot-only names and directory traversal primitives
+    stripped_dots = cleaned.strip(" .")
+    if not stripped_dots or set(stripped_dots) <= {"."}:
+        return "download"
+    # Guard against Windows reserved device names (e.g. CON, PRN, AUX, NUL, COM1..9, LPT1..9)
+    base_stem = stripped_dots.split(".", 1)[0].upper()
+    if base_stem in {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }:
+        return f"_{cleaned}"
+    return cleaned or "download"
 
 
 def format_size(bytes_sz: int | float | None) -> str:
     """Format byte count into human-readable string."""
-    if bytes_sz is None or bytes_sz <= 0:
+    if bytes_sz is None:
         return "Unknown size"
+    if bytes_sz <= 0:
+        return "0 B"
     val = float(bytes_sz)
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if val < 1024.0:

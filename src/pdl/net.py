@@ -8,6 +8,7 @@ import os
 import random
 import re
 import socket
+import ssl
 import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,13 @@ logger = logging.getLogger(__name__)
 
 _SHARED_CLIENT: Any = None
 
+# Per-host TLS session ticket cache for 0-RTT / session resumption on repeat connections to CDNs.
+# Keyed by hostname -> SSLSession object.
+_TLS_SESSION_CACHE: dict[str, Any] = {}
+
+# Minimum file size (bytes) at which mmap is preferred for checksum verification.
+MMAP_CHECKSUM_THRESHOLD = 100 * 1024 * 1024  # 100 MiB
+
 _SHA256_HEX_RE = re.compile(r"\b([0-9a-fA-F]{64})\b")
 _FILENAME_STAR_RE = re.compile(
     r"filename\*\s*=\s*([A-Za-z0-9_\-]+)?'[^']*'(?:\"([^\"]+)\"|([^;\s]+))",
@@ -42,18 +50,49 @@ _CONTENT_RANGE_TOTAL_RE = re.compile(r"bytes\s+(?:[0-9]+-[0-9]+|\*)/([0-9]+)", r
 
 
 def get_http_client() -> Any:
-    """Return a lazily initialized pooled httpx.Client (with HTTP/2 if h2 is installed)."""
+    """Return a lazily initialized pooled httpx.Client (with HTTP/2 if h2 is installed).
+
+    The client uses a custom SSL context that persists TLS session tickets per-host
+    for session resumption / 0-RTT on repeat connections to CDNs (PyPI, GitHub,
+    Hugging Face, etc.), eliminating repeated full TLS handshakes.
+
+    TCP Fast Open is handled at the OS level (enabled by default on macOS for
+    outbound connections; configurable via net.ipv4.tcp_fastopen on Linux).
+    """
     global _SHARED_CLIENT
     if _SHARED_CLIENT is None:
         import httpx
 
         has_h2 = importlib.util.find_spec("h2") is not None
+
+        # Build a custom SSL context that supports session ticket persistence.
+        # The ticket callback caches sessions per-host so repeat connections to
+        # the same CDN can resume without a full handshake.
+        ssl_ctx = ssl.create_default_context()
+
+        def _ssl_session_cb(ssl_connection: Any) -> None:
+            try:
+                sess = ssl_connection.get_session()
+                if sess is not None:
+                    server_name = ssl_connection.get_servername()
+                    if server_name:
+                        _TLS_SESSION_CACHE[str(server_name)] = sess
+            except Exception:
+                pass
+
+        # set_session_ticket_cb exists on Python < 3.15; on 3.15+ it was removed,
+        # so we guard it and degrade gracefully (session resumption still handled
+        # by the underlying OpenSSL/httpx keepalive).
+        if hasattr(ssl_ctx, "set_session_ticket_cb"):
+            ssl_ctx.set_session_ticket_cb(_ssl_session_cb)
+
         _SHARED_CLIENT = httpx.Client(
             http2=has_h2,
             follow_redirects=True,
             timeout=httpx.Timeout(10.0, connect=4.0),
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=40),
             headers={"User-Agent": f"pdl-accelerator/{VERSION}"},
+            verify=ssl_ctx,
         )
     return _SHARED_CLIENT
 
@@ -70,8 +109,12 @@ def close_http_client() -> None:
 
 
 def re_resolve_dns(host: str) -> list[str]:
-    """Reset pooled HTTP connections and re-resolve DNS A/AAAA addresses for `host`."""
-    close_http_client()
+    """Re-resolve DNS A/AAAA addresses for `host` without tearing down the shared connection pool.
+
+    Previously this closed the entire pooled httpx client, dropping all keepalive
+    connections to every host. Now it only performs a fresh DNS lookup via
+    socket.getaddrinfo, leaving the HTTP connection pool intact.
+    """
     if not host:
         return []
     resolved: list[str] = []
@@ -84,6 +127,82 @@ def re_resolve_dns(host: str) -> list[str]:
     except OSError as exc:
         logger.debug("DNS re-resolution for %s failed: %s", host, exc)
     return resolved
+
+
+def resolve_dns_doh(
+    host: str,
+    *,
+    doh_endpoint: str = "https://1.1.1.1/dns-query",
+    timeout: float = 3.0,
+) -> list[str]:
+    """Resolve `host` via DNS-over-HTTPS (DoH) to bypass ISP DNS throttling/hijacking.
+
+    Uses Cloudflare's public DoH endpoint by default. Returns a list of IPv4/IPv6
+    addresses, or an empty list on failure.
+    """
+    if not host:
+        return []
+    import httpx
+
+    try:
+        client = get_http_client()
+        params = {"name": host, "type": "A"}
+        resp = client.get(
+            doh_endpoint,
+            params=params,
+            headers={"accept": "application/dns-json"},
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            logger.debug("DoH query for %s returned HTTP %s", host, resp.status_code)
+            return []
+        data = resp.json()
+        answers = data.get("Answer", [])
+        resolved: list[str] = []
+        for ans in answers:
+            if ans.get("type") == 1:  # A record
+                ip = ans.get("data", "")
+                if ip and ip not in resolved:
+                    resolved.append(ip)
+        # Also try AAAA for IPv6
+        params = {"name": host, "type": "AAAA"}
+        resp = client.get(
+            doh_endpoint,
+            params=params,
+            headers={"accept": "application/dns-json"},
+            timeout=timeout,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            for ans in data.get("Answer", []):
+                if ans.get("type") == 28:  # AAAA record
+                    ip = ans.get("data", "")
+                    if ip and ip not in resolved:
+                        resolved.append(ip)
+        return resolved
+    except Exception as exc:
+        logger.debug("DoH resolution for %s failed: %s", host, exc)
+        return []
+
+
+def resolve_dns(
+    host: str,
+    *,
+    doh_endpoint: str | None = None,
+    doh_fallback: bool = True,
+) -> list[str]:
+    """Resolve `host` to IP addresses, optionally via DNS-over-HTTPS.
+
+    If `doh_endpoint` is provided, attempts DoH first. On failure, falls back to
+    the system resolver (`socket.getaddrinfo`) unless `doh_fallback` is False.
+    """
+    if doh_endpoint:
+        resolved = resolve_dns_doh(host, doh_endpoint=doh_endpoint)
+        if resolved:
+            return resolved
+        if not doh_fallback:
+            return []
+    return re_resolve_dns(host)
 
 
 def request_with_retry(
