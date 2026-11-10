@@ -446,7 +446,17 @@ Recipes:
     parser.add_argument(
         "--type",
         dest="history_type",
-        choices=["direct", "stream", "search", "github", "huggingface", "ipsw", "pypi", "brew", "torrent"],
+        choices=[
+            "direct",
+            "stream",
+            "search",
+            "github",
+            "huggingface",
+            "ipsw",
+            "pypi",
+            "brew",
+            "torrent",
+        ],
         help="Filter history entries by download type.",
     )
     parser.add_argument(

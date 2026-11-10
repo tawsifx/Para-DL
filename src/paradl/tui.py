@@ -75,11 +75,11 @@ except ImportError:  # pragma: no cover - depends on optional install
 # ---------------------------------------------------------------------------
 
 STATUS_COLORS: dict[str, str] = {
-    "queued": "#888888",      # muted neutral
-    "running": "#00ff88",     # green — active progress
-    "paused": "#ffcc00",      # amber — suspendable
-    "completed": "#00cc66",   # green — done
-    "failed": "#ff4444",      # red — error
+    "queued": "#888888",  # muted neutral
+    "running": "#00ff88",  # green — active progress
+    "paused": "#ffcc00",  # amber — suspendable
+    "completed": "#00cc66",  # green — done
+    "failed": "#ff4444",  # red — error
 }
 
 STATUS_LABELS: dict[str, str] = {
@@ -246,9 +246,7 @@ class _DownloadRunner:
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._loop, name="pdl-tui-runner", daemon=True
-        )
+        self._thread = threading.Thread(target=self._loop, name="pdl-tui-runner", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -277,9 +275,7 @@ class _DownloadRunner:
         self.store.update_progress(task_id, status="running")
         QueueManager.update_job_status(task_id, "running")
 
-        def on_progress(
-            downloaded: int, total: int | None, speed: float, conns: int
-        ) -> None:
+        def on_progress(downloaded: int, total: int | None, speed: float, conns: int) -> None:
             self.app.call_from_thread(
                 self.store.update_progress,
                 task_id,
@@ -297,9 +293,7 @@ class _DownloadRunner:
                 t_info.mirrors = list(job.mirrors)
 
             try:
-                wd_mode = WatchdogMode(
-                    str(job.options.get("watchdog_mode", "v2")).lower()
-                )
+                wd_mode = WatchdogMode(str(job.options.get("watchdog_mode", "v2")).lower())
             except ValueError:
                 wd_mode = WatchdogMode.V2
 
@@ -349,9 +343,7 @@ class _DownloadRunner:
                         size=result.bytes_downloaded,
                         duration=result.duration,
                         success=True,
-                        sha256=result.checksum_digest
-                        if result.checksum_algo == "sha256"
-                        else None,
+                        sha256=result.checksum_digest if result.checksum_algo == "sha256" else None,
                         history_limit=self.config.history_limit,
                     )
             else:
@@ -481,7 +473,9 @@ class PdlTuiApp(_AppBase[None]):
             # Header
             Container(
                 Static("pdl", id="header-title", classes="header-title"),
-                Static("Parallel Download Manager", id="header-subtitle", classes="header-subtitle"),
+                Static(
+                    "Parallel Download Manager", id="header-subtitle", classes="header-subtitle"
+                ),
                 id="header",
             ),
             # Filter bar

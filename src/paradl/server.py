@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from paradl.config import PDLConfig
 from paradl.engines.aria2 import Aria2Engine
@@ -62,6 +62,7 @@ except ImportError:  # pragma: no cover - depends on optional install
 
     class BaseModel:  # type: ignore[no-redef]
         """Fallback stub so module imports without fastapi installed."""
+
         def model_dump(self) -> dict[str, Any]:
             return {}
 
@@ -74,9 +75,13 @@ except ImportError:  # pragma: no cover - depends on optional install
 # API request / response models
 # ===========================================================================
 
+
 class ResolveRequest(BaseModel):
     """Classify a download target without starting a transfer (Gopeed resolve_task)."""
-    target: str = Field(..., description="URL, magnet, torrent, hf:/gh:/ipsw:/pip: shortcut, or search query")
+
+    target: str = Field(
+        ..., description="URL, magnet, torrent, hf:/gh:/ipsw:/pip: shortcut, or search query"
+    )
 
 
 class ResolveResponse(BaseModel):
@@ -95,6 +100,7 @@ class ResolveResponse(BaseModel):
 
 class CreateTaskRequest(BaseModel):
     """Create a new download task (Gopeed create_task)."""
+
     model_config = ConfigDict(extra="ignore")
 
     target: str = Field(..., description="URL or shortcut (hf:/gh:/ipsw:/pip: etc.)")
@@ -102,7 +108,9 @@ class CreateTaskRequest(BaseModel):
         default=None, description="Output directory (default: pdl config output_dir)"
     )
     filename: str | None = Field(default=None, description="Suggested output filename")
-    connections: int = Field(default=16, ge=1, le=16, description="Parallel connection streams (1-16)")
+    connections: int = Field(
+        default=16, ge=1, le=16, description="Parallel connection streams (1-16)"
+    )
     mirrors: list[str] = Field(default_factory=list, description="Alternate mirror URLs")
     priority: int = Field(default=0, description="Queue priority (higher runs first)")
     watchdog: str = Field(default="v2", description="Anti-throttle watchdog: v1, v2, or off")
@@ -114,17 +122,19 @@ class CreateTaskRequest(BaseModel):
     pause_on_low_power: bool = Field(
         default=False, description="Pause while macOS Low Power / Battery Saver is active"
     )
-    when_fast_bps: float = Field(default=0.0, description="Only start when short speed test exceeds this")
+    when_fast_bps: float = Field(
+        default=0.0, description="Only start when short speed test exceeds this"
+    )
     start_at: str | None = Field(default=None, description="Scheduled start time HH:MM")
     expected_digest: str | None = Field(
         default=None, description="Expected checksum (sha256:<hex>) for verification"
     )
-    checksum: str | None = Field(
-        default=None, description="Alias for expected_digest"
-    )
+    checksum: str | None = Field(default=None, description="Alias for expected_digest")
     auto_extract: bool = Field(default=False, description="Auto-extract archives on completion")
     http3: bool = Field(default=True, description="Enable HTTP/3 (QUIC) when supported")
-    proxy: str | None = Field(default=None, description="Proxy URL for aria2c transfers (--all-proxy)")
+    proxy: str | None = Field(
+        default=None, description="Proxy URL for aria2c transfers (--all-proxy)"
+    )
     is_audio: bool = Field(default=True, description="Media: extract audio only (vs video)")
     audio_codec: str = Field(default="aac", description="Media audio codec")
     video_quality: str = Field(default="best", description="Media video quality preset")
@@ -182,12 +192,13 @@ class TaskActionResponse(BaseModel):
 # In-memory task state store (thread-safe)
 # ===========================================================================
 
+
 @dataclass
 class _ApiTask:
-    id: str                       # API-facing task id (uuid or sqlite job id as str)
+    id: str  # API-facing task id (uuid or sqlite job id as str)
     target: str
     target_type: str
-    queue_job_id: int | None = None   # SQLite queue_jobs.id when persisted there
+    queue_job_id: int | None = None  # SQLite queue_jobs.id when persisted there
     status: str = "queued"  # queued, running, paused, completed, failed
     out_dir: str = ""
     filename: str | None = None
@@ -201,6 +212,9 @@ class _ApiTask:
     created_at: str = ""
     updated_at: str = ""
     options: dict[str, Any] = field(default_factory=dict)
+    require_ac: bool | None = None
+    pause_on_low_power: bool | None = None
+    when_fast_bps: float | None = None
 
     def to_api(self) -> TaskInfo:
         return TaskInfo(
@@ -295,6 +309,7 @@ class _TaskStore:
 # Background task runner
 # ===========================================================================
 
+
 class _TaskRunner:
     """Picks up queued tasks from the store + SQLite queue and runs them via Aria2Engine."""
 
@@ -346,6 +361,7 @@ class _TaskRunner:
                 speed_bps=speed,
                 status="running",
             )
+
         return cb
 
     # -- single task execution --------------------------------------------
@@ -361,9 +377,11 @@ class _TaskRunner:
                 self.store.update(task_id, status="paused")
                 return
 
-            out_dir = Path(task.out_dir).expanduser().resolve() if task.out_dir else Path(
-                self.config.output_dir
-            ).expanduser().resolve()
+            out_dir = (
+                Path(task.out_dir).expanduser().resolve()
+                if task.out_dir
+                else Path(self.config.output_dir).expanduser().resolve()
+            )
             out_dir.mkdir(parents=True, exist_ok=True)
 
             # Classify the target
@@ -394,13 +412,13 @@ class _TaskRunner:
                 min_cooldown_sec=2.0,
                 caffeinate=bool(task.options.get("caffeinate", self.config.caffeinate)),
                 net_watch=bool(task.options.get("net_watch", self.config.net_watch)),
-                stall_timeout=float(task.options.get("stall_timeout", self.config.stall_timeout)),
+                stall_timeout=float(task.options.get("stall_timeout") or self.config.stall_timeout),
                 require_ac=bool(task.options.get("require_ac", task.require_ac)),
                 pause_on_low_power=bool(
                     task.options.get("pause_on_low_power", task.pause_on_low_power)
                 ),
                 mirrors=mirrors,
-                when_fast_bps=float(task.options.get("when_fast_bps", task.when_fast_bps)),
+                when_fast_bps=float(task.options.get("when_fast_bps") or task.when_fast_bps or 0.0),
                 http3=bool(task.options.get("http3", True)),
                 proxy=task.options.get("proxy"),
                 on_progress=self._make_progress_cb(task_id),
@@ -527,7 +545,8 @@ class _TaskRunner:
                 if self._active_count() >= self.max_concurrent:
                     break
                 # Skip if already assigned to a running thread
-                if self.store.get_thread(task.id) is not None and self.store.get_thread(task.id).is_alive():
+                thread = self.store.get_thread(task.id)
+                if thread is not None and thread.is_alive():
                     continue
                 # Check stop event before dispatching
                 if self.store.is_stopped(task.id):
@@ -578,6 +597,7 @@ def _get_state() -> dict[str, Any]:
 # ===========================================================================
 # FastAPI app construction
 # ===========================================================================
+
 
 def _build_app(store: _TaskStore, config: PDLConfig) -> FastAPI:
     app = FastAPI(
@@ -708,7 +728,9 @@ def _build_app(store: _TaskStore, config: PDLConfig) -> FastAPI:
     # ------------------------------------------------------------------
     @app.get("/tasks", response_model=TaskListResponse, tags=["tasks"])
     def list_tasks(
-        status: str | None = Query(default=None, description="Filter by status: queued, running, paused, completed, failed"),
+        status: str | None = Query(
+            default=None, description="Filter by status: queued, running, paused, completed, failed"
+        ),
     ) -> TaskListResponse:
         """List all tasks, optionally filtered by status."""
         tasks = store.list_all()
@@ -798,7 +820,9 @@ def _build_app(store: _TaskStore, config: PDLConfig) -> FastAPI:
             with contextlib.suppress(Exception):
                 QueueManager.remove_jobs([task.queue_job_id])
 
-        return TaskActionResponse(id=task_id, status="deleted", message="Task cancelled and removed.")
+        return TaskActionResponse(
+            id=task_id, status="deleted", message="Task cancelled and removed."
+        )
 
     return app
 
@@ -807,10 +831,11 @@ def _build_app(store: _TaskStore, config: PDLConfig) -> FastAPI:
 # Server entrypoint
 # ===========================================================================
 
+
 def create_app() -> FastAPI:
     """Build and return the FastAPI application (starts the background runner)."""
     state = _get_state()
-    return state["app"]
+    return cast(FastAPI, state["app"])
 
 
 def run_server(
@@ -827,7 +852,7 @@ def run_server(
     _get_state()
 
     UI.emit_event("api_server_started", host=host, port=port)
-    uvicorn.run(  # type: ignore
+    uvicorn.run(
         create_app(),
         host=host,
         port=port,

@@ -291,9 +291,7 @@ class HistoryManager:
         try:
             cols = {r["name"] for r in conn.execute("PRAGMA table_info(queue_jobs)").fetchall()}
             if "category" not in cols:
-                conn.execute(
-                    "ALTER TABLE queue_jobs ADD COLUMN category TEXT NOT NULL DEFAULT ''"
-                )
+                conn.execute("ALTER TABLE queue_jobs ADD COLUMN category TEXT NOT NULL DEFAULT ''")
         except sqlite3.Error:
             pass
         conn.execute(
@@ -445,9 +443,7 @@ class HistoryManager:
                 clauses: list[str] = []
 
                 if search:
-                    clauses.append(
-                        "(LOWER(filename) LIKE LOWER(?) OR LOWER(target) LIKE LOWER(?))"
-                    )
+                    clauses.append("(LOWER(filename) LIKE LOWER(?) OR LOWER(target) LIKE LOWER(?))")
                     like = f"%{search}%"
                     params.extend([like, like])
 

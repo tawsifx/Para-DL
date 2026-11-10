@@ -421,9 +421,7 @@ class LiveTransferDisplay:
                 f_bar = "█" * f_filled + "░" * (f_bar_w - f_filled)
                 txt.append(f"    {fname:28} [{f_bar}] {f_pct:5.1f}%  ", style="dim white")
                 if f_total > 0:
-                    txt.append(
-                        f"{format_size(f_down)}/{format_size(f_total)}\n", style="dim cyan"
-                    )
+                    txt.append(f"{format_size(f_down)}/{format_size(f_total)}\n", style="dim cyan")
                 else:
                     txt.append(f"{format_size(f_down)}\n", style="dim cyan")
 

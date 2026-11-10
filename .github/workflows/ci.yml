@@ -25,7 +25,7 @@ jobs:
         run: uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
 
       - name: Run mypy (type check)
-        run: uv run mypy src/pdl/
+        run: uv run mypy src/paradl/
 
   test-macos:
     name: Tests (macOS)
@@ -51,7 +51,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/pdl --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing --cov-fail-under=80
 
   test-windows:
     name: Tests (Windows)
@@ -78,7 +78,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/pdl --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing --cov-fail-under=80
 
   bench:
     name: Performance Benchmarks

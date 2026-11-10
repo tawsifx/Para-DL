@@ -297,7 +297,9 @@ def test_m7_batch_checksum_aggregation(tmp_path):
 
     # When it1 is verified but it2 has no digest hint, the batch is not claimed fully verified
     with (
-        mock.patch("paradl.engines.aria2.ChecksumEngine.verify", return_value=(True, "sha256", "abc")),
+        mock.patch(
+            "paradl.engines.aria2.ChecksumEngine.verify", return_value=(True, "sha256", "abc")
+        ),
         mock.patch.object(
             aria2_mod.MirrorManager,
             "resolve_and_validate",
