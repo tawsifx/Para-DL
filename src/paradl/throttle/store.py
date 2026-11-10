@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
-import contextlib
 import sqlite3
 import statistics
 from datetime import UTC, datetime
