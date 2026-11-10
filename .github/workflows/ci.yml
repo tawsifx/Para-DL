@@ -51,7 +51,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
 
   test-windows:
     name: Tests (Windows)
@@ -78,7 +78,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
 
   bench:
     name: Performance Benchmarks

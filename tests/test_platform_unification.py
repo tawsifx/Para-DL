@@ -25,7 +25,7 @@ class TestPlatformUnification(unittest.TestCase):
         """Verify auth status reports 'credential_manager' on Windows when configured."""
         with (
             patch("paradl.auth.is_windows", return_value=True),
-            patch("paradl.platform.has_keychain_token", side_effect=lambda srv: srv == "hf"),
+            patch("paradl.auth.has_keychain_token", side_effect=lambda srv: srv == "hf"),
         ):
             status = auth.get_auth_status()
             self.assertTrue(status["hf"]["configured"])
