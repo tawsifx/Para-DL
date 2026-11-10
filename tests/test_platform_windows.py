@@ -1,4 +1,4 @@
-"""Tests for Windows platform subsystem (pdl.platform.windows)."""
+"""Tests for Windows platform subsystem (paradl.platform.windows)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pdl.platform import windows
+from paradl.platform import windows
 
 
 class TestWindowsPlatform(unittest.TestCase):
@@ -18,7 +18,9 @@ class TestWindowsPlatform(unittest.TestCase):
 
         with patch.object(windows, "get_kernel32", return_value=mock_kernel32):
             with windows.WindowsSleepAssertion(enabled=True):
-                mock_kernel32.SetThreadExecutionState.assert_called_with(windows.ES_CONTINUOUS | windows.ES_SYSTEM_REQUIRED)
+                mock_kernel32.SetThreadExecutionState.assert_called_with(
+                    windows.ES_CONTINUOUS | windows.ES_SYSTEM_REQUIRED
+                )
             # On exit, it resets to ES_CONTINUOUS
             mock_kernel32.SetThreadExecutionState.assert_called_with(windows.ES_CONTINUOUS)
 
@@ -27,9 +29,11 @@ class TestWindowsPlatform(unittest.TestCase):
         with windows.WindowsSleepAssertion(enabled=False):
             pass
 
-        with patch.object(windows, "get_kernel32", return_value=None):
-            with windows.WindowsSleepAssertion(enabled=True):
-                pass
+        with (
+            patch.object(windows, "get_kernel32", return_value=None),
+            windows.WindowsSleepAssertion(enabled=True),
+        ):
+            pass
 
     def test_parse_netsh_wlan(self) -> None:
         """Verify parsing SSID from netsh wlan show interfaces output."""
@@ -64,11 +68,13 @@ There is 1 interface on the system:
         mock_status.SystemStatusFlag = 0  # Battery Saver off
 
         mock_kernel32 = MagicMock()
+
         def fake_get_power(byref_arg):
             byref_arg._obj.ACLineStatus = 1
             byref_arg._obj.BatteryLifePercent = 88
             byref_arg._obj.SystemStatusFlag = 0
             return 1
+
         mock_kernel32.GetSystemPowerStatus.side_effect = fake_get_power
 
         with patch.object(windows, "get_kernel32", return_value=mock_kernel32):
@@ -85,7 +91,9 @@ There is 1 interface on the system:
             fpath.write_bytes(b"MZtestbinary")
 
             # We test the parser/format helper functions directly to be cross-platform
-            parsed_initial = windows.parse_zone_identifier_text("[ZoneTransfer]\nZoneId=3\nHostUrl=https://example.com/tool.exe\n")
+            parsed_initial = windows.parse_zone_identifier_text(
+                "[ZoneTransfer]\nZoneId=3\nHostUrl=https://example.com/tool.exe\n"
+            )
             self.assertEqual(parsed_initial.get("ZoneId"), "3")
             self.assertEqual(parsed_initial.get("HostUrl"), "https://example.com/tool.exe")
 
@@ -97,17 +105,21 @@ There is 1 interface on the system:
             self.assertIn("HostUrl=https://example.com/tool.exe", updated_ini)
 
             # Setting origin URL generates valid INI
-            generated = windows.format_zone_identifier_text("https://github.com/astral-sh/uv", zone_id=None)
+            generated = windows.format_zone_identifier_text(
+                "https://github.com/astral-sh/uv", zone_id=None
+            )
             self.assertIn("HostUrl=https://github.com/astral-sh/uv", generated)
 
     def test_get_power_status_desktop_unknown_battery(self) -> None:
         """Verify SYSTEM_POWER_STATUS with BatteryLifePercent=255 produces battery_percent=None, not -1."""
         mock_kernel32 = MagicMock()
+
         def fake_get_power(byref_arg):
             byref_arg._obj.ACLineStatus = 1
             byref_arg._obj.BatteryLifePercent = 255  # Unknown on AC desktop
             byref_arg._obj.SystemStatusFlag = 0
             return 1
+
         mock_kernel32.GetSystemPowerStatus.side_effect = fake_get_power
 
         with patch.object(windows, "get_kernel32", return_value=mock_kernel32):
@@ -130,8 +142,10 @@ There is 1 interface on the system:
         """Verify Windows credential set, get, has, and delete roundtrip."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             store_file = Path(tmp_dir) / "credentials.json"
-            with patch.object(windows, "_get_dpapi_store_path", return_value=store_file), \
-                 patch.object(windows, "get_advapi32", return_value=None):
+            with (
+                patch.object(windows, "_get_dpapi_store_path", return_value=store_file),
+                patch.object(windows, "get_advapi32", return_value=None),
+            ):
                 self.assertTrue(windows.set_keychain_token("hf", "hf_test_secret_token_123"))
                 self.assertTrue(windows.has_keychain_token("hf"))
                 self.assertEqual(windows.get_keychain_token("hf"), "hf_test_secret_token_123")
@@ -141,7 +155,14 @@ There is 1 interface on the system:
 
     def test_check_windows_utilities(self) -> None:
         """Verify check_windows_utilities audits powershell, curl, tar, winget."""
-        with patch("shutil.which", side_effect=lambda name: f"C:\\Windows\\System32\\{name}.exe" if name in ("powershell", "curl", "tar") else None):
+        with patch(
+            "shutil.which",
+            side_effect=lambda name: (
+                f"C:\\Windows\\System32\\{name}.exe"
+                if name in ("powershell", "curl", "tar")
+                else None
+            ),
+        ):
             res = windows.check_windows_utilities()
             self.assertTrue(res["powershell"]["available"])
             self.assertTrue(res["curl"]["available"])

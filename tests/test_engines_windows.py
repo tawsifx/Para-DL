@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import platform
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from pdl.engines.github import GitHubEngine
-from pdl.engines.pypi import PyPIEngine
-from pdl.toolchain import Toolchain
+from paradl.engines.github import GitHubEngine
+from paradl.engines.pypi import PyPIEngine
+from paradl.toolchain import Toolchain
 
 
 class TestEnginesWindows(unittest.TestCase):
@@ -20,21 +19,35 @@ class TestEnginesWindows(unittest.TestCase):
         mac_wheel = "numpy-2.1.0-cp312-cp312-macosx_11_0_arm64.whl"
         any_wheel = "requests-2.32.3-py3-none-any.whl"
 
-        score_win = PyPIEngine.score_wheel_filename(win_wheel, target_py="312", target_plat="win32", is_arm=False)
-        score_mac = PyPIEngine.score_wheel_filename(mac_wheel, target_py="312", target_plat="win32", is_arm=False)
-        score_any = PyPIEngine.score_wheel_filename(any_wheel, target_py="312", target_plat="win32", is_arm=False)
+        score_win = PyPIEngine.score_wheel_filename(
+            win_wheel, target_py="312", target_plat="win32", is_arm=False
+        )
+        score_mac = PyPIEngine.score_wheel_filename(
+            mac_wheel, target_py="312", target_plat="win32", is_arm=False
+        )
+        score_any = PyPIEngine.score_wheel_filename(
+            any_wheel, target_py="312", target_plat="win32", is_arm=False
+        )
 
         self.assertGreater(score_win, 50, "win_amd64 wheel should score high on win32 target_plat")
-        self.assertLessEqual(score_mac, 0, "macosx wheel should have score <= 0 on win32 target_plat")
+        self.assertLessEqual(
+            score_mac, 0, "macosx wheel should have score <= 0 on win32 target_plat"
+        )
         self.assertGreater(score_any, 0, "pure-python any wheel should be compatible")
 
     def test_pypi_wheel_scoring_64bit_beats_32bit(self) -> None:
         """Verify win_amd64 scores strictly higher than win32 on 64-bit Windows."""
         win64_wheel = "numpy-2.1.0-cp312-cp312-win_amd64.whl"
         win32_wheel = "numpy-2.1.0-cp312-cp312-win32.whl"
-        score64 = PyPIEngine.score_wheel_filename(win64_wheel, target_py="312", target_plat="win32", is_arm=False)
-        score32 = PyPIEngine.score_wheel_filename(win32_wheel, target_py="312", target_plat="win32", is_arm=False)
-        self.assertGreater(score64, score32, "win_amd64 must score strictly higher than win32 on 64-bit OS")
+        score64 = PyPIEngine.score_wheel_filename(
+            win64_wheel, target_py="312", target_plat="win32", is_arm=False
+        )
+        score32 = PyPIEngine.score_wheel_filename(
+            win32_wheel, target_py="312", target_plat="win32", is_arm=False
+        )
+        self.assertGreater(
+            score64, score32, "win_amd64 must score strictly higher than win32 on 64-bit OS"
+        )
 
     def test_github_asset_scoring_windows(self) -> None:
         """Verify GitHub release asset scoring on Windows."""
@@ -42,8 +55,10 @@ class TestEnginesWindows(unittest.TestCase):
         win_msi = "ripgrep-14.1.1-x86_64.msi"
         mac_tar = "ripgrep-14.1.1-aarch64-apple-darwin.tar.gz"
 
-        with patch("platform.system", return_value="Windows"), \
-             patch("platform.machine", return_value="AMD64"):
+        with (
+            patch("platform.system", return_value="Windows"),
+            patch("platform.machine", return_value="AMD64"),
+        ):
             score_zip_dl = GitHubEngine.score_release_asset(win_zip, install_mode=False)
             score_msi_dl = GitHubEngine.score_release_asset(win_msi, install_mode=False)
             score_mac_dl = GitHubEngine.score_release_asset(mac_tar, install_mode=False)
@@ -60,10 +75,15 @@ class TestEnginesWindows(unittest.TestCase):
         """Verify Toolchain checks .exe and candidate Windows directories."""
         tc = Toolchain(check_fallbacks=True)
 
-        with patch("sys.platform", "win32"), \
-             patch("shutil.which", return_value=None), \
-             patch("os.path.exists", side_effect=lambda p: "scoop" in str(p) and str(p).endswith(".exe")), \
-             patch("os.access", return_value=True):
+        with (
+            patch("sys.platform", "win32"),
+            patch("shutil.which", return_value=None),
+            patch(
+                "os.path.exists",
+                side_effect=lambda p: "scoop" in str(p) and str(p).endswith(".exe"),
+            ),
+            patch("os.access", return_value=True),
+        ):
             found = tc._find_bin("aria2c", [str(Path.home() / "scoop/shims/aria2c.exe")])
             self.assertIsNotNone(found)
             self.assertTrue(found.endswith(".exe"))

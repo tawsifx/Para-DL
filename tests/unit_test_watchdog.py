@@ -5,13 +5,12 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pdl.engines.watchdog import (
+from paradl.engines.watchdog import (
     WatchdogActionType,
     WatchdogController,
-    WatchdogDecision,
     compute_percentile,
 )
-from pdl.models import WatchdogMode
+from paradl.models import WatchdogMode
 
 
 class TestComputePercentile(unittest.TestCase):
@@ -60,12 +59,14 @@ class TestWatchdogControllerInit(unittest.TestCase):
         self.assertEqual(wd.disabled_reason, "no_range_support")
 
     def test_connections_clamped(self) -> None:
-        wd = WatchdogController(mode=WatchdogMode.V2, user_floor_bps=1000, connections=32, host="example.com")
+        wd = WatchdogController(
+            mode=WatchdogMode.V2, user_floor_bps=1000, connections=32, host="example.com"
+        )
         self.assertEqual(wd.connections, 16)
         self.assertEqual(wd.initial_connections, 16)
 
     def test_learned_profile_applies_connections(self) -> None:
-        with patch("pdl.engines.watchdog.HistoryManager.get_best_profile") as mock_get:
+        with patch("paradl.engines.watchdog.HistoryManager.get_best_profile") as mock_get:
             mock_get.return_value = MagicMock(
                 connections=8,
                 ip_family="ipv4",
@@ -144,7 +145,7 @@ class TestWatchdogStep(unittest.TestCase):
         self.assertEqual(wd.low_speed_consecutive, 0)  # reset during cooldown
 
     def test_resilience_event_triggers_recycle(self) -> None:
-        from pdl.events import ResilienceEvent, ResilienceEventType
+        from paradl.events import ResilienceEvent, ResilienceEventType
 
         wd = WatchdogController(mode=WatchdogMode.V2, user_floor_bps=1000, host="example.com")
         event = ResilienceEvent(
@@ -152,9 +153,7 @@ class TestWatchdogStep(unittest.TestCase):
             reason="no progress for 30s",
             timestamp=100.0,
         )
-        decision = wd.step(
-            elapsed_sec=100.0, speed_bps=5000.0, resilience_event=event
-        )
+        decision = wd.step(elapsed_sec=100.0, speed_bps=5000.0, resilience_event=event)
         self.assertEqual(decision.action, WatchdogActionType.RESILIENCE_RECYCLE)
         self.assertEqual(wd.cycle_count, 1)
 

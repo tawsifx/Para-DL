@@ -5,16 +5,16 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pdl.engines.aria2 import (
+from paradl.engines.aria2 import (
+    _DAEMON_POOL,
     Aria2DaemonPool,
     Aria2Engine,
     Aria2RpcDaemon,
-    _DAEMON_POOL,
-    get_daemon_pool,
     _pick_free_port,
+    get_daemon_pool,
     shutdown_daemon_pool,
 )
-from pdl.models import (
+from paradl.models import (
     DownloadItem,
     TargetInfo,
     TargetType,
@@ -36,7 +36,7 @@ class TestPickFreePort(unittest.TestCase):
 class TestAria2RpcDaemonInit(unittest.TestCase):
     """Tests for Aria2RpcDaemon initialization."""
 
-    @patch("pdl.engines.aria2.UI.register_secret")
+    @patch("paradl.engines.aria2.UI.register_secret")
     def test_init_sets_port_and_secret(self, mock_register) -> None:
         daemon = Aria2RpcDaemon(aria2c_bin="/usr/bin/aria2c")
         self.assertIsInstance(daemon.port, int)
@@ -73,7 +73,7 @@ class TestDownloadItem(unittest.TestCase):
             url="https://example.com/file.zip",
             out_dir="/tmp/downloads",
             filename="file.zip",
-            headers={"User-Agent": "pdl/1.0"},
+            headers={"User-Agent": "paradl/1.0"},
             expected_length=1048576,
             expected_digest="sha256:abc123",
         )
@@ -131,7 +131,7 @@ class TestAria2EngineMissingBinary(unittest.TestCase):
         # Mock TOOLCHAIN object with aria2c = None (it's a read-only property)
         fake_toolchain = MagicMock()
         fake_toolchain.aria2c = None
-        with patch("pdl.engines.aria2.TOOLCHAIN", fake_toolchain):
+        with patch("paradl.engines.aria2.TOOLCHAIN", fake_toolchain):
             result = Aria2Engine.download(
                 TargetInfo(
                     raw="https://example.com/file.zip",
@@ -170,10 +170,9 @@ class TestAria2DaemonPool(unittest.TestCase):
         self.assertEqual(len(pool._entries), 0)
 
     def test_shutdown_daemon_pool(self) -> None:
-        pool = get_daemon_pool()
+        get_daemon_pool()
         shutdown_daemon_pool()
         # After shutdown, a new pool should be created on next get
-        from pdl.engines.aria2 import _DAEMON_POOL
 
         self.assertIsNone(_DAEMON_POOL)
 
@@ -181,12 +180,12 @@ class TestAria2DaemonPool(unittest.TestCase):
 class TestAria2DaemonHTTP3(unittest.TestCase):
     """Tests for HTTP/3 support in Aria2RpcDaemon."""
 
-    @patch("pdl.engines.aria2.UI.register_secret")
+    @patch("paradl.engines.aria2.UI.register_secret")
     def test_http3_stored(self, mock_register) -> None:
         daemon = Aria2RpcDaemon(aria2c_bin="/usr/bin/aria2c", http3=True)
         self.assertTrue(daemon.http3)
 
-    @patch("pdl.engines.aria2.UI.register_secret")
+    @patch("paradl.engines.aria2.UI.register_secret")
     def test_http3_default_false(self, mock_register) -> None:
         daemon = Aria2RpcDaemon(aria2c_bin="/usr/bin/aria2c")
         self.assertFalse(daemon.http3)
@@ -196,21 +195,21 @@ class TestAdaptiveConcurrency(unittest.TestCase):
     """Tests for RTT/loss-based adaptive connection budget."""
 
     def setUp(self) -> None:
-        from pdl.history import HistoryManager
-        import tempfile
         import os
+        import tempfile
 
         self.tmpdir = tempfile.mkdtemp()
-        self.env_patch = patch.dict(os.environ, {"PDL_HOME": self.tmpdir}, clear=False)
+        self.env_patch = patch.dict(os.environ, {"PARADL_HOME": self.tmpdir}, clear=False)
         self.env_patch.start()
 
     def tearDown(self) -> None:
         self.env_patch.stop()
         import shutil
+
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_host_strategy_stores_rtt_and_loss(self) -> None:
-        from pdl.history import HistoryManager, HostStrategy
+        from paradl.history import HistoryManager, HostStrategy
 
         strategy = HostStrategy(
             host="example.com",
@@ -229,6 +228,7 @@ class TestAdaptiveConcurrency(unittest.TestCase):
 
     def test_high_rtt_reduces_connection_budget(self) -> None:
         """Verify RTT-based budget reduction logic directly."""
+
         # Simulate the adaptive budget calculation from aria2.download_batch
         def compute_budget(rtt_ms: float, loss_pct: float, base_budget: int = 16) -> int:
             budget = base_budget

@@ -10,22 +10,22 @@ from unittest import mock
 
 import pytest
 
-from pdl.cli import build_parser
-from pdl.config import PDLConfig
-from pdl.curl_parser import parse_curl_command
-from pdl.engines import aria2 as aria2_mod
-from pdl.engines.aria2 import Aria2Engine
-from pdl.engines.github import GitHubEngine
-from pdl.engines.hf import HuggingFaceEngine
-from pdl.engines.media import MediaEngine
-from pdl.engines.pypi import PyPIEngine
-from pdl.history import compute_hour_bucket
-from pdl.mirrors import MirrorResolution, parse_metalink_bytes
-from pdl.models import DownloadItem, WatchdogMode, format_size, sanitize_filename
-from pdl.net import detect_isp, probe_http_url, probe_range_support, reset_isp_detector
-from pdl.platform.windows import unquarantine_zone_identifier_text
-from pdl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
-from pdl.ui import UI
+from paradl.cli import build_parser
+from paradl.config import PDLConfig
+from paradl.curl_parser import parse_curl_command
+from paradl.engines import aria2 as aria2_mod
+from paradl.engines.aria2 import Aria2Engine
+from paradl.engines.github import GitHubEngine
+from paradl.engines.hf import HuggingFaceEngine
+from paradl.engines.media import MediaEngine
+from paradl.engines.pypi import PyPIEngine
+from paradl.history import compute_hour_bucket
+from paradl.mirrors import MirrorResolution, parse_metalink_bytes
+from paradl.models import DownloadItem, WatchdogMode, format_size, sanitize_filename
+from paradl.net import detect_isp, probe_http_url, probe_range_support, reset_isp_detector
+from paradl.platform.windows import unquarantine_zone_identifier_text
+from paradl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
+from paradl.ui import UI
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,10 @@ from pdl.ui import UI
 # ---------------------------------------------------------------------------
 def test_h1_curl_parser_value_flags():
     cases = [
-        ("curl -x http://proxy.local:8080 https://example.com/file.zip", "https://example.com/file.zip"),
+        (
+            "curl -x http://proxy.local:8080 https://example.com/file.zip",
+            "https://example.com/file.zip",
+        ),
         ("curl --connect-timeout 10 https://example.com/file.zip", "https://example.com/file.zip"),
         ("curl --retry 3 https://example.com/file.zip", "https://example.com/file.zip"),
         ("curl --max-time 30 -L https://example.com/file.zip", "https://example.com/file.zip"),
@@ -52,23 +55,32 @@ def test_h1_curl_parser_value_flags():
 # H2: PyPI explicit pinned version 404 does not fall back to latest
 # ---------------------------------------------------------------------------
 def test_h2_pypi_pinned_version_404_no_fallback(monkeypatch):
-    from pdl.engines import pypi as pypi_mod
+    from paradl.engines import pypi as pypi_mod
 
     def fake_fetch(url: str, *args, **kwargs):
         if "/nonexistent-pkg/9.9.9/json" in url:
             return None, {}, 404
         if "/nonexistent-pkg/json" in url:
-            return {
-                "info": {"name": "nonexistent-pkg", "version": "1.0.0", "summary": "", "requires_dist": []},
-                "urls": [
-                    {
-                        "filename": "nonexistent_pkg-1.0.0-py3-none-any.whl",
-                        "packagetype": "bdist_wheel",
-                        "url": "https://files.invalid/nonexistent_pkg-1.0.0-py3-none-any.whl",
-                        "size": 1,
-                    }
-                ],
-            }, {}, 200
+            return (
+                {
+                    "info": {
+                        "name": "nonexistent-pkg",
+                        "version": "1.0.0",
+                        "summary": "",
+                        "requires_dist": [],
+                    },
+                    "urls": [
+                        {
+                            "filename": "nonexistent_pkg-1.0.0-py3-none-any.whl",
+                            "packagetype": "bdist_wheel",
+                            "url": "https://files.invalid/nonexistent_pkg-1.0.0-py3-none-any.whl",
+                            "size": 1,
+                        }
+                    ],
+                },
+                {},
+                200,
+            )
         return None, {}, 404
 
     monkeypatch.setattr(pypi_mod, "fetch_json_with_etag", fake_fetch)
@@ -82,6 +94,7 @@ def test_h2_pypi_pinned_version_404_no_fallback(monkeypatch):
 def test_h3_media_codec_args():
     # Verify codec argument definitions in MediaEngine
     import inspect
+
     src = inspect.getsource(MediaEngine._convert_coreaudio_or_ffmpeg)
     assert '"flac": ["-vn", "-c:a", "flac"]' in src
     assert '"wav": ["-vn", "-c:a", "pcm_s16le"]' in src
@@ -102,7 +115,7 @@ def test_h4_aria2_final_file_resolution(tmp_path):
 
     class FakeDaemon:
         def __init__(self, **kwargs):
-            pass
+            self._proc = None
 
         def start(self):
             pass
@@ -178,7 +191,9 @@ def test_h4_aria2_final_file_resolution(tmp_path):
 # ---------------------------------------------------------------------------
 def test_m1_cli_flags_parsing():
     parser = build_parser(PDLConfig())
-    args = parser.parse_args(["https://example.com/f.zip", "--watchdog", "off", "--no-caffeinate", "--no-net-watch"])
+    args = parser.parse_args(
+        ["https://example.com/f.zip", "--watchdog", "off", "--no-caffeinate", "--no-net-watch"]
+    )
     assert args.watchdog == "off"
     assert args.caffeinate is False
     assert args.net_watch is False
@@ -270,21 +285,40 @@ def test_m7_batch_checksum_aggregation(tmp_path):
     f2 = tmp_path / "f2.bin"
     f2.write_bytes(b"file2")
 
-    it1 = DownloadItem(url="http://x/f1.bin", out_dir=tmp_path, filename="f1.bin", expected_digest="sha256:4b4869...dummy")
-    it2 = DownloadItem(url="http://x/f2.bin", out_dir=tmp_path, filename="f2.bin")  # No expected digest
+    it1 = DownloadItem(
+        url="http://x/f1.bin",
+        out_dir=tmp_path,
+        filename="f1.bin",
+        expected_digest="sha256:4b4869...dummy",
+    )
+    it2 = DownloadItem(
+        url="http://x/f2.bin", out_dir=tmp_path, filename="f2.bin"
+    )  # No expected digest
 
     # When it1 is verified but it2 has no digest hint, the batch is not claimed fully verified
     with (
-        mock.patch("pdl.engines.aria2.ChecksumEngine.verify", return_value=(True, "sha256", "abc")),
-        mock.patch.object(aria2_mod.MirrorManager, "resolve_and_validate", return_value=MirrorResolution(
-            active_uris=["http://x/f1.bin"], expected_length=5, accept_ranges=True, filename=None
-        )),
+        mock.patch("paradl.engines.aria2.ChecksumEngine.verify", return_value=(True, "sha256", "abc")),
+        mock.patch.object(
+            aria2_mod.MirrorManager,
+            "resolve_and_validate",
+            return_value=MirrorResolution(
+                active_uris=["http://x/f1.bin"],
+                expected_length=5,
+                accept_ranges=True,
+                filename=None,
+            ),
+        ),
         mock.patch.object(aria2_mod, "Aria2RpcDaemon") as mock_d_cls,
     ):
         mock_d = mock_d_cls.return_value
         mock_d.add_uri.return_value = "gid1"
         mock_d.get_global_stat.return_value = {"downloadSpeed": "0"}
-        mock_d.tell_status.return_value = {"status": "complete", "completedLength": "5", "totalLength": "5", "files": []}
+        mock_d.tell_status.return_value = {
+            "status": "complete",
+            "completedLength": "5",
+            "totalLength": "5",
+            "files": [],
+        }
         mock_d.get_servers.return_value = []
 
         res = Aria2Engine.download_batch(
@@ -362,7 +396,8 @@ def test_l4_isp_detection_no_unknown_caching():
         isp = detect_isp(force_refresh=True)
         assert isp == "Unknown ISP"
         # Ensure _CACHED_ISP was not populated with "Unknown ISP"
-        import pdl.net as net_mod
+        import paradl.net as net_mod
+
         assert net_mod._CACHED_ISP is None
 
 
@@ -388,7 +423,7 @@ def test_l5_tarfile_extractall_fallback(tmp_path):
 # R1: Probe requests request Accept-Encoding: identity
 # ---------------------------------------------------------------------------
 def test_r1_probe_requests_identity_encoding():
-    with mock.patch("pdl.net.get_http_client") as mock_client_fn:
+    with mock.patch("paradl.net.get_http_client") as mock_client_fn:
         mock_client = mock_client_fn.return_value
         stream_ctx = mock_client.stream.return_value
         mock_resp = stream_ctx.__enter__.return_value
@@ -400,7 +435,7 @@ def test_r1_probe_requests_identity_encoding():
         _args, kwargs = mock_client.stream.call_args
         assert kwargs["headers"].get("Accept-Encoding") == "identity"
 
-    with mock.patch("pdl.net.request_with_retry") as mock_req:
+    with mock.patch("paradl.net.request_with_retry") as mock_req:
         mock_resp = mock.MagicMock()
         mock_resp.status_code = 200
         mock_resp.url = "https://example.com/test.zip"
@@ -416,7 +451,7 @@ def test_r1_probe_requests_identity_encoding():
 # CLI Progress Bar Display
 # ---------------------------------------------------------------------------
 def test_progress_bar_display(capsys):
-    from pdl.ui import UI, LiveTransferDisplay
+    from paradl.ui import UI, LiveTransferDisplay
 
     UI.quiet = False
     UI.json_mode = False

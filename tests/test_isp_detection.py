@@ -6,19 +6,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from pdl.config import PDLConfig
-from pdl.net import (
+from paradl.config import PDLConfig
+from paradl.net import (
     clean_isp_name,
     detect_isp,
     reset_isp_detector,
     set_isp_detector,
 )
-from pdl.throttle.cli import (
-    build_throttle_parser,
+from paradl.throttle.cli import (
     generate_throttle_launchd_plist,
     run_throttle_cli,
 )
-from pdl.throttle.models import (
+from paradl.throttle.models import (
     ClassificationResult,
     MeasurementDataset,
     ThrottleReport,
@@ -33,9 +32,13 @@ class TestISPDetection(unittest.TestCase):
         """Verify cleaning and normalization of raw ISP / ASN names."""
         self.assertEqual(clean_isp_name(""), "")
         self.assertEqual(clean_isp_name("   "), "")
-        self.assertEqual(clean_isp_name("AS149048 Duranta Online Limited"), "Duranta Online Limited")
+        self.assertEqual(
+            clean_isp_name("AS149048 Duranta Online Limited"), "Duranta Online Limited"
+        )
         self.assertEqual(clean_isp_name("AS13335 - Cloudflare, Inc."), "Cloudflare, Inc.")
-        self.assertEqual(clean_isp_name("AS7922: Comcast Cable Communications"), "Comcast Cable Communications")
+        self.assertEqual(
+            clean_isp_name("AS7922: Comcast Cable Communications"), "Comcast Cable Communications"
+        )
         self.assertEqual(clean_isp_name('"Starlink"'), "Starlink")
         self.assertEqual(clean_isp_name("'Vodafone UK'"), "Vodafone UK")
 
@@ -171,7 +174,7 @@ class TestISPDetection(unittest.TestCase):
         set_isp_detector(lambda: "Auto Telecom 5G")
         cfg = PDLConfig(isp="auto")
 
-        with patch("pdl.throttle.cli._handle_targets_cmd", return_value=0) as mock_cmd:
+        with patch("paradl.throttle.cli._handle_targets_cmd", return_value=0) as mock_cmd:
             ret = run_throttle_cli(["targets"], cfg)
             self.assertEqual(ret, 0)
             self.assertTrue(mock_cmd.called)
@@ -183,7 +186,7 @@ class TestISPDetection(unittest.TestCase):
         set_isp_detector(lambda: "Auto Telecom 5G")
         cfg = PDLConfig(isp="auto")
 
-        with patch("pdl.throttle.cli._handle_targets_cmd", return_value=0) as mock_cmd:
+        with patch("paradl.throttle.cli._handle_targets_cmd", return_value=0) as mock_cmd:
             ret = run_throttle_cli(["targets", "--isp", "Special Satellite"], cfg)
             self.assertEqual(ret, 0)
             args = mock_cmd.call_args[0][0]
@@ -192,6 +195,7 @@ class TestISPDetection(unittest.TestCase):
     def test_generate_throttle_launchd_plist_no_hardcoded_isp(self, tmp_path_factory=None) -> None:
         """Verify launchd plist generator does not hardcode personal ISP when auto/unset."""
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_file = Path(tmp_dir) / "test.plist"
             generate_throttle_launchd_plist(out_file, isp="auto")

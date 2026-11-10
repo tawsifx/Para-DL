@@ -5,13 +5,13 @@ from __future__ import annotations
 import argparse
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from pdl.app import PDLApp
-from pdl.config import PDLConfig
-from pdl.mirrors import find_or_fetch_metalink
-from pdl.models import ExitCode, TargetType, is_image_domain
-from pdl.net import HttpProbeResult, probe_target
+from paradl.app import PDLApp
+from paradl.config import PDLConfig
+from paradl.mirrors import find_or_fetch_metalink
+from paradl.models import ExitCode, TargetType, is_image_domain
+from paradl.net import HttpProbeResult, probe_target
 
 
 class TestImageProbeAndHttpErrors(unittest.TestCase):
@@ -35,7 +35,7 @@ class TestImageProbeAndHttpErrors(unittest.TestCase):
             filename="vintage-painting.jpg",
             final_url=url,
         )
-        with patch("pdl.net.probe_http_url", return_value=mock_p):
+        with patch("paradl.net.probe_http_url", return_value=mock_p):
             t = probe_target(url)
             self.assertEqual(t.target_type, TargetType.DIRECT)
             self.assertEqual(t.filename_hint, "vintage-painting.jpg")
@@ -49,7 +49,7 @@ class TestImageProbeAndHttpErrors(unittest.TestCase):
             status_code=402,
             final_url=url,
         )
-        with patch("pdl.net.probe_http_url", return_value=mock_p):
+        with patch("paradl.net.probe_http_url", return_value=mock_p):
             t = probe_target(url)
             self.assertEqual(t.target_type, TargetType.DIRECT)
             self.assertEqual(t.status_code, 402)
@@ -65,7 +65,7 @@ class TestImageProbeAndHttpErrors(unittest.TestCase):
             status_code=404,
             final_url=url,
         )
-        with patch("pdl.net.probe_http_url", return_value=mock_p):
+        with patch("paradl.net.probe_http_url", return_value=mock_p):
             t = probe_target(url)
             self.assertEqual(t.status_code, 404)
             self.assertIsNotNone(t.probe_error)
@@ -80,8 +80,10 @@ class TestImageProbeAndHttpErrors(unittest.TestCase):
             status_code=402,
             final_url=url,
         )
-        with patch("pdl.net.probe_http_url", return_value=mock_p), \
-             patch("pdl.engines.media.MediaEngine.execute") as mock_media:
+        with (
+            patch("paradl.net.probe_http_url", return_value=mock_p),
+            patch("paradl.engines.media.MediaEngine.execute") as mock_media,
+        ):
             app = PDLApp(PDLConfig())
             args = argparse.Namespace(
                 targets=[url],

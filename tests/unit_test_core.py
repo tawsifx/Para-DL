@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from pdl.models import (
+from paradl.models import (
     DIRECT_EXTENSIONS,
     ExitCode,
     TargetType,
@@ -156,10 +156,10 @@ class TestMmapChecksum(unittest.TestCase):
     """Tests for mmap-based checksum verification for large files."""
 
     def test_compute_hashes_small_file_streaming(self) -> None:
-        import tempfile
         import os
+        import tempfile
 
-        from pdl.postproc.checksum import ChecksumEngine
+        from paradl.postproc.checksum import ChecksumEngine
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
             f.write(b"hello world" * 100)
@@ -173,11 +173,10 @@ class TestMmapChecksum(unittest.TestCase):
             os.unlink(tmp_path)
 
     def test_compute_hashes_large_file_mmap(self) -> None:
-        import tempfile
         import os
-        from unittest.mock import patch
+        import tempfile
 
-        from pdl.postproc.checksum import ChecksumEngine, MMAP_CHECKSUM_THRESHOLD
+        from paradl.postproc.checksum import ChecksumEngine
 
         # Create a temp file smaller than the threshold to verify streaming path
         with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
@@ -191,7 +190,7 @@ class TestMmapChecksum(unittest.TestCase):
             os.unlink(tmp_path)
 
     def test_mmap_threshold_constant(self) -> None:
-        from pdl.postproc.checksum import MMAP_CHECKSUM_THRESHOLD
+        from paradl.postproc.checksum import MMAP_CHECKSUM_THRESHOLD
 
         self.assertEqual(MMAP_CHECKSUM_THRESHOLD, 100 * 1024 * 1024)
 

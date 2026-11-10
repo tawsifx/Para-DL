@@ -29,7 +29,7 @@
   * **Transitive Wheelhouse Pre-Flight**: Resolves complete dependency trees via `uv pip compile` (~15ms) and pre-downloads missing wheels across 16 parallel channels into a temporary wheelhouse.
   * Installs offline via `uv pip install --find-links <wheelhouse>` into the active environment (respecting `VIRTUAL_ENV` or custom `--python`).
 * **GitHub PowerSuite & Zero-Setup Binary Installer (`paradl install`)**:
-  * Downloads release binaries scored for Windows (`.zip`, `.exe`, MSVC) or macOS (ARM64/Universal2) and verifies cryptographic SHA-256 digests before installation into user binary directories (`%LOCALAPPDATA%\Programs\pdl\bin` or `~/.local/bin`).
+  * Downloads release binaries scored for Windows (`.zip`, `.exe`, MSVC) or macOS (ARM64/Universal2) and verifies cryptographic SHA-256 digests before installation into user binary directories (`%LOCALAPPDATA%\Programs\paradl\bin` or `~/.local/bin`).
   * On Windows, audits Authenticode trust signatures via `Get-AuthenticodeSignature`.
 * **Media & Audio Mastering**:
   * In-process single-pass `yt-dlp` resolution with pinned `yt-dlp-ejs` JavaScript challenge solving (`deno`, `node >= 22`, `quickjs`).
@@ -182,17 +182,108 @@ paradl netprobe "https://example.com/large-file.bin"
 paradl bench "https://example.com/large-file.bin" --duration 60
 ```
 
+### 7. History — Filtering, Search & Re-download
+```bash
+# Show recent download history
+paradl history
+
+# Filter by search term (matches filename or target)
+paradl history --search ubuntu --limit 20
+
+# Filter by download type
+paradl history --type github
+paradl history --type direct
+
+# Show only successful / failed entries
+paradl history --success
+paradl history --failed
+
+# Re-download a previous history entry by ID
+paradl resume --from-history 42 -o ~/Downloads
+```
+
+### 8. REST API Server (`pdl server`) — MCP-compatible
+```bash
+# Install optional API dependencies
+pip install "parallel-dl[api]"
+
+# Start the REST API server (default http://127.0.0.1:8000)
+pdl server
+
+# Custom host/port
+pdl server --host 0.0.0.0 --port 8080
+```
+
+Endpoints (mirror Gopeed's MCP tool set):
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/resolve` | Classify/resolve a target without downloading (`resolve_task`) |
+| `POST` | `/tasks` | Create and queue a download (`create_task`) |
+| `GET` | `/tasks` | List all tasks with status & progress (`list_tasks`) |
+| `GET` | `/tasks/{id}` | Get a single task's details (`get_task`) |
+| `POST` | `/tasks/{id}/pause` | Pause a queued/running task (`pause_task`) |
+| `POST` | `/tasks/{id}/resume` | Resume a paused/failed task (`continue_task`) |
+| `DELETE` | `/tasks/{id}` | Cancel and remove a task (`delete_task`) |
+
+Example — create a task via `curl`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"target": "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso", "connections": 16}'
+```
+
+Response:
+```json
+{"id": "42", "status": "queued", "message": "Task created and queued."}
+```
+
+This also unlocks a future browser extension (extension talks to the local API) and a remote web UI.
+
+### 9. Textual TUI (`pdl tui`) — In-terminal download manager
+```bash
+# Install optional TUI dependencies
+pip install "parallel-dl[tui]"
+
+# Start the TUI
+pdl tui
+```
+
+The TUI provides a visual download manager inside your terminal:
+
+| Key | Action |
+|-----|--------|
+| `Add` | Open dialog to add a new download (target, category, output dir, connections) |
+| `Pause` | Pause the selected queued/running task |
+| `Resume` | Resume a paused/failed task (re-queues it) |
+| `Delete` | Cancel and remove the selected task |
+| `Start Queue` | Begin processing all queued jobs in the background |
+| `Refresh` | Reload tasks from the SQLite queue |
+| `Quit` | Exit the TUI |
+
+Features:
+- **Task list** with ID, target/filename, category, progress bar, status, speed, and connection count
+- **Per-file progress** for multi-file transfers (metalinks, torrents, archives)
+- **Connection/peer statistics** (conns, peers, avg speed/conn)
+- **Live updating** progress bars refreshed every second
+- **Categories** — tag jobs (software, media, documents, archives) and filter by category
+- **Search** — filter tasks by target or filename substring
+- **Persistent queue** — jobs stored in SQLite survive TUI restarts
+
 ---
 
 ## Architecture & Design
 
-`parallel-dl` is structured into clean, decoupled modules inside `src/pdl`:
-* `pdl.platform`: Unified cross-platform subsystem dynamically dispatching between `pdl.platform.windows` (kernel32, SYSTEM_POWER_STATUS, Zone.Identifier ADS, WinCred) and `pdl.platform.macos` (caffeinate, scutil, pmset, Keychain, WhereFroms).
-* `pdl.engines`: Specialized protocol accelerators (`Aria2Engine`, `MediaEngine`, `PyPIEngine`, `GitHubEngine`, `HFEngine`, `BrewEngine`, `IPSWEngine`, `CloudEngine`).
-* `pdl.throttle`: Network probes, throughput sampling, burst-series analysis, and adaptive socket recycle watchdog state machine.
-* `pdl.doctor`: Environment diagnostic, security posture, and toolchain validator for both Windows and macOS.
-* `pdl.auth`: Secure token management backed by Windows Credential Manager or macOS Keychain Services API.
-* `pdl.ui`: Rich live multi-progress rendering, diagnostic tables, and ANSI spinners.
+`parallel-dl` is structured into clean, decoupled modules inside `src/paradl`:
+* `paradl.platform`: Unified cross-platform subsystem dynamically dispatching between `paradl.platform.windows` (kernel32, SYSTEM_POWER_STATUS, Zone.Identifier ADS, WinCred) and `paradl.platform.macos` (caffeinate, scutil, pmset, Keychain, WhereFroms).
+* `paradl.engines`: Specialized protocol accelerators (`Aria2Engine`, `MediaEngine`, `PyPIEngine`, `GitHubEngine`, `HFEngine`, `BrewEngine`, `IPSWEngine`, `CloudEngine`).
+* `paradl.throttle`: Network probes, throughput sampling, burst-series analysis, and adaptive socket recycle watchdog state machine.
+* `paradl.doctor`: Environment diagnostic, security posture, and toolchain validator for both Windows and macOS.
+* `paradl.auth`: Secure token management backed by Windows Credential Manager or macOS Keychain Services API.
+* `paradl.ui`: Rich live multi-progress rendering, diagnostic tables, and ANSI spinners.
+* `paradl.tui`: Textual-based terminal UI with task list, progress bars, pause/resume, categories, and search.
+* `paradl.server`: REST API server mirroring Gopeed's MCP tool set (`resolve`, `create_task`, `list_tasks`, `get_task`, `pause_task`, `continue_task`, `delete_task`).
 
 ---
 

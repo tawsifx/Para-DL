@@ -58,9 +58,9 @@ Repository = "https://github.com/tawsifx/Para-DL.git"
 Issues = "https://github.com/tawsifx/Para-DL/issues"
 
 [project.scripts]
-paradl = "pdl.cli:main"
-parallel-dl = "pdl.cli:main"
-pdl = "pdl.cli:main"
+paradl = "paradl.cli:main"
+parallel-dl = "paradl.cli:main"
+pdl = "paradl.cli:main"
 
 [dependency-groups]
 dev = [
@@ -72,8 +72,18 @@ dev = [
     "httpx[http2]>=0.28.0",
 ]
 
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+]
+tui = [
+    "textual>=0.86.0",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/pdl"]
+packages = ["src/paradl"]
 dev-mode-dirs = ["src"]
 
 [tool.ruff]
@@ -102,7 +112,7 @@ lint.ignore = [
 ]
 format.quote-style = "double"
 format.docstring-code-format = true
-isort.known-first-party = ["pdl"]
+isort.known-first-party = ["paradl"]
 
 [tool.mypy]
 python_version = "3.11"

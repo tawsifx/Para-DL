@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import io
 import unittest
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pdl.engines.pypi import PyPIEngine
+from paradl.engines.pypi import PyPIEngine
 
 
 class TestPyPITransitive(unittest.TestCase):
