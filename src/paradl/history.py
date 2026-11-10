@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import shutil
+import contextlib
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -387,7 +388,7 @@ class HistoryManager:
                 actual_size = 0
 
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 conn.execute(
                     """
                     INSERT INTO downloads (timestamp, target, type, filename, path, size, duration, success, adb, sha256)
@@ -437,7 +438,7 @@ class HistoryManager:
           - success: filter to only successful (True) or failed (False) entries.
         """
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 query = "SELECT * FROM downloads"
                 params: list[Any] = []
                 clauses: list[str] = []
@@ -486,7 +487,7 @@ class HistoryManager:
     def get_entry_by_id(cls, entry_id: int) -> dict[str, Any] | None:
         """Return a single history entry by its database id, or None if not found."""
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 row = conn.execute(
                     "SELECT * FROM downloads WHERE id = ?",
                     (int(entry_id),),
@@ -513,7 +514,7 @@ class HistoryManager:
     @classmethod
     def clear(cls) -> bool:
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 conn.execute("DELETE FROM downloads")
                 conn.commit()
             return True
@@ -640,7 +641,7 @@ class HistoryManager:
         )
 
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO learned_profiles
@@ -717,7 +718,7 @@ class HistoryManager:
         ).strip() or "default"
 
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 rows = conn.execute(
                     "SELECT * FROM learned_profiles WHERE host = ?",
                     (host_low,),
@@ -782,7 +783,7 @@ class HistoryManager:
     def list_learned_profiles(cls, host: str | None = None) -> list[LearnedProfile]:
         """Return all stored learned profiles (optionally filtered by host), ordered by updated_epoch DESC."""
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 if host:
                     rows = conn.execute(
                         "SELECT * FROM learned_profiles WHERE host = ? ORDER BY updated_epoch DESC, speed_after DESC",
@@ -801,7 +802,7 @@ class HistoryManager:
     def reset_profiles(cls, host: str | None = None) -> int:
         """Delete learned profiles (and corresponding host_strategies) for `host` (or all hosts if None)."""
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 if host:
                     h_low = host.strip().lower()
                     c1 = conn.execute("DELETE FROM learned_profiles WHERE host = ?", (h_low,))
@@ -941,7 +942,7 @@ class HistoryManager:
     @classmethod
     def list_host_strategies(cls) -> list[HostStrategy]:
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 rows = conn.execute(
                     "SELECT * FROM host_strategies ORDER BY updated_at DESC"
                 ).fetchall()
@@ -979,7 +980,7 @@ class HistoryManager:
     @classmethod
     def get_http_cache(cls, url: str) -> tuple[str, Any] | None:
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 row = conn.execute(
                     "SELECT etag, body_json FROM http_cache WHERE url = ?", (url,)
                 ).fetchone()
@@ -993,7 +994,7 @@ class HistoryManager:
     @classmethod
     def set_http_cache(cls, url: str, etag: str, body_obj: Any) -> None:
         try:
-            with cls._connect() as conn:
+            with contextlib.closing(cls._connect()) as conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO http_cache (url, etag, body_json, updated_at) VALUES (?, ?, ?, ?)",
                     (url, etag, json.dumps(body_obj), time.time()),

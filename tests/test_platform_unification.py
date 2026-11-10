@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -13,13 +14,14 @@ from paradl import auth, doctor, hooks, paths
 class TestPlatformUnification(unittest.TestCase):
     def test_paths_windows_localappdata(self) -> None:
         """Verify get_paradl_home() uses LOCALAPPDATA on Windows when PARADL_HOME is unset."""
-        fake_local_appdata = "/fake/Users/Alice/AppData/Local"
-        with patch.dict(os.environ, {"LOCALAPPDATA": fake_local_appdata}, clear=False):
-            if "PARADL_HOME" in os.environ:
-                del os.environ["PARADL_HOME"]
-            with patch("paradl.paths.is_windows", return_value=True):
-                home = paths.get_paradl_home()
-                self.assertEqual(home, Path(fake_local_appdata) / "paradl")
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_local_appdata = str(Path(tmp).resolve())
+            with patch.dict(os.environ, {"LOCALAPPDATA": fake_local_appdata}, clear=False):
+                if "PARADL_HOME" in os.environ:
+                    del os.environ["PARADL_HOME"]
+                with patch("paradl.paths.is_windows", return_value=True):
+                    home = paths.get_paradl_home()
+                    self.assertEqual(home, Path(fake_local_appdata) / "paradl")
 
     def test_auth_status_windows_source_name(self) -> None:
         """Verify auth status reports 'credential_manager' on Windows when configured."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import contextlib
 import sqlite3
 import statistics
 from datetime import UTC, datetime
@@ -32,7 +33,7 @@ class ThrottleStore:
     """Manages SQLite tables (`throttle_samples`, `throttle_runs`, `asn_cache`) inside `$PARADL_HOME/history.db`."""
 
     @classmethod
-    def _conn(cls) -> sqlite3.Connection:
+    def _conn(cls) -> contextlib.AbstractContextManager[sqlite3.Connection]:
         conn = HistoryManager._connect()
         conn.execute(
             """
@@ -83,7 +84,7 @@ class ThrottleStore:
             """
         )
         conn.commit()
-        return conn
+        return contextlib.closing(conn)
 
     # ------------------------------------------------------------------
     # ASN & Country Cache
