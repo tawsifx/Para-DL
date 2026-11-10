@@ -1,116 +1,65 @@
-# `parallel-dl` (`paradl`) v1.0.0
+# parallel-dl (`paradl`)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows & macOS](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20macOS-brightgreen.svg)]()
 [![Architecture: x64 & ARM64](https://img.shields.io/badge/arch-x64%20%7C%20ARM64-blue.svg)]()
 
-> **High-Performance Multi-Channel Download Accelerator with Anti-Throttle Watchdog for Windows 10/11 & macOS (x64 and ARM64).**
+> Fast, multi-channel download accelerator that bypasses ISP throttling with 16 parallel streams, adaptive watchdog recovery, and cryptographic verification — on Windows and macOS.
 
-`parallel-dl` (invoked as `paradl` or `parallel-dl`) bypasses single-stream ISP bandwidth throttling by orchestrating **16 parallel range channels** via an in-process Aria2 JSON-RPC daemon, backed by an adaptive rolling-p90 watchdog and verified cryptographic checksums.
-
----
-
-## Key Features
-
-* **16-Channel Parallel Engine**: Saturates your bandwidth connection with up to 16 concurrent HTTP range streams per transfer.
-* **Anti-Throttle Watchdog v2**: Dynamically monitors transfer throughput. If ISP traffic policing or token-bucket shaping throttles the flow below the adaptive threshold (`max(user_floor, 0.5 * rolling_p90)`), the watchdog cycles RPC connections in ~150ms to instantly reset ISP flow meters.
-* **Dual-Platform Native Architecture**:
-  * **Windows 10 & 11**:
-    * **Sleep Prevention**: Holds `SetThreadExecutionState` system assertions (`ES_CONTINUOUS | ES_SYSTEM_REQUIRED`) via `kernel32.dll` to prevent idle sleep during active transfers.
-    * **Power Policy**: Monitors AC power status, battery percentage, and Battery Saver (Low Power Mode) via `GetSystemPowerStatus`.
-    * **Mark of the Web & Zone Transfer**: Records download source URLs in NTFS Alternate Data Streams (`:Zone.Identifier` `[ZoneTransfer] HostUrl=...`) and automatically unblocks verified binaries.
-    * **Token Security**: Backed by Windows Credential Manager (`wincred` / `cmdkey`) with DPAPI encrypted user store fallback.
-    * **Native Notifications**: PowerShell-driven Windows 10/11 native toast notifications.
-  * **macOS (Apple Silicon & Intel)**:
-    * Holds `caffeinate` assertions, queries `scutil` / AirPort Wi-Fi identity, monitors battery via `pmset`, manages tokens via Apple Keychain Services (`security`), and sets `com.apple.metadata:kMDItemWhereFroms`.
-* **Python / PyPI Wheelhouse Engine (`paradl pip`)**:
-  * Resolves packages via PyPI JSON API and scores binary wheels for **Windows** (`win_amd64`, `win_arm64`, `win32`) and **macOS** (`cp312-macosx_...`).
-  * **Transitive Wheelhouse Pre-Flight**: Resolves complete dependency trees via `uv pip compile` (~15ms) and pre-downloads missing wheels across 16 parallel channels into a temporary wheelhouse.
-  * Installs offline via `uv pip install --find-links <wheelhouse>` into the active environment (respecting `VIRTUAL_ENV` or custom `--python`).
-* **GitHub PowerSuite & Zero-Setup Binary Installer (`paradl install`)**:
-  * Downloads release binaries scored for Windows (`.zip`, `.exe`, MSVC) or macOS (ARM64/Universal2) and verifies cryptographic SHA-256 digests before installation into user binary directories (`%LOCALAPPDATA%\Programs\paradl\bin` or `~/.local/bin`).
-  * On Windows, audits Authenticode trust signatures via `Get-AuthenticodeSignature`.
-* **Media & Audio Mastering**:
-  * In-process single-pass `yt-dlp` resolution with pinned `yt-dlp-ejs` JavaScript challenge solving (`deno`, `node >= 22`, `quickjs`).
-  * Protocol-segregated downloaders (`dash: native`, `m3u8: native`) complying with CVE-2026-50574 and multi-threaded native fragment downloading (`concurrent_fragment_downloads = 16`).
-  * FFmpeg / Apple CoreAudio packaging and universal ID3v2.3 cover art and metadata tagging (`mutagen`).
-* **Hugging Face Hub Engine (`hf:`)**:
-  * 16-channel downloads for AI models, GGUF weights, and safetensors with Bearer authentication and `X-Linked-ETag` validation.
-* **Homebrew Formula & Bottle Accelerator (`paradl brew`)** (macOS/Linux):
-  * Pre-downloads Homebrew bottles directly into `~/Library/Caches/Homebrew/downloads/` with 16 parallel channels before pouring locally.
-* **Apple IPSW Firmware Engine (`ipsw:`)**:
-  * Resolves device names (`ipsw:iPhone 16 Pro`) to Apple CDN URLs and verifies TSS signatures.
-* **"Copy as cURL" Import Engine (`--from-curl`, `--clipboard`)**:
-  * Safely parses DevTools cURL commands and creates host-scoped temporary cookie jars for authenticated downloads.
+`parallel-dl` (invokable as `paradl`, `pdl`, or `parallel-dl`) saturates your connection by splitting downloads across concurrent range channels, then automatically resets throttled flows with an adaptive p90 watchdog. Every file is verified with SHA-256 checksums before it lands on disk.
 
 ---
 
-## Installation & Setup
+## Features
 
-### Prerequisites
-
-`parallel-dl` uses `aria2c` for 16-channel segmented transport and optionally `ffmpeg` for media extraction:
-
-* **Windows 10 / 11** (via Winget, Scoop, or Chocolatey):
-  ```powershell
-  # Using winget (built into Windows 10 & 11)
-  winget install aria2.aria2 Gyan.FFmpeg astral-sh.uv
-
-  # Or using scoop
-  scoop install aria2 ffmpeg uv
-
-  # Or using chocolatey
-  choco install aria2 ffmpeg uv
-  ```
-
-* **macOS** (via Homebrew):
-  ```bash
-  brew install aria2 ffmpeg uv
-  ```
+| Feature | What it does |
+|---------|--------------|
+| **16-Channel Parallel Engine** | Splits transfers into concurrent HTTP range streams to maximize bandwidth. |
+| **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in ~150ms to restore full speed. |
+| **SHA-256 Verification** | Cryptographically validates every download before writing to disk. |
+| **Cross-Platform** | Native Windows 10/11 and macOS (Intel & Apple Silicon) support. |
+| **Python Packages** | `paradl pip install <pkg>` — resolves and installs wheels with transitive deps via `uv`. |
+| **GitHub Releases** | `paradl install <owner/repo>` — downloads and verifies release binaries. |
+| **Media & Audio** | YouTube/yt-dlp downloads with ID3 tagging, cover art, and 256kbps AAC extraction. |
+| **Hugging Face Models** | `hf:` prefixed downloads for GGUF weights, safetensors, and AI models. |
+| **Apple IPSW Firmware** | `ipsw:` prefixed downloads with TSS signature verification. |
+| **REST API** | `pdl server` — FastAPI server with task CRUD (mirrors Gopeed's MCP set). |
+| **Terminal UI** | `pdl tui` — Textual-based download manager with progress bars and categories. |
+| **Download History** | `paradl history` — searchable, filterable SQLite-backed download log. |
 
 ---
 
-### Option 1: Via `uv tool` or `pipx` (Recommended for Windows & macOS)
+## Installation
 
-With [uv](https://github.com/astral-sh/uv) (ultra-fast):
+### Option 1: Via `uv` (recommended)
+
 ```bash
 uv tool install git+https://github.com/tawsifx/Para-DL.git
 ```
 
-Or with `pipx`:
+### Option 2: Via `pipx`
+
 ```bash
 pipx install git+https://github.com/tawsifx/Para-DL.git
 ```
 
----
-
-### Option 2: Via Homebrew (macOS)
+### Option 3: Via Homebrew (macOS)
 
 ```bash
 brew tap tawsifx/tap
 brew install parallel-dl
 ```
 
----
+### Prerequisites
 
-### Option 3: Local Development Setup
+`paradl` uses [`aria2`](https://aria2.github.io/) for segmented transport and optionally [`ffmpeg`](https://ffmpeg.org/) for media extraction:
 
-* **On Windows (PowerShell)**:
-  ```powershell
-  git clone https://github.com/tawsifx/Para-DL.git $env:USERPROFILE\pdl
-  cd $env:USERPROFILE\pdl
-  .\scripts\install-local.ps1
-  ```
+- **Windows:** `winget install aria2.aria2 Gyan.FFmpeg` (or scoop / chocolatey)
+- **macOS:** `brew install aria2 ffmpeg`
 
-* **On macOS / Linux (Bash/Zsh)**:
-  ```bash
-  git clone https://github.com/tawsifx/Para-DL.git ~/pdl
-  cd ~/pdl
-  ./scripts/install-local.sh
-  ```
+Verify the install:
 
-Verify the installation:
 ```bash
 paradl --version
 paradl doctor
@@ -118,115 +67,110 @@ paradl doctor
 
 ---
 
-## Quick Reference & Recipes
+## Quick Start
 
-### 1. Python / PyPI Packages
+### Download a large file
+
 ```bash
-# Install Python package and all transitive dependencies with 16 parallel channels
+paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -o ./downloads
+```
+
+### Download with custom channel count
+
+```bash
+paradl "https://example.com/large-file.zip" -c 16 -o ./downloads
+```
+
+### Install a Python package
+
+```bash
 paradl pip install requests
 paradl pip install fastapi
-
-# Download package wheel (.whl) directly with SHA-256 validation (scored for your OS)
-paradl pip:torch -o ./wheels
-paradl pypi:numpy -o ./wheels
 ```
 
-### 2. GitHub Releases & Tool Installation
+### Install a GitHub release binary
+
 ```bash
-# Install tool directly into your user bin directory (verified SHA-256)
 paradl install BurntSushi/ripgrep
 paradl install astral-sh/uv
-
-# Download release assets scored for your host (Windows x64/MSVC or macOS ARM64)
-paradl gh:sharkdp/fd -o ./downloads
 ```
 
-### 3. Media & Audio Extraction
+### Download media (YouTube, etc.)
+
 ```bash
-# Download track by search query or URL (ID3 tagged, 256kbps audio)
+# Audio track (256kbps AAC, ID3 tagged)
 paradl "Song Title Artist Name" -o ./music
-paradl "https://www.youtube.com/watch?v=..." -o ./music
 
-# High-resolution video (4K or 1080p) with subtitles
-paradl -v -Q 4k --subs "https://www.youtube.com/watch?v=..." -o ./videos
+# High-res video with subtitles
+paradl -v -Q 4k --subs "https://youtube.com/watch?v=..." -o ./videos
 ```
 
-### 4. Hugging Face Models (`hf:`) & Apple IPSW (`ipsw:`)
-```bash
-# Download GGUF quantized models with 16 parallel streams
-paradl "hf:TheBloke/Llama-2-7B-GGUF" --asset "*Q4_K_M.gguf" -o ./models
+### Download a Hugging Face model
 
-# Download iOS restore firmware by device model
+```bash
+paradl "hf:TheBloke/Llama-2-7B-GGUF" --asset "*Q4_K_M.gguf" -o ./models
+```
+
+### Download Apple IPSW firmware
+
+```bash
 paradl ipsw:iPhone14,5 -o ./downloads
 paradl "ipsw:iPhone 16 Pro" -o ./downloads
 ```
 
-### 5. General Large Files, Cloud Drives & cURL
-```bash
-# Large ISO or archive with 16 concurrent range streams and auto-extraction (-x)
-paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -c 16 -o ./downloads
+### Import cURL from browser DevTools
 
-# Paste cURL from browser DevTools directly from clipboard
+```bash
 paradl --clipboard -o ./downloads
 ```
 
-### 6. Diagnostics & System Doctor
+---
+
+## Diagnostics & History
+
 ```bash
-# Check toolchain, versions, platform utilities, and security status
+# Check toolchain, platform utilities, and security status
 paradl doctor
 
-# Probe server range support and speed limits across 1, 4, 16 connections
+# Probe server range support and speed across 1, 4, 16 connections
 paradl netprobe "https://example.com/large-file.bin"
 
-# Benchmark Watchdog v2 vs v1 vs off
-paradl bench "https://example.com/large-file.bin" --duration 60
-```
-
-### 7. History — Filtering, Search & Re-download
-```bash
-# Show recent download history
+# View recent download history
 paradl history
 
-# Filter by search term (matches filename or target)
+# Search history
 paradl history --search ubuntu --limit 20
 
-# Filter by download type
-paradl history --type github
-paradl history --type direct
-
-# Show only successful / failed entries
-paradl history --success
-paradl history --failed
-
-# Re-download a previous history entry by ID
+# Re-download a previous entry by ID
 paradl resume --from-history 42 -o ~/Downloads
 ```
 
-### 8. REST API Server (`pdl server`) — MCP-compatible
+---
+
+## REST API Server
+
+Start a local API server for programmatic control:
+
 ```bash
-# Install optional API dependencies
 pip install "parallel-dl[api]"
-
-# Start the REST API server (default http://127.0.0.1:8000)
 pdl server
-
-# Custom host/port
-pdl server --host 0.0.0.0 --port 8080
 ```
 
-Endpoints (mirror Gopeed's MCP tool set):
+Default: `http://127.0.0.1:8000`
+
+Endpoints:
 
 | Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/resolve` | Classify/resolve a target without downloading (`resolve_task`) |
-| `POST` | `/tasks` | Create and queue a download (`create_task`) |
-| `GET` | `/tasks` | List all tasks with status & progress (`list_tasks`) |
-| `GET` | `/tasks/{id}` | Get a single task's details (`get_task`) |
-| `POST` | `/tasks/{id}/pause` | Pause a queued/running task (`pause_task`) |
-| `POST` | `/tasks/{id}/resume` | Resume a paused/failed task (`continue_task`) |
-| `DELETE` | `/tasks/{id}` | Cancel and remove a task (`delete_task`) |
+|--------|----------|-------------|
+| `POST` | `/resolve` | Classify a target without downloading |
+| `POST` | `/tasks` | Create and queue a download task |
+| `GET` | `/tasks` | List all tasks with status & progress |
+| `GET` | `/tasks/{id}` | Get a single task's details |
+| `POST` | `/tasks/{id}/pause` | Pause a task |
+| `POST` | `/tasks/{id}/resume` | Resume a paused/failed task |
+| `DELETE` | `/tasks/{id}` | Cancel and remove a task |
 
-Example — create a task via `curl`:
+Example:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/tasks \
@@ -234,56 +178,36 @@ curl -X POST http://127.0.0.1:8000/tasks \
   -d '{"target": "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso", "connections": 16}'
 ```
 
-Response:
-```json
-{"id": "42", "status": "queued", "message": "Task created and queued."}
-```
+---
 
-This also unlocks a future browser extension (extension talks to the local API) and a remote web UI.
+## Terminal UI
 
-### 9. Textual TUI (`pdl tui`) — In-terminal download manager
+A visual download manager inside your terminal:
+
 ```bash
-# Install optional TUI dependencies
 pip install "parallel-dl[tui]"
-
-# Start the TUI
 pdl tui
 ```
 
-The TUI provides a visual download manager inside your terminal:
-
-| Key | Action |
-|-----|--------|
-| `Add` | Open dialog to add a new download (target, category, output dir, connections) |
-| `Pause` | Pause the selected queued/running task |
-| `Resume` | Resume a paused/failed task (re-queues it) |
-| `Delete` | Cancel and remove the selected task |
-| `Start Queue` | Begin processing all queued jobs in the background |
-| `Refresh` | Reload tasks from the SQLite queue |
-| `Quit` | Exit the TUI |
-
-Features:
-- **Task list** with ID, target/filename, category, progress bar, status, speed, and connection count
-- **Per-file progress** for multi-file transfers (metalinks, torrents, archives)
-- **Connection/peer statistics** (conns, peers, avg speed/conn)
-- **Live updating** progress bars refreshed every second
-- **Categories** — tag jobs (software, media, documents, archives) and filter by category
-- **Search** — filter tasks by target or filename substring
-- **Persistent queue** — jobs stored in SQLite survive TUI restarts
+Features: task list with progress bars, pause/resume/delete, categories, search, and a persistent SQLite queue.
 
 ---
 
-## Architecture & Design
+## Configuration
 
-`parallel-dl` is structured into clean, decoupled modules inside `src/paradl`:
-* `paradl.platform`: Unified cross-platform subsystem dynamically dispatching between `paradl.platform.windows` (kernel32, SYSTEM_POWER_STATUS, Zone.Identifier ADS, WinCred) and `paradl.platform.macos` (caffeinate, scutil, pmset, Keychain, WhereFroms).
-* `paradl.engines`: Specialized protocol accelerators (`Aria2Engine`, `MediaEngine`, `PyPIEngine`, `GitHubEngine`, `HFEngine`, `BrewEngine`, `IPSWEngine`, `CloudEngine`).
-* `paradl.throttle`: Network probes, throughput sampling, burst-series analysis, and adaptive socket recycle watchdog state machine.
-* `paradl.doctor`: Environment diagnostic, security posture, and toolchain validator for both Windows and macOS.
-* `paradl.auth`: Secure token management backed by Windows Credential Manager or macOS Keychain Services API.
-* `paradl.ui`: Rich live multi-progress rendering, diagnostic tables, and ANSI spinners.
-* `paradl.tui`: Textual-based terminal UI with task list, progress bars, pause/resume, categories, and search.
-* `paradl.server`: REST API server mirroring Gopeed's MCP tool set (`resolve`, `create_task`, `list_tasks`, `get_task`, `pause_task`, `continue_task`, `delete_task`).
+| Environment Variable | Description | Default |
+|----------------------|-------------|---------|
+| `PARADL_HOME` | Config & data directory | `~/.config/paradl` (macOS/Linux) <br> `%LOCALAPPDATA%\paradl` (Windows) |
+
+---
+
+## CLI Entry Points
+
+All three commands invoke the same application:
+
+- `paradl` — primary command
+- `pdl` — short alias
+- `parallel-dl` — full package name
 
 ---
 
