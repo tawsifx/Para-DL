@@ -105,3 +105,4 @@ jobs:
           name: benchmark-results
           path: benchmark.json
           retention-days: 30
+          if-no-files-found: ignore
