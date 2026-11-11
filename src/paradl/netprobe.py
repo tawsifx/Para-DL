@@ -197,7 +197,7 @@ def classify_throttling(
             "none",
             1,
             "single_stream",
-            "Server does not honor HTTP Range (206); connection recycling disabled (1 stream).",
+            "Server does not honor HTTP Range (206); single-stream download with anti-throttle watchdog active.",
         )
 
     # 1. Check for burst-then-throttle: early burst speed significantly higher than late window speed

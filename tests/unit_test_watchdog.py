@@ -51,12 +51,14 @@ class TestWatchdogControllerInit(unittest.TestCase):
         self.assertFalse(wd.is_active)
         self.assertEqual(wd.disabled_reason, "off")
 
-    def test_no_range_support_disables(self) -> None:
+    def test_no_range_support_stays_active(self) -> None:
         wd = WatchdogController(
             mode=WatchdogMode.V2, user_floor_bps=1000, host="example.com", supports_range=False
         )
-        self.assertFalse(wd.is_active)
-        self.assertEqual(wd.disabled_reason, "no_range_support")
+        # Watchdog remains active in single-stream mode to pause/unpause the
+        # sole connection and reset ISP throttling.
+        self.assertTrue(wd.is_active)
+        self.assertIsNone(wd.disabled_reason)
 
     def test_connections_clamped(self) -> None:
         wd = WatchdogController(
@@ -178,9 +180,16 @@ class TestWatchdogStatusLabel(unittest.TestCase):
 
     def test_no_range_label(self) -> None:
         wd = WatchdogController(
-            mode=WatchdogMode.V2, user_floor_bps=1000, host="example.com", supports_range=False
+            mode=WatchdogMode.V2,
+            user_floor_bps=1000,
+            host="example.com",
+            supports_range=False,
+            connections=1,
         )
-        self.assertEqual(wd.status_label(), "Watchdog: Off (200-only server)")
+        label = wd.status_label()
+        self.assertIn("Watchdog v2", label)
+        self.assertIn("single stream", label)
+        self.assertIn("1 streams", label)
 
 
 if __name__ == "__main__":

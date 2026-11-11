@@ -108,8 +108,11 @@ class WatchdogController:
             self.network_id = platform.get_network_id() or "default"
 
         if not self.supports_range:
-            self.disabled_reason = "no_range_support"
-            return
+            # Single-stream fallback (200-only server): keep the watchdog
+            # active so it can still pause/unpause the sole connection to
+            # reset ISP per-flow throttling. Range support is not required
+            # for pause/resume-based anti-throttle on a single stream.
+            pass
 
         if self.mode == WatchdogMode.OFF or self.user_floor_bps <= 0:
             self.disabled_reason = "off"
@@ -162,9 +165,6 @@ class WatchdogController:
         Every event triggers the same action: recycle all connections, re-resolve DNS,
         reset the speed baseline, and log the reason.
         """
-        if not self.supports_range:
-            return WatchdogDecision(action=WatchdogActionType.NONE)
-
         self.reset_speed_baseline()
         self.cycle_count += 1
         self.last_recycle_elapsed = elapsed_sec
@@ -193,14 +193,13 @@ class WatchdogController:
         return max(self.user_floor_bps, 0.5 * p90)
 
     def status_label(self) -> str:
-        if self.disabled_reason == "no_range_support":
-            return "Watchdog: Off (200-only server)"
         if self.disabled_reason is not None or self.mode == WatchdogMode.OFF:
             return "Watchdog: Off"
         if self.revalidation_pending:
             return f"Watchdog {self.mode.value}: Re-validating profile"
         thresh = self.current_threshold_bps()
-        return f"Watchdog {self.mode.value}: <{format_speed(thresh)} (cycles: {self.cycle_count}, {self.connections} streams)"
+        stream_suffix = " (single stream)" if not self.supports_range else ""
+        return f"Watchdog {self.mode.value}: <{format_speed(thresh)} (cycles: {self.cycle_count}, {self.connections} streams){stream_suffix}"
 
     def step(
         self,

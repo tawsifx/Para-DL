@@ -747,11 +747,11 @@ class Aria2Engine:
         if not supports_range:
             print_plain(
                 "  [yellow]• Server does not honor HTTP Range (206 Partial Content); "
-                "disabling connection recycling and using a single stream.[/yellow]"
+                "using single stream — anti-throttle watchdog remains active.[/yellow]"
             )
             UI.emit_event(
                 "watchdog_action",
-                action="disabled",
+                action="single_stream",
                 reason="Server returned 200 instead of 206 on Range probe",
                 supports_range=False,
             )
@@ -820,7 +820,7 @@ class Aria2Engine:
                 #   RTT > 100ms  -> scale down toward 4 conns (high latency)
                 #   Loss > 5%    -> scale down toward 4 conns (unstable path)
                 #   RTT < 50ms & Loss < 1% -> keep full budget (clean path)
-                budget = watchdog.connections if supports_range else 1
+                budget = watchdog.connections
                 if supports_range and budget > 1:
                     rtt_factor = 1.0
                     if avg_rtt_ms > 100.0:
@@ -832,7 +832,7 @@ class Aria2Engine:
                     budget = max(4, int(budget * adaptive_factor))
 
                 # Global connection budget across concurrent files capped at safe_conn (<= 16)
-                per_file_conn = max(1, budget // max(curr_conc, 1)) if supports_range else 1
+                per_file_conn = max(1, budget // max(curr_conc, 1))
 
                 # Acquire a pooled daemon (reuses existing process instead of spawning a new one)
                 daemon = get_daemon_pool().acquire(
@@ -874,7 +874,7 @@ class Aria2Engine:
                         if (
                             watchdog.mode == WatchdogMode.V2
                             and watchdog.is_active
-                            and per_file_conn > 1
+                            and per_file_conn >= 1
                         ):
                             # Tier 1: native lowest-speed-limit for dead-slow individual flows
                             lowest_lim = max(int(threshold_bps / (per_file_conn * 8)), 4096)
