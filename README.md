@@ -16,7 +16,7 @@
 | Feature | What it does |
 |---------|--------------|
 | **16-Channel Parallel Engine** | Splits transfers into concurrent HTTP range streams to maximize bandwidth. |
-| **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in ~150ms to restore full speed. |
+| **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in ~150ms to restore full speed. Stays active even on single-stream (no-Range) servers, pausing/unpausing the sole connection to reset ISP per-flow throttling. |
 | **SHA-256 Verification** | Cryptographically validates every download before writing to disk. |
 | **Cross-Platform** | Native Windows 10/11 and macOS (Intel & Apple Silicon) support. |
 | **Python Packages** | `paradl pip install <pkg>` — resolves and installs wheels with transitive deps via `uv`. |
@@ -74,6 +74,8 @@ paradl doctor
 ```bash
 paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -o ./downloads
 ```
+
+> **Note on single-stream (no-Range) servers:** Some servers (e.g. GitHub `archive/refs/heads/main.zip`) do not honor HTTP `Range` requests (`206 Partial Content`). `paradl` detects this up-front, downgrades to a single stream, and **keeps the anti-throttle watchdog active** — it pauses/unpauses the sole connection to reset ISP per-flow throttling. Parallel chunking is impossible on such URLs regardless of downloader; use `git clone` or GitHub Release assets instead for parallel downloads.
 
 ### Download with custom channel count
 
