@@ -10,7 +10,7 @@ import sys
 import time
 from typing import Any
 
-from paradl.models import ExitCode, format_size, format_speed
+from paradl.core.models import ExitCode, format_size, format_speed
 
 logger = logging.getLogger(__name__)
 

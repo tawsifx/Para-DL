@@ -8,10 +8,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from paradl import platform
-from paradl.clock import get_clock
-from paradl.events import ResilienceEvent
-from paradl.history import HistoryManager, LearnedProfile, compute_hour_bucket
-from paradl.models import WatchdogMode, format_speed
+from paradl.core.clock import get_clock
+from paradl.core.models import WatchdogMode, format_speed
+from paradl.resilience.events import ResilienceEvent
+from paradl.storage.history import HistoryManager, LearnedProfile, compute_hour_bucket
 
 logger = logging.getLogger(__name__)
 

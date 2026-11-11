@@ -21,20 +21,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 from paradl import platform
-from paradl.clock import get_clock
-from paradl.engines.watchdog import (
-    WatchdogActionType,
-    WatchdogController,
-    compute_percentile,
-)
-from paradl.events import (
-    ResilienceEventSource,
-    check_free_disk_space,
-    check_power_policy,
-)
-from paradl.history import HistoryManager
-from paradl.mirrors import MetalinkCompanion, MirrorManager
-from paradl.models import (
+from paradl.core.clock import get_clock
+from paradl.core.models import (
     DownloadItem,
     ExitCode,
     TargetInfo,
@@ -45,11 +33,23 @@ from paradl.models import (
     format_speed,
     parse_rate,
 )
+from paradl.engines.watchdog import (
+    WatchdogActionType,
+    WatchdogController,
+    compute_percentile,
+)
 from paradl.net import probe_range_support, resolve_dns
 from paradl.postproc.checksum import ChecksumEngine
-from paradl.queue import check_when_fast_gate
-from paradl.toolchain import TOOLCHAIN
+from paradl.resilience.events import (
+    ResilienceEventSource,
+    check_free_disk_space,
+    check_power_policy,
+)
+from paradl.resilience.queue import check_when_fast_gate
+from paradl.storage.history import HistoryManager
+from paradl.storage.mirrors import MetalinkCompanion, MirrorManager
 from paradl.ui import UI, LiveTransferDisplay, print_plain
+from paradl.util.toolchain import TOOLCHAIN
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +272,7 @@ class Aria2RpcDaemon:
     @staticmethod
     def _aria2c_supports_http3(aria2c_bin: str | None = None) -> bool:
         """Return True if `aria2c` supports HTTP/3 (QUIC) — introduced in aria2 1.36.0."""
-        from paradl.toolchain import TOOLCHAIN
+        from paradl.util.toolchain import TOOLCHAIN
 
         bin_path = aria2c_bin or TOOLCHAIN.aria2c
         if not bin_path:

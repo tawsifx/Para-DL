@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from paradl import VERSION, platform
-from paradl.engines.aria2 import Aria2Engine
-from paradl.models import (
+from paradl.core.models import (
     DownloadItem,
     ExitCode,
     TargetInfo,
@@ -21,6 +20,7 @@ from paradl.models import (
     TransferResult,
     WatchdogMode,
 )
+from paradl.engines.aria2 import Aria2Engine
 from paradl.net import fetch_json_with_etag, probe_http_url
 from paradl.postproc.checksum import ChecksumEngine
 from paradl.ui import UI, print_plain

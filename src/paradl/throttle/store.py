@@ -11,10 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from paradl.clock import get_clock
-from paradl.history import HistoryManager, LearnedProfile, compute_hour_bucket
-from paradl.paths import get_throttle_dir
+from paradl.core.clock import get_clock
+from paradl.core.paths import get_throttle_dir
 from paradl.platform import macos
+from paradl.storage.history import HistoryManager, LearnedProfile, compute_hour_bucket
 from paradl.throttle.models import (
     CoverageCell,
     MeasurementDataset,

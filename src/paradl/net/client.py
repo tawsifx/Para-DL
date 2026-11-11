@@ -16,8 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from paradl import VERSION
-from paradl.history import HistoryManager
-from paradl.models import (
+from paradl.core.models import (
     DIRECT_EXTENSIONS,
     TargetInfo,
     TargetType,
@@ -144,7 +143,9 @@ def resolve_dns_doh(
         return []
 
     try:
-        client = get_http_client()
+        from paradl.net import get_http_client as _ghc
+
+        client = _ghc()
         params = {"name": host, "type": "A"}
         resp = client.get(
             doh_endpoint,
@@ -196,12 +197,16 @@ def resolve_dns(
     the system resolver (`socket.getaddrinfo`) unless `doh_fallback` is False.
     """
     if doh_endpoint:
-        resolved = resolve_dns_doh(host, doh_endpoint=doh_endpoint)
+        from paradl.net import resolve_dns_doh as _rddh
+
+        resolved = _rddh(host, doh_endpoint=doh_endpoint)
         if resolved:
             return resolved
         if not doh_fallback:
             return []
-    return re_resolve_dns(host)
+    from paradl.net import re_resolve_dns as _rrd
+
+    return _rrd(host)
 
 
 def request_with_retry(
@@ -216,7 +221,9 @@ def request_with_retry(
     """Perform an HTTP request with jittered exponential backoff on transient failures."""
     import httpx
 
-    client = get_http_client()
+    from paradl.net import get_http_client as _ghc
+
+    client = _ghc()
     last_exc: Exception | None = None
     for attempt in range(max(retries, 1)):
         try:
@@ -307,7 +314,9 @@ def probe_range_support(
     """Send a streaming GET with Range: bytes=0-0 to verify 206 Partial Content support
     without downloading the full response body on 200-only servers.
     """
-    client = get_http_client()
+    from paradl.net import get_http_client as _ghc
+
+    client = _ghc()
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         "Accept-Encoding": "identity",
@@ -368,7 +377,9 @@ def probe_http_url(
 
     head_res: HttpProbeResult | None = None
     try:
-        resp = request_with_retry("HEAD", url, headers=req_headers, retries=2, timeout=timeout)
+        from paradl.net import request_with_retry as _rwr
+
+        resp = _rwr("HEAD", url, headers=req_headers, retries=2, timeout=timeout)
         if resp.status_code not in (400, 403, 405, 501):
             ctype = resp.headers.get("content-type", "").lower()
             cdisp = resp.headers.get("content-disposition", "")
@@ -393,7 +404,9 @@ def probe_http_url(
 
     # Fall back to Range: bytes=0-0 GET if HEAD failed, returned 403/405, or didn't confirm range support
     if head_res is None or not head_res.ok or not head_res.accept_ranges:
-        range_res = probe_range_support(url, headers=headers, timeout=timeout)
+        from paradl.net import probe_range_support as _prs
+
+        range_res = _prs(url, headers=headers, timeout=timeout)
         if range_res.ok:
             if head_res and head_res.ok:
                 if not range_res.filename and head_res.filename:
@@ -434,6 +447,8 @@ def fetch_json_with_etag(
 
     Returns (parsed_json_or_None, response_headers_lower, status_code).
     """
+    from paradl.storage.history import HistoryManager
+
     req_headers = dict(headers or {})
     cached = HistoryManager.get_http_cache(url)
     if cached is not None:
@@ -442,7 +457,9 @@ def fetch_json_with_etag(
             req_headers["If-None-Match"] = cached_etag
 
     try:
-        resp = request_with_retry("GET", url, headers=req_headers, retries=2, timeout=timeout)
+        from paradl.net import request_with_retry as _rwr
+
+        resp = _rwr("GET", url, headers=req_headers, retries=2, timeout=timeout)
         hdrs = {k.lower(): v for k, v in resp.headers.items()}
         if resp.status_code == 304 and cached is not None:
             return cached[1], hdrs, 200
@@ -450,6 +467,8 @@ def fetch_json_with_etag(
             data = resp.json()
             etag = hdrs.get("etag")
             if etag:
+                from paradl.storage.history import HistoryManager
+
                 HistoryManager.set_http_cache(url, etag, data)
             return data, hdrs, 200
         return None, hdrs, resp.status_code
@@ -581,7 +600,9 @@ def probe_target(
             content_len: int | None = None
             acc_ranges: bool | None = None
             if allow_network_probe:
-                p_res = probe_http_url(direct_url, headers=hf_headers)
+                from paradl.net import probe_http_url as _phu
+
+                p_res = _phu(direct_url, headers=hf_headers)
                 if p_res.ok:
                     etag_sha = p_res.etag_sha256
                     content_len = p_res.content_length
@@ -649,7 +670,9 @@ def probe_target(
                 fname = f"{fname or 'image'}.jpg"
 
             if allow_network_probe:
-                p_res = probe_http_url(target)
+                from paradl.net import probe_http_url as _phu
+
+                p_res = _phu(target)
                 if p_res.ok:
                     final_fname = p_res.filename or fname
                     final_fname = sanitize_filename(final_fname)[:180]
@@ -699,7 +722,9 @@ def probe_target(
 
         # 6d. HTTP HEAD / Range Probe for unknown generic URLs
         if allow_network_probe and target.startswith(("http://", "https://")):
-            p_res = probe_http_url(target)
+            from paradl.net import probe_http_url as _phu
+
+            p_res = _phu(target)
             if p_res.ok:
                 content_type = p_res.content_type
                 content_len = p_res.content_length
@@ -770,11 +795,13 @@ def probe_targets_parallel(
     """Probe multiple targets concurrently while preserving input order."""
     if not targets:
         return []
+    from paradl.net import probe_target as _pt
+
     if len(targets) == 1:
-        return [probe_target(targets[0], allow_network_probe=allow_network_probe)]
+        return [_pt(targets[0], allow_network_probe=allow_network_probe)]
     with ThreadPoolExecutor(max_workers=min(len(targets), 8)) as pool:
         futures = [
-            pool.submit(probe_target, t, allow_network_probe=allow_network_probe) for t in targets
+            pool.submit(_pt, t, allow_network_probe=allow_network_probe) for t in targets
         ]
         return [f.result() for f in futures]
 

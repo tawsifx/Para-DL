@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
-from paradl.models import ExitCode, TargetInfo, TransferResult, WatchdogMode, format_size
+from paradl.core.models import ExitCode, TargetInfo, TransferResult, WatchdogMode, format_size
 from paradl.net import fetch_json_with_etag
 from paradl.postproc.checksum import ChecksumEngine
 from paradl.ui import UI, print_plain

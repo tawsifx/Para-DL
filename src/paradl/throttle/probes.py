@@ -21,7 +21,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import httpx
 
 from paradl import VERSION
-from paradl.clock import get_clock
+from paradl.core.clock import get_clock
 from paradl.platform import macos
 from paradl.throttle.budget import DataBudgetTracker
 from paradl.throttle.models import (
@@ -53,8 +53,8 @@ from paradl.throttle.parsers import (
 )
 from paradl.throttle.store import ThrottleStore
 from paradl.throttle.targets import resolve_ip_asn_country
-from paradl.toolchain import TOOLCHAIN
 from paradl.ui import redact_secrets
+from paradl.util.toolchain import TOOLCHAIN
 
 logger = logging.getLogger(__name__)
 

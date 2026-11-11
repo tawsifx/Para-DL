@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from paradl.models import format_size
+from paradl.core.models import format_size
 from paradl.ui import UI, print_plain
 
 logger = logging.getLogger(__name__)

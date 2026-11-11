@@ -1,4 +1,9 @@
-"""Main application orchestrator for pdl subcommands, engines, and post-processing."""
+"""Application orchestrator — PDLApp main controller and subcommand handlers.
+
+Wires together config, engines, queue, history, checksum verification, archive
+extraction, ADB sync, and platform features. This is the top-level orchestration
+layer; it imports from engines, resilience, storage, net, ui, and platform.
+"""
 
 from __future__ import annotations
 
@@ -12,9 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from paradl import VERSION
-from paradl.config import PDLConfig
-from paradl.history import HistoryManager
-from paradl.models import (
+from paradl.core.config import PDLConfig
+from paradl.core.models import (
     ExitCode,
     TargetInfo,
     TargetType,
@@ -23,143 +27,10 @@ from paradl.models import (
     format_speed,
     parse_rate,
 )
+from paradl.storage.history import HistoryManager
 from paradl.ui import UI, print_plain
 
 logger = logging.getLogger(__name__)
-
-
-class TargetInspector:
-    """Inspects target metadata and classification without downloading."""
-
-    @classmethod
-    def inspect(
-        cls,
-        target: str,
-        *,
-        ejs_remote: bool = False,
-        player_client: str | None = None,
-    ) -> int:
-        from paradl.engines.github import GitHubEngine
-        from paradl.engines.hf import HuggingFaceEngine
-        from paradl.engines.media import MediaEngine
-        from paradl.net import probe_target
-
-        t_info = probe_target(target)
-        UI.emit_event(
-            "target_classified",
-            target=target,
-            target_type=t_info.target_type.value,
-            clean_url=t_info.clean_url,
-            filename_hint=t_info.filename_hint,
-            content_length=t_info.content_length,
-            accept_ranges=t_info.accept_ranges,
-        )
-
-        props: dict[str, Any] = {
-            "Classification": t_info.target_type.value.upper(),
-            "Resolved URL": t_info.clean_url,
-        }
-
-        if t_info.target_type == TargetType.GITHUB and t_info.github_meta:
-            meta = t_info.github_meta
-            owner = meta.get("owner", "")
-            repo = meta.get("repo", "")
-            props["GitHub Repo"] = f"{owner}/{repo}"
-            props["Target Kind"] = meta.get("type", "repo")
-            rel = GitHubEngine.fetch_release_info(owner, repo)
-            if rel:
-                props["Latest Tag"] = rel.get("tag_name", "-")
-                props["Published At"] = str(rel.get("published_at", "-"))[:10]
-                props["Asset Count"] = str(len(rel.get("assets", [])))
-
-        elif t_info.target_type == TargetType.HF and t_info.hf_meta:
-            meta = t_info.hf_meta
-            repo_id = meta.get("repo_id", "")
-            props["HF Model ID"] = repo_id
-            info = HuggingFaceEngine.fetch_hf_info(repo_id, meta.get("repo_type", "model"))
-            if info:
-                props["Pipeline Type"] = info.get("pipeline_tag", "-")
-                props["Downloads"] = str(info.get("downloads", "-"))
-                props["Files Count"] = str(len(info.get("siblings", [])))
-
-        elif t_info.target_type in (TargetType.STREAM, TargetType.SEARCH):
-            m_info = MediaEngine.extract_metadata(
-                t_info.clean_url,
-                ejs_remote=ejs_remote,
-                player_client=player_client,
-            )
-            if m_info:
-                props["Media Title"] = m_info.get("title", "-")
-                props["Uploader"] = m_info.get("uploader", "-")
-                props["Duration"] = f"{m_info.get('duration', 0)}s"
-                props["View Count"] = str(m_info.get("view_count", "-"))
-
-        elif t_info.target_type == TargetType.IPSW and t_info.ipsw_meta:
-            meta = t_info.ipsw_meta
-            props["Apple Device"] = meta.get("device_name", "-")
-            props["Model Identifier"] = meta.get("identifier", "-")
-            props["iOS Version"] = meta.get("version", "-")
-            props["Build ID"] = meta.get("buildid", "-")
-            if meta.get("filesize"):
-                props["File Size"] = format_size(meta["filesize"])
-            if meta.get("sha256"):
-                props["SHA-256 Hash"] = meta["sha256"]
-
-        elif t_info.target_type == TargetType.PYPI and t_info.pypi_meta:
-            meta = t_info.pypi_meta
-            props["Python Package"] = meta.get("package", "-")
-            props["Version"] = meta.get("version", "-")
-            props["Artifact Type"] = meta.get("packagetype", "-")
-            if meta.get("filename"):
-                props["Filename Hint"] = meta["filename"]
-            if meta.get("filesize"):
-                props["File Size"] = format_size(meta["filesize"])
-            if meta.get("sha256"):
-                props["SHA-256 Hash"] = meta["sha256"]
-
-        elif t_info.target_type == TargetType.BREW and t_info.brew_meta:
-            meta = t_info.brew_meta
-            props["Homebrew Formula"] = meta.get("formula", "-")
-            props["Version"] = meta.get("version", "-")
-            props["Bottle Tag"] = meta.get("tag", "-")
-            if meta.get("filename"):
-                props["Bottle File"] = meta["filename"]
-            if meta.get("filesize"):
-                props["File Size"] = format_size(meta["filesize"])
-            if meta.get("sha256"):
-                props["SHA-256 Hash"] = meta["sha256"]
-
-        elif t_info.target_type == TargetType.DIRECT:
-            if t_info.filename_hint:
-                props["Filename Hint"] = t_info.filename_hint
-            if t_info.content_length:
-                props["Content Length"] = format_size(t_info.content_length)
-            if t_info.mime_type:
-                props["MIME Type"] = t_info.mime_type
-            if t_info.accept_ranges is not None:
-                props["Accept-Ranges"] = (
-                    "206 Partial Content" if t_info.accept_ranges else "200 Only"
-                )
-            if t_info.etag_sha256:
-                props["ETag SHA-256"] = t_info.etag_sha256
-
-        if UI.json_mode:
-            UI.emit_event("info", target=target, properties=props)
-            return int(ExitCode.OK)
-
-        from rich import box
-        from rich.table import Table
-
-        table = Table(title=f"Target Inspector: {target}", box=box.HORIZONTALS, pad_edge=False)
-        table.add_column("Property", style="bold cyan")
-        table.add_column("Value", style="white")
-        for k, v in props.items():
-            table.add_row(str(k), str(v))
-
-        UI.print()
-        UI.print_renderable(table)
-        UI.print()
-        return int(ExitCode.OK)
 
 
 class PDLApp:
@@ -185,7 +56,7 @@ class PDLApp:
         con.print(Text("─" * 48, style="dim"))
 
     def print_diagnostics(self) -> int:
-        from paradl.doctor import run_doctor
+        from paradl.diagnostics.doctor import run_doctor
 
         return run_doctor()
 
@@ -331,8 +202,8 @@ class PDLApp:
         q_args: list[str],
         args: argparse.Namespace,
     ) -> int:
-        from paradl.net import probe_target
-        from paradl.queue import (
+        from paradl.net.client import probe_target
+        from paradl.resilience.queue import (
             QueueManager,
             format_start_at_time,
             generate_launchd_plist,
@@ -365,7 +236,6 @@ class PDLApp:
             connections = min(max(int(raw_conn), 1), 16)
             priority = int(getattr(args, "priority", 0) or 0)
             req_ac_arg = getattr(args, "require_ac", None)
-            # B2: Queued jobs default to --require-ac ON unless explicitly overridden with --no-require-ac
             require_ac = True if req_ac_arg is None else bool(req_ac_arg)
             pause_on_low_power = bool(
                 getattr(args, "pause_on_low_power", self.config.pause_on_low_power)
@@ -517,6 +387,8 @@ class PDLApp:
             dest_p = Path(dest_str).expanduser().resolve() if dest_str else None
             interval_sec = int(getattr(args, "interval", 900) or 900)
             try:
+                from paradl.resilience.queue import generate_launchd_plist
+
                 generate_launchd_plist(
                     dest_path=dest_p,
                     start_at=at_norm,
@@ -538,7 +410,7 @@ class PDLApp:
         r_args: list[str],
         args: argparse.Namespace,
     ) -> int:
-        from paradl.queue import QueueManager
+        from paradl.resilience.queue import QueueManager
 
         # --from-history: re-download a previous history entry by its ID
         from_history = getattr(args, "from_history", None)
@@ -624,7 +496,7 @@ class PDLApp:
             )
 
         if getattr(args, "doctor", False) or getattr(args, "diagnose", False):
-            from paradl.doctor import run_doctor
+            from paradl.diagnostics.doctor import run_doctor
 
             return run_doctor()
 
@@ -646,6 +518,8 @@ class PDLApp:
             return self.clean_orphans(Path(getattr(args, "output", None) or self.config.output_dir))
 
         if getattr(args, "info_target", None):
+            from paradl.app.inspector import TargetInspector
+
             return TargetInspector.inspect(
                 args.info_target,
                 ejs_remote=getattr(args, "ejs_remote", False),
@@ -684,8 +558,6 @@ class PDLApp:
                     assume_yes=assume_yes,
                 )
             elif "/" not in raw_target and not raw_target.startswith("http"):
-                import shutil
-
                 from paradl.engines.brew import BrewEngine
 
                 if shutil.which("brew") and BrewEngine.get_brew_cache_path(raw_target):
@@ -726,7 +598,7 @@ class PDLApp:
                 error=inst_res.error,
                 exit_code=inst_res.exit_code,
             )
-            from paradl.hooks import HookRunner
+            from paradl.resilience.hooks import HookRunner
 
             HookRunner.run_result_actions(
                 {
@@ -745,7 +617,7 @@ class PDLApp:
             return inst_res.exit_code
 
         if getattr(args, "netprobe_url", None):
-            from paradl.netprobe import run_netprobe
+            from paradl.diagnostics.netprobe import run_netprobe
 
             code, _ = run_netprobe(
                 args.netprobe_url,
@@ -755,7 +627,7 @@ class PDLApp:
             return code
 
         if getattr(args, "bench_url", None):
-            from paradl.bench import run_bench
+            from paradl.diagnostics.bench import run_bench
 
             code, _ = run_bench(
                 args.bench_url,
@@ -769,7 +641,7 @@ class PDLApp:
             )
             return code
 
-        # Validate rate flags up front (Phase 0 #7: reject unparseable values with a clear error)
+        # Validate rate flags up front
         limit_rate = getattr(args, "limit_rate", None) or self.config.max_download_limit
         if limit_rate:
             try:
@@ -823,7 +695,7 @@ class PDLApp:
 
         start_at = getattr(args, "start_at", None)
         if start_at is not None:
-            from paradl.queue import is_schedule_due, parse_start_at_time
+            from paradl.resilience.queue import is_schedule_due, parse_start_at_time
 
             try:
                 parse_start_at_time(start_at)
@@ -895,17 +767,17 @@ class PDLApp:
         )
 
         from paradl import platform
+        from paradl.core.models import TransferResult
         from paradl.engines.aria2 import Aria2Engine
         from paradl.engines.github import GitHubEngine
         from paradl.engines.hf import HuggingFaceEngine
         from paradl.engines.ipsw import IpswEngine
         from paradl.engines.media import MediaEngine
-        from paradl.events import check_free_disk_space, check_power_policy
-        from paradl.models import TransferResult
-        from paradl.net import probe_targets_parallel
+        from paradl.net.client import probe_targets_parallel
         from paradl.postproc.adb import ADBDeviceSync
         from paradl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
         from paradl.postproc.checksum import ChecksumEngine
+        from paradl.resilience.events import check_free_disk_space, check_power_policy
 
         # Start-up guard: Power policy check (--require-ac / --pause-on-low-power)
         pwr_ok, pwr_err = check_power_policy(
@@ -941,6 +813,9 @@ class PDLApp:
                 )
 
                 t0 = time.time()
+                out_file: Path | None = None
+                tx_res: TransferResult | None = None
+
                 # Start-up guard: Free-disk check when content_length is already known
                 disk_ok, disk_err = check_free_disk_space(out_dir, t_info.content_length)
 
@@ -1046,10 +921,10 @@ class PDLApp:
                             t_info, out_dir, connections=connections, **common_opts
                         )
 
-                out_file = tx_res.file_path
+                out_file = tx_res.file_path if tx_res else None
 
                 # Explicit user checksum or companion verification (--checksum / --verify)
-                if tx_res.success and out_file and out_file.is_file():
+                if tx_res and tx_res.success and out_file and out_file.is_file():
                     if getattr(args, "checksum", None):
                         matched, algo, digest = ChecksumEngine.verify(out_file, args.checksum)
                         tx_res.checksum_verified = matched
@@ -1103,7 +978,8 @@ class PDLApp:
 
                 # Auto-Archive Extraction (--extract)
                 if (
-                    tx_res.success
+                    tx_res
+                    and tx_res.success
                     and out_file
                     and out_file.is_file()
                     and auto_extract
@@ -1122,7 +998,7 @@ class PDLApp:
 
                 # Mobile ADB Sync (--push / --adb)
                 adb_pushed = False
-                if tx_res.success and out_file and push_adb and out_file.is_file():
+                if tx_res and tx_res.success and out_file and push_adb and out_file.is_file():
                     dest_phone_dir = (
                         self.config.adb_music_dir if is_audio else self.config.adb_download_dir
                     )
@@ -1130,7 +1006,8 @@ class PDLApp:
 
                 # Finder Extended Attribute (--no-xattr to disable)
                 if (
-                    tx_res.success
+                    tx_res
+                    and tx_res.success
                     and out_file
                     and out_file.exists()
                     and not getattr(args, "no_xattr", False)
@@ -1143,7 +1020,7 @@ class PDLApp:
                 file_sz = (
                     out_file.stat().st_size
                     if (out_file and out_file.is_file())
-                    else tx_res.bytes_downloaded
+                    else (tx_res.bytes_downloaded if tx_res else 0)
                 )
                 HistoryManager.record(
                     target=target,
@@ -1151,13 +1028,22 @@ class PDLApp:
                     file_path=str(out_file) if out_file else None,
                     size=file_sz,
                     duration=elapsed,
-                    success=tx_res.success,
+                    success=tx_res.success if tx_res else False,
                     adb=adb_pushed,
-                    sha256=tx_res.checksum_digest if tx_res.checksum_algo == "sha256" else None,
+                    sha256=(
+                        tx_res.checksum_digest
+                        if tx_res and tx_res.checksum_algo == "sha256"
+                        else None
+                    ),
                     history_limit=self.config.history_limit,
                 )
 
-                if tx_res.success and tx_res.avg_speed_bps > 0 and (file_sz or 0) >= 32768:
+                if (
+                    tx_res
+                    and tx_res.success
+                    and tx_res.avg_speed_bps > 0
+                    and (file_sz or 0) >= 32768
+                ):
                     try:
                         from urllib.parse import urlparse as _urlparse
 
@@ -1178,47 +1064,47 @@ class PDLApp:
                     "result",
                     target=target,
                     target_type=t_info.target_type.value,
-                    success=tx_res.success,
+                    success=tx_res.success if tx_res else False,
                     file_path=str(out_file) if out_file else None,
                     bytes_downloaded=file_sz or 0,
                     duration=round(elapsed, 3),
-                    avg_speed_bps=round(tx_res.avg_speed_bps, 2),
-                    recycle_count=tx_res.recycle_count,
-                    audio_format_produced=tx_res.audio_format_produced,
-                    checksum_verified=tx_res.checksum_verified,
-                    checksum_algo=tx_res.checksum_algo,
-                    checksum_digest=tx_res.checksum_digest,
+                    avg_speed_bps=round(tx_res.avg_speed_bps, 2) if tx_res else 0,
+                    recycle_count=tx_res.recycle_count if tx_res else 0,
+                    audio_format_produced=tx_res.audio_format_produced if tx_res else None,
+                    checksum_verified=tx_res.checksum_verified if tx_res else None,
+                    checksum_algo=tx_res.checksum_algo if tx_res else None,
+                    checksum_digest=tx_res.checksum_digest if tx_res else None,
                     adb_synced=adb_pushed,
-                    error=tx_res.error,
-                    exit_code=tx_res.exit_code,
+                    error=tx_res.error if tx_res else None,
+                    exit_code=tx_res.exit_code if tx_res else int(ExitCode.FAILURE),
                 )
 
-                from paradl.hooks import HookRunner
+                from paradl.resilience.hooks import HookRunner
 
                 HookRunner.run_result_actions(
                     {
                         "event": "result",
                         "target": target,
                         "target_type": t_info.target_type.value,
-                        "success": tx_res.success,
+                        "success": tx_res.success if tx_res else False,
                         "file_path": str(out_file) if out_file else None,
                         "bytes_downloaded": file_sz or 0,
                         "duration": round(elapsed, 3),
-                        "avg_speed_bps": round(tx_res.avg_speed_bps, 2),
-                        "recycle_count": tx_res.recycle_count,
-                        "audio_format_produced": tx_res.audio_format_produced,
-                        "checksum_verified": tx_res.checksum_verified,
-                        "checksum_algo": tx_res.checksum_algo,
-                        "checksum_digest": tx_res.checksum_digest,
+                        "avg_speed_bps": round(tx_res.avg_speed_bps, 2) if tx_res else 0,
+                        "recycle_count": tx_res.recycle_count if tx_res else 0,
+                        "audio_format_produced": tx_res.audio_format_produced if tx_res else None,
+                        "checksum_verified": tx_res.checksum_verified if tx_res else None,
+                        "checksum_algo": tx_res.checksum_algo if tx_res else None,
+                        "checksum_digest": tx_res.checksum_digest if tx_res else None,
                         "adb_synced": adb_pushed,
-                        "error": tx_res.error,
-                        "exit_code": tx_res.exit_code,
+                        "error": tx_res.error if tx_res else None,
+                        "exit_code": tx_res.exit_code if tx_res else int(ExitCode.FAILURE),
                     },
-                    is_success=tx_res.success,
+                    is_success=tx_res.success if tx_res else False,
                     notify=bool(getattr(args, "notify", False)),
                 )
 
-                if not tx_res.success and overall_exit_code == int(ExitCode.OK):
+                if tx_res and not tx_res.success and overall_exit_code == int(ExitCode.OK):
                     overall_exit_code = (
                         tx_res.exit_code if tx_res.exit_code != 0 else int(ExitCode.FAILURE)
                     )
@@ -1226,12 +1112,12 @@ class PDLApp:
                 results.append(
                     {
                         "target": target,
-                        "success": tx_res.success,
+                        "success": tx_res.success if tx_res else False,
                         "file": out_file,
                         "adb": adb_pushed,
-                        "audio_format_produced": tx_res.audio_format_produced,
-                        "avg_speed_bps": tx_res.avg_speed_bps,
-                        "recycle_count": tx_res.recycle_count,
+                        "audio_format_produced": tx_res.audio_format_produced if tx_res else None,
+                        "avg_speed_bps": tx_res.avg_speed_bps if tx_res else 0,
+                        "recycle_count": tx_res.recycle_count if tx_res else 0,
                     }
                 )
 
@@ -1310,10 +1196,10 @@ class PDLApp:
         import sys
         from urllib.parse import urlparse
 
-        from paradl.curl_parser import create_netscape_cookie_jar, parse_curl_command
+        from paradl.core.models import ExitCode, TargetInfo, TargetType
         from paradl.engines.aria2 import Aria2Engine
-        from paradl.models import ExitCode, TargetInfo, TargetType
         from paradl.ui import UI, print_plain
+        from paradl.util.curl_parser import create_netscape_cookie_jar, parse_curl_command
 
         curl_cmd = ""
         if getattr(args, "clipboard", False):

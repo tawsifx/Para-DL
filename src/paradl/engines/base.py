@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from paradl.models import TargetInfo, TransferResult
+from paradl.core.models import TargetInfo, TransferResult
 
 
 @runtime_checkable

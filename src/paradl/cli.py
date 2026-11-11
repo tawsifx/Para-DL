@@ -9,8 +9,8 @@ import sys
 from collections.abc import Sequence
 
 from paradl import VERSION
-from paradl.config import PDLConfig
-from paradl.models import ExitCode
+from paradl.core.config import PDLConfig
+from paradl.core.models import ExitCode
 from paradl.ui import UI, SecretRedactingFilter, check_optional_dep, print_plain
 
 SUBCOMMANDS = {
@@ -778,7 +778,7 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
             return int(ExitCode.OK)
         elif sub == "tui":
             check_optional_dep("textual", "tui")
-            from paradl.tui import run_tui
+            from paradl.ui.tui import run_tui
 
             run_tui()
             return int(ExitCode.OK)

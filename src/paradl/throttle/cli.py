@@ -17,10 +17,10 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
-from paradl.clock import get_clock
-from paradl.config import PDLConfig
-from paradl.models import ExitCode
-from paradl.paths import get_logs_dir, get_paradl_home, get_throttle_dir
+from paradl.core.clock import get_clock
+from paradl.core.config import PDLConfig
+from paradl.core.models import ExitCode
+from paradl.core.paths import get_logs_dir, get_paradl_home, get_throttle_dir
 from paradl.platform import macos
 from paradl.throttle.budget import (
     DEFAULT_FULL_BUDGET_BYTES,

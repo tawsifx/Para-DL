@@ -8,7 +8,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 
-from paradl.clock import get_clock
+from paradl.core.clock import get_clock
 from paradl.throttle.models import BudgetSummary
 
 logger = logging.getLogger(__name__)

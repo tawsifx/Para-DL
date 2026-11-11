@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from paradl.models import (
+from paradl.core.models import (
     ExitCode,
     TargetInfo,
     TargetType,

@@ -12,8 +12,8 @@ import zipfile
 from pathlib import Path
 from typing import ClassVar
 
-from paradl.toolchain import TOOLCHAIN, is_macos
 from paradl.ui import print_plain
+from paradl.util.toolchain import TOOLCHAIN, is_macos
 
 logger = logging.getLogger(__name__)
 

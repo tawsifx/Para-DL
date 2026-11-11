@@ -12,12 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from paradl.engines.aria2 import (
-    Aria2Engine,
-    register_temp_path,
-    unregister_temp_path,
-)
-from paradl.models import (
+from paradl.core.models import (
     ExitCode,
     TargetInfo,
     TargetType,
@@ -26,9 +21,14 @@ from paradl.models import (
     parse_rate,
     sanitize_filename,
 )
+from paradl.engines.aria2 import (
+    Aria2Engine,
+    register_temp_path,
+    unregister_temp_path,
+)
 from paradl.net import request_with_retry
-from paradl.toolchain import TOOLCHAIN, is_macos
 from paradl.ui import LiveTransferDisplay, print_plain
+from paradl.util.toolchain import TOOLCHAIN, is_macos
 
 logger = logging.getLogger(__name__)
 

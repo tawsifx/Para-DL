@@ -15,8 +15,7 @@ from typing import Any
 
 from paradl import VERSION
 from paradl import platform as pdl_platform
-from paradl.engines.aria2 import Aria2Engine
-from paradl.models import (
+from paradl.core.models import (
     DownloadItem,
     ExitCode,
     TargetInfo,
@@ -25,12 +24,13 @@ from paradl.models import (
     WatchdogMode,
     format_size,
 )
+from paradl.engines.aria2 import Aria2Engine
 from paradl.net import fetch_json_with_etag, request_with_retry
 from paradl.platform import macos
 from paradl.postproc.archive import ArchiveExtractor
 from paradl.postproc.checksum import ChecksumEngine
-from paradl.toolchain import TOOLCHAIN
 from paradl.ui import UI, print_plain
+from paradl.util.toolchain import TOOLCHAIN
 
 logger = logging.getLogger(__name__)
 

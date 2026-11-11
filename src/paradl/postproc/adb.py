@@ -6,8 +6,8 @@ import logging
 import subprocess
 from pathlib import Path
 
-from paradl.toolchain import TOOLCHAIN
 from paradl.ui import print_plain
+from paradl.util.toolchain import TOOLCHAIN
 
 logger = logging.getLogger(__name__)
 

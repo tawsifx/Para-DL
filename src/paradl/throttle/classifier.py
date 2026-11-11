@@ -9,7 +9,7 @@ import math
 import statistics
 from typing import Any
 
-from paradl.models import format_size, format_speed
+from paradl.core.models import format_size, format_speed
 from paradl.throttle.models import (
     ClassificationResult,
     ISPEvidenceSummary,

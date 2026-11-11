@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from paradl.paths import get_targets_file
+from paradl.core.paths import get_targets_file
 from paradl.throttle.models import TargetCandidate, ValidatedTarget
 from paradl.throttle.store import ThrottleStore
 
