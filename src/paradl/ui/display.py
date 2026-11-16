@@ -237,9 +237,16 @@ class LiveTransferDisplay:
     and per-connection / peer statistics for torrent and multi-connection HTTP transfers.
     """
 
-    def __init__(self, title: str, total_bytes: int | None = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        total_bytes: int | None = None,
+        *,
+        simple: bool = False,
+    ) -> None:
         self.title = title
         self.total_bytes = total_bytes or 0
+        self.simple = simple
         self.downloaded_bytes = 0
         self.speed_bps = 0.0
         self.connections = 0
@@ -252,9 +259,11 @@ class LiveTransferDisplay:
         self._live: Any = None
         self._last_json_emit = 0.0
         self._last_non_terminal_emit = 0.0
+        self._last_simple_emit = 0.0
+        self._last_simple_pct = -1
 
     def __enter__(self) -> LiveTransferDisplay:
-        if not UI.json_mode and not UI.quiet:
+        if not self.simple and not UI.json_mode and not UI.quiet:
             con = UI.get_console()
             if con is not None:
                 if con.is_terminal:
@@ -274,15 +283,52 @@ class LiveTransferDisplay:
                     con.print(self._build_renderable())
         return self
 
+    def _finalize_on_success(self) -> None:
+        if self.total_bytes > 0 and self.downloaded_bytes < self.total_bytes:
+            self.downloaded_bytes = self.total_bytes
+        for fp in self.file_progress:
+            f_total = int(fp.get("total") or 0)
+            if f_total > 0 and int(fp.get("downloaded") or 0) < f_total:
+                fp["downloaded"] = f_total
+
+    def _format_simple_line(self) -> str:
+        pct = (self.downloaded_bytes * 100.0 / self.total_bytes) if self.total_bytes > 0 else 0.0
+        rem = max(self.total_bytes - self.downloaded_bytes, 0)
+        if self.speed_bps > 0 and self.total_bytes > 0:
+            eta_s = int(rem / self.speed_bps)
+            eta_str = f"{eta_s // 60:02d}:{eta_s % 60:02d}"
+        else:
+            eta_str = "--:--"
+
+        pct_str = f"{pct:5.1f}%" if self.total_bytes > 0 else " ---.-%"
+        size_part = (
+            f"{format_size(self.downloaded_bytes)} / {format_size(self.total_bytes)}"
+            if self.total_bytes > 0
+            else format_size(self.downloaded_bytes)
+        )
+        parts = [
+            f"  {self.title[:32]}",
+            pct_str,
+            size_part,
+            format_speed(self.speed_bps),
+            f"ETA {eta_str}",
+        ]
+        if self.connections > 1:
+            parts.append(f"[{self.connections} conns]")
+        return "  ".join(parts)
+
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self.simple:
+            if not UI.json_mode and not UI.quiet and exc_type is None:
+                self._finalize_on_success()
+                if self._last_simple_pct < 100:
+                    self._last_simple_pct = 100
+                    print(self._format_simple_line(), flush=True)
+            return
         if self._live is not None:
             try:
-                if (
-                    exc_type is None
-                    and self.total_bytes > 0
-                    and self.downloaded_bytes < self.total_bytes
-                ):
-                    self.downloaded_bytes = self.total_bytes
+                if exc_type is None:
+                    self._finalize_on_success()
                 self._live.update(self._build_renderable(), refresh=True)
                 self._live.stop()
             except Exception as exc:
@@ -291,8 +337,7 @@ class LiveTransferDisplay:
         elif not UI.json_mode and not UI.quiet and exc_type is None:
             con = UI.get_console()
             if con is not None:
-                if self.total_bytes > 0 and self.downloaded_bytes < self.total_bytes:
-                    self.downloaded_bytes = self.total_bytes
+                self._finalize_on_success()
                 con.print(self._build_renderable())
 
     def update(
@@ -346,6 +391,27 @@ class LiveTransferDisplay:
                 file_progress=self.file_progress,
                 connection_speeds=self.connection_speeds,
             )
+
+        if self.simple:
+            if not UI.json_mode and not UI.quiet:
+                is_done = self.total_bytes > 0 and self.downloaded_bytes >= self.total_bytes
+                int_pct = int(pct) if self.total_bytes > 0 else -1
+                should_emit = (
+                    force_event
+                    or (is_done and self._last_simple_pct < 100)
+                    or (
+                        self.total_bytes > 0
+                        and int_pct > self._last_simple_pct
+                        and (now - self._last_simple_emit >= 0.5)
+                    )
+                    or (now - self._last_simple_emit >= 1.0)
+                )
+                if should_emit:
+                    self._last_simple_emit = now
+                    if self.total_bytes > 0:
+                        self._last_simple_pct = 100 if is_done else int_pct
+                    print(self._format_simple_line(), flush=True)
+            return
 
         if self._live is not None:
             self._live.update(self._build_renderable())

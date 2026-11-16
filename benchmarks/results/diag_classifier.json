@@ -1,0 +1,48 @@
+{
+  "tag": "diag_classifier",
+  "python": "3.12.16",
+  "results": [
+    {
+      "case": "classifier.mann_whitney_u_test",
+      "scale": 200,
+      "iterations": 300,
+      "units_per_call": 400,
+      "p50_ms": 2.4390210001001833,
+      "p95_ms": 3.6154045006696838,
+      "p99_ms": 6.2161525798546755,
+      "mean_ms": 2.52812960336693,
+      "throughput_units_per_s": 158219.7366255611,
+      "traced_peak_kb": 33.935546875,
+      "rss_delta_mb": 0.046875,
+      "label": "small"
+    },
+    {
+      "case": "classifier.mann_whitney_u_test",
+      "scale": 2000,
+      "iterations": 30,
+      "units_per_call": 4000,
+      "p50_ms": 39.027874999192136,
+      "p95_ms": 43.323130950375344,
+      "p99_ms": 72.60460892945052,
+      "mean_ms": 40.54257633330659,
+      "throughput_units_per_s": 98661.71224826465,
+      "traced_peak_kb": 376.828125,
+      "rss_delta_mb": 0.390625,
+      "label": "medium"
+    },
+    {
+      "case": "classifier.mann_whitney_u_test",
+      "scale": 20000,
+      "iterations": 9,
+      "units_per_call": 40000,
+      "p50_ms": 400.4633749991626,
+      "p95_ms": 467.9882333999558,
+      "p99_ms": 488.59671307975077,
+      "mean_ms": 411.4951343332602,
+      "throughput_units_per_s": 97206.49568508615,
+      "traced_peak_kb": 3751.203125,
+      "rss_delta_mb": 10.21875,
+      "label": "stress"
+    }
+  ]
+}

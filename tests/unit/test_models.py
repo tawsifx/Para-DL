@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import pytest
+
 from paradl.models import (
     DIRECT_EXTENSIONS,
     ExitCode,
@@ -64,12 +66,24 @@ class TestFormatSpeedAndSize(unittest.TestCase):
         self.assertEqual(format_speed(1536), "1.5 KB/s")
         self.assertEqual(format_speed(1024 * 1024 * 2.5), "2.5 MB/s")
 
-    def test_format_size(self) -> None:
-        self.assertEqual(format_size(None), "Unknown size")
-        self.assertEqual(format_size(0), "0 B")
-        self.assertEqual(format_size(512), "512.0 B")
-        self.assertEqual(format_size(1024 * 1.5), "1.5 KB")
-        self.assertEqual(format_size(1024 * 1024 * 3), "3.0 MB")
+
+# Deduplicated format_size oracle: the union of
+#   unit_test_core.py::TestFormatSpeedAndSize::test_format_size
+# and test_bug_fixes.py::test_l3_format_size.
+FORMAT_SIZE_CASES = [
+    (None, "Unknown size"),
+    (0, "0 B"),
+    (0.0, "0 B"),
+    (512, "512.0 B"),
+    (1024, "1.0 KB"),
+    (1024 * 1.5, "1.5 KB"),
+    (1024 * 1024 * 3, "3.0 MB"),
+]
+
+
+@pytest.mark.parametrize(("value", "expected"), FORMAT_SIZE_CASES)
+def test_format_size(value: float | None, expected: str) -> None:
+    assert format_size(value) == expected
 
 
 class TestSanitizeFilename(unittest.TestCase):
@@ -143,13 +157,19 @@ class TestExitCodes(unittest.TestCase):
         self.assertEqual(ExitCode.INTERRUPTED, 130)
 
 
-class TestWatchdogModes(unittest.TestCase):
-    """Tests for WatchdogMode enum."""
+# Deduplicated WatchdogMode oracle: the exact duplicate assertions formerly in
+#   unit_test_aria2.py::TestWatchdogModes::test_values
+# and unit_test_core.py::TestWatchdogModes::test_watchdog_mode_values.
+WATCHDOG_MODE_CASES = [
+    (WatchdogMode.V1, "v1"),
+    (WatchdogMode.V2, "v2"),
+    (WatchdogMode.OFF, "off"),
+]
 
-    def test_watchdog_mode_values(self) -> None:
-        self.assertEqual(WatchdogMode.V1, "v1")
-        self.assertEqual(WatchdogMode.V2, "v2")
-        self.assertEqual(WatchdogMode.OFF, "off")
+
+@pytest.mark.parametrize(("mode", "expected"), WATCHDOG_MODE_CASES)
+def test_watchdog_mode_values(mode: WatchdogMode, expected: str) -> None:
+    assert mode == expected
 
 
 class TestMmapChecksum(unittest.TestCase):

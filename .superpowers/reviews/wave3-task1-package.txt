@@ -1,0 +1,692 @@
+=== DIFF STAT (Task 1 scope) ===
+ pyproject.toml    | 7 ++++++-
+ tests/conftest.py | 7 ++-----
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+=== DIFF conftest + pyproject ===
+diff --git a/pyproject.toml b/pyproject.toml
+index ae04660..fa66b5f 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -60,7 +60,6 @@ Issues = "https://github.com/tawsifx/Para-DL/issues"
+ [project.scripts]
+ paradl = "paradl.cli:main"
+ parallel-dl = "paradl.cli:main"
+-pdl = "paradl.cli:main"
+ 
+ [dependency-groups]
+ dev = [
+@@ -114,6 +113,12 @@ format.quote-style = "double"
+ format.docstring-code-format = true
+ isort.known-first-party = ["paradl"]
+ 
++[tool.pytest.ini_options]
++testpaths = ["tests"]
++pythonpath = ["src"]
++python_files = ["test_*.py"]
++markers = ["slow: end-to-end or multi-second transfer tests"]
++
+ [tool.mypy]
+ python_version = "3.11"
+ warn_return_any = true
+diff --git a/tests/conftest.py b/tests/conftest.py
+index edd0da4..c7fff43 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -3,17 +3,14 @@
+ from __future__ import annotations
+ 
+ import os
+-import sys
+ import tempfile
+ from pathlib import Path
+ from unittest.mock import MagicMock, patch
+ 
+ import pytest
+ 
+-# Ensure src/paradl is importable without installation
+-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+-if str(SRC_DIR) not in sys.path:
+-    sys.path.insert(0, str(SRC_DIR))
++# Autouse hermeticity guard: block every non-loopback socket connection.
++from tests.support.guards import forbid_wan_sockets  # noqa: F401
+ 
+ 
+ @pytest.fixture(autouse=True)
+=== NEW SUPPORT FILES ===
+----- tests/support/__init__.py -----
+"""Shared test-support harness for the paradl test suite.
+
+This package centralizes deterministic fakes, a loopback-only throttle server,
+macOS command-output fakes, and safety guards so the unit / integration / e2e
+tiers do not duplicate infrastructure.
+"""
+----- tests/support/fakes.py -----
+"""Centralized, deterministic fakes shared across the paradl test tiers.
+
+The clock is a thin subclass of :class:`paradl.core.clock.FakeClock` so there is
+a single source of truth for fake-time semantics; the other fakes are small
+in-memory stand-ins for keyring and the aria2 JSON-RPC status surface.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from paradl.core.clock import FakeClock as _CoreFakeClock
+from paradl.models import TargetInfo, TargetType
+
+
+class FakeClock(_CoreFakeClock):
+    """Test-facing alias of the production fake clock (identical semantics).
+
+    Subclassing keeps :mod:`paradl.core.clock` the single source of truth while
+    giving migrated tests a stable import path under ``tests.support``.
+    """
+
+
+class FakeKeychain:
+    """In-memory stand-in for keyring's ``get/set/delete_password`` API.
+
+    Keys are ``(service, username)`` pairs, matching keyring's addressing model.
+    No real keychain or SecretService is touched.
+    """
+
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, str], str] = {}
+
+    # keyring-compatible API
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self._store[(service, username)] = password
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self._store.get((service, username))
+
+    def delete_password(self, service: str, username: str) -> None:
+        self._store.pop((service, username), None)
+
+    # short aliases used by tests that prefer get/set/delete naming
+    def set(self, service: str, username: str, password: str) -> None:
+        self.set_password(service, username, password)
+
+    def get(self, service: str, username: str) -> str | None:
+        return self.get_password(service, username)
+
+    def delete(self, service: str, username: str) -> None:
+        self.delete_password(service, username)
+
+    def clear(self) -> None:
+        self._store.clear()
+
+
+class FakeAria2Server:
+    """Deterministic in-memory stand-in for an aria2 JSON-RPC daemon.
+
+    Mirrors the status surface consumed by :class:`paradl.engines.aria2.Aria2Engine`
+    (``tell_status`` / ``get_servers`` / ``get_global_stat``) and the small
+    control surface needed to drive a watchdog recycle workflow end-to-end.
+    No aria2c process or socket is ever created.
+    """
+
+    def __init__(
+        self,
+        *,
+        gid: str = "gid-1",
+        status: str = "complete",
+        completed_length: int = 100,
+        total_length: int = 100,
+        download_speed: float = 1024,
+        files: list[dict[str, Any]] | None = None,
+        servers: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self.gid = gid
+        self.status = status
+        self.completed_length = completed_length
+        self.total_length = total_length
+        self.download_speed = download_speed
+        self.files: list[dict[str, Any]] = list(files) if files is not None else []
+        self.servers: list[dict[str, Any]] = list(servers) if servers is not None else []
+        self.calls: list[str] = []
+
+    def update(
+        self,
+        *,
+        status: str | None = None,
+        completed_length: int | None = None,
+        total_length: int | None = None,
+        download_speed: float | None = None,
+        files: list[dict[str, Any]] | None = None,
+        servers: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Mutate only the supplied fields so tests can drive state transitions."""
+        if status is not None:
+            self.status = status
+        if completed_length is not None:
+            self.completed_length = completed_length
+        if total_length is not None:
+            self.total_length = total_length
+        if download_speed is not None:
+            self.download_speed = download_speed
+        if files is not None:
+            self.files = list(files)
+        if servers is not None:
+            self.servers = list(servers)
+
+    def tell_status(self, gid: str | None = None) -> dict[str, Any]:
+        self.calls.append("tell_status")
+        return {
+            "status": self.status,
+            "completedLength": self.completed_length,
+            "totalLength": self.total_length,
+            "files": list(self.files),
+        }
+
+    def get_servers(self, gid: str | None = None) -> list[dict[str, Any]]:
+        self.calls.append("get_servers")
+        return list(self.servers)
+
+    def get_global_stat(self) -> dict[str, Any]:
+        self.calls.append("get_global_stat")
+        return {"downloadSpeed": self.download_speed}
+
+    def add_uri(self, uris: list[str], options: dict[str, Any]) -> str:
+        self.calls.append("add_uri")
+        return self.gid
+
+    def force_pause(self, gid: str) -> str:
+        self.calls.append("force_pause")
+        return gid
+
+    def unpause(self, gid: str) -> str:
+        self.calls.append("unpause")
+        return gid
+
+    def change_option(self, gid: str, options: dict[str, Any]) -> str:
+        self.calls.append("change_option")
+        return gid
+
+    def save_session(self) -> None:
+        self.calls.append("save_session")
+
+    def stop(self, *, graceful: bool = True) -> None:
+        self.calls.append("stop")
+
+    def __enter__(self) -> FakeAria2Server:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.stop()
+
+
+def make_target_info(**overrides: Any) -> TargetInfo:
+    """Build a :class:`paradl.models.TargetInfo` mirroring the legacy fixture.
+
+    Any field can be overridden by keyword (e.g. ``filename_hint="x.zip"``).
+    The function returns a fresh object every call, so tests never share mutable
+    ``headers`` / ``mirrors`` lists.
+    """
+    defaults: dict[str, Any] = {
+        "raw": "https://example.com/file.zip",
+        "target_type": TargetType.DIRECT,
+        "clean_url": "https://example.com/file.zip",
+        "filename_hint": "file.zip",
+        "content_length": 1048576,
+        "accept_ranges": True,
+    }
+    defaults.update(overrides)
+    return TargetInfo(**defaults)
+
+
+__all__ = [
+    "FakeAria2Server",
+    "FakeClock",
+    "FakeKeychain",
+    "make_target_info",
+]
+----- tests/support/server.py -----
+"""Reusable loopback-only HTTP server with byte-range and bandwidth-throttle support.
+
+This is NEW infrastructure: no existing test spins up an inline HTTP server, so
+nothing is being consolidated here. It gives integration/e2e tests a real
+``http.server`` endpoint on an ephemeral loopback port without ever touching a
+WAN interface.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.util import find_spec
+from typing import Any
+
+import pytest
+
+DEFAULT_BODY: bytes = b"paradl-throttle-body-" * 32
+
+# pytest-xdist registers a per-worker "worker" scope. Without xdist, a single
+# pytest process is the worker, so "session" is the equivalent single instance.
+_SERVER_SCOPE = "worker" if find_spec("xdist") is not None else "session"
+
+
+def _parse_range(value: str, total: int) -> tuple[int, int] | None:
+    """Parse a single ``bytes=start-end`` range into inclusive bounds."""
+    if not value.startswith("bytes=") or total <= 0:
+        return None
+    spec = value[6:].split(",", 1)[0].strip()
+    if "-" not in spec:
+        return None
+    raw_start, _, raw_end = spec.partition("-")
+    try:
+        if raw_start == "":
+            suffix = int(raw_end)
+            if suffix <= 0:
+                return None
+            return max(0, total - suffix), total - 1
+        start = int(raw_start)
+        end = int(raw_end) if raw_end else total - 1
+    except ValueError:
+        return None
+    if start < 0 or start >= total:
+        return None
+    end = min(end, total - 1)
+    return (start, end) if end >= start else None
+
+
+class _ThrottleHandler(BaseHTTPRequestHandler):
+    """Serves the parent server's byte body, honoring a single Range header."""
+
+    protocol_version = "HTTP/1.1"
+
+    @property
+    def _server(self) -> ThrottleHTTPServer:
+        return self.server  # type: ignore[return-value]
+
+    def do_GET(self) -> None:
+        server = self._server
+        body = server.body
+        total = len(body)
+        start, end = 0, total - 1
+        status = 200
+
+        range_header = self.headers.get("Range")
+        if range_header:
+            bounds = _parse_range(range_header, total)
+            if bounds is None:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{total}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            start, end = bounds
+            status = 206
+
+        chunk = body[start : end + 1]
+        self.send_response(status)
+        self.send_header("Content-Type", server.content_type)
+        self.send_header("Accept-Ranges", "bytes")
+        if status == 206:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{total}")
+        self.send_header("Content-Length", str(len(chunk)))
+        self.end_headers()
+        self._write_throttled(chunk)
+
+    def _write_throttled(self, chunk: bytes) -> None:
+        bps = self._server.throttle_bps
+        if bps <= 0:
+            self.wfile.write(chunk)
+            return
+        # Send in ~100 ms slices so throttling stays responsive to shutdown.
+        slice_size = max(1, int(bps // 10))
+        for offset in range(0, len(chunk), slice_size):
+            part = chunk[offset : offset + slice_size]
+            time.sleep(len(part) / bps)
+            self.wfile.write(part)
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        """Silence per-request logging; tests assert on responses, not access logs."""
+
+
+class ThrottleHTTPServer(ThreadingHTTPServer):
+    """A ``ThreadingHTTPServer`` bound to ``127.0.0.1:0`` with a throttle knob.
+
+    Use as a context manager to start/stop the serving thread, or rely on the
+    :func:`throttle_server` fixture which does exactly that.
+    """
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(
+        self,
+        body: bytes = DEFAULT_BODY,
+        *,
+        throttle_bps: float = 0.0,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        self.body = bytes(body)
+        self.throttle_bps = float(throttle_bps)
+        self.content_type = content_type
+        self._thread: threading.Thread | None = None
+        super().__init__(("127.0.0.1", 0), _ThrottleHandler)
+
+    @property
+    def host(self) -> str:
+        return "127.0.0.1"
+
+    @property
+    def port(self) -> int:
+        return int(self.server_address[1])
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}/"
+
+    def __enter__(self) -> ThrottleHTTPServer:
+        self._thread = threading.Thread(target=self.serve_forever, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.shutdown()
+        self.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+            self._thread = None
+
+
+@pytest.fixture(scope=_SERVER_SCOPE)
+def throttle_server():
+    """Yield one shared, loopback-only throttle server for the whole run."""
+    with ThrottleHTTPServer() as server:
+        yield server
+
+
+__all__ = ["ThrottleHTTPServer", "throttle_server"]
+----- tests/support/macos_fake.py -----
+"""Deterministic stand-in for macOS CLI tools used by paradl.
+
+Every command's output comes from a checked-in golden file under
+``tests/support/golden``; no ``subprocess`` call is ever made. Golden strings
+are shaped to be parseable by :mod:`paradl.platform.macos` helpers.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+_GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
+
+
+class FakeMacOSRunner:
+    """Returns fixed, golden-backed output for scutil/pmset/caffeinate/codesign/xattr."""
+
+    def __init__(self, *, golden_dir: Path | None = None) -> None:
+        self.golden_dir = Path(golden_dir) if golden_dir is not None else _GOLDEN_DIR
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def golden(self, name: str) -> str:
+        """Read a golden output file by name."""
+        return (self.golden_dir / name).read_text(encoding="utf-8")
+
+    def _record(self, tool: str, args: tuple[str, ...]) -> None:
+        self.calls.append((tool, args))
+
+    def pmset(self, *args: str) -> str:
+        self._record("pmset", args)
+        if args == ("-g", "batt"):
+            return self.golden("pmset_batt.txt")
+        return self.golden("pmset_general.txt")
+
+    def scutil(self, *args: str) -> str:
+        self._record("scutil", args)
+        if args == ("--nwi",):
+            return self.golden("scutil_nwi.txt")
+        return self.golden("scutil_query.txt")
+
+    def caffeinate(self, *args: str) -> str:
+        self._record("caffeinate", args)
+        return self.golden("caffeinate.txt")
+
+    def codesign(self, *args: str) -> str:
+        self._record("codesign", args)
+        return self.golden("codesign.txt")
+
+    def xattr(self, *args: str) -> str:
+        self._record("xattr", args)
+        return self.golden("xattr.txt")
+
+    def run(self, tool: str, *args: str) -> str:
+        """Dispatch by tool name, for tests that drive commands generically."""
+        runners = {
+            "pmset": self.pmset,
+            "scutil": self.scutil,
+            "caffeinate": self.caffeinate,
+            "codesign": self.codesign,
+            "xattr": self.xattr,
+        }
+        runner = runners.get(tool)
+        if runner is None:
+            raise ValueError(f"No fake runner for tool: {tool!r}")
+        return runner(*args)
+
+
+__all__ = ["FakeMacOSRunner"]
+----- tests/support/guards.py -----
+"""Safety guards that keep the test suite hermetic.
+
+``forbid_wan_sockets`` is registered autouse from the root conftest.
+``forbid_untracked_subprocess`` is OPT-IN (a named fixture only) so that
+legitimate subprocess tests -- notably the mypy regression guard -- keep working.
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import os
+import socket
+import subprocess
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+
+def _is_loopback_host(host: str) -> bool:
+    if host in ("localhost", "::1") or host.startswith("127."):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _is_loopback_address(address: Any) -> bool:
+    # AF_UNIX connections pass a filesystem path; those are local by definition.
+    if isinstance(address, (str, bytes, os.PathLike)):
+        return True
+    if isinstance(address, tuple) and address:
+        return _is_loopback_host(str(address[0]))
+    return False
+
+
+@pytest.fixture(autouse=True)
+def forbid_wan_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Block every socket connection whose destination is not loopback."""
+    original_connect = socket.socket.connect
+    original_connect_ex = socket.socket.connect_ex
+
+    def guarded_connect(self: socket.socket, address: Any) -> Any:
+        if not _is_loopback_address(address):
+            raise RuntimeError(f"Blocked non-loopback socket connect to {address!r}")
+        return original_connect(self, address)
+
+    def guarded_connect_ex(self: socket.socket, address: Any) -> int:
+        if not _is_loopback_address(address):
+            raise RuntimeError(f"Blocked non-loopback socket connect_ex to {address!r}")
+        return original_connect_ex(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+
+
+class SubprocessGuard:
+    """Records subprocess calls and rejects any program not on the allowlist."""
+
+    def __init__(self, allowed: frozenset[str] = frozenset()) -> None:
+        self.allowed: set[str] = set(allowed)
+        self.calls: list[str] = []
+
+    def allow(self, *programs: str) -> None:
+        """Add program basenames (e.g. ``'mypy'``) to the allowlist."""
+        self.allowed.update(programs)
+
+    @staticmethod
+    def _program_of(args: Any, kwargs: dict[str, Any]) -> str:
+        target = kwargs.get("args", args[0] if args else None)
+        if target is None:
+            return "<unknown>"
+        if isinstance(target, (str, bytes, os.PathLike)):
+            first = os.fspath(target)
+        else:
+            seq = list(target)
+            first = os.fspath(seq[0]) if seq else "<unknown>"
+        return Path(first).name
+
+    def _wrap(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        def guarded(*args: Any, **kwargs: Any) -> Any:
+            program = self._program_of(args, kwargs)
+            self.calls.append(program)
+            if program not in self.allowed:
+                raise AssertionError(
+                    f"Untracked subprocess call {program!r}; allowed={sorted(self.allowed)}"
+                )
+            return func(*args, **kwargs)
+
+        return guarded
+
+
+@pytest.fixture
+def forbid_untracked_subprocess(monkeypatch: pytest.MonkeyPatch) -> SubprocessGuard:
+    """Opt-in guard: fail on any subprocess call to a non-allowlisted program.
+
+    Tests that legitimately spawn a process must request this fixture and call
+    ``guard.allow('program')`` first. It is deliberately NOT autouse.
+    """
+    guard = SubprocessGuard()
+    for name in ("run", "Popen", "call", "check_call", "check_output"):
+        monkeypatch.setattr(subprocess, name, guard._wrap(getattr(subprocess, name)))
+    return guard
+
+
+__all__ = ["SubprocessGuard", "forbid_untracked_subprocess", "forbid_wan_sockets"]
+=== GOLDEN FILES ===
+total 56
+drwxr-xr-x  9 tawsifx  staff  288 Nov 17 01:26 .
+drwxr-xr-x  9 tawsifx  staff  288 Nov 17 01:27 ..
+-rw-r--r--  1 tawsifx  staff   45 Nov 17 01:26 caffeinate.txt
+-rw-r--r--  1 tawsifx  staff   89 Nov 17 01:26 codesign.txt
+-rw-r--r--  1 tawsifx  staff  114 Nov 17 01:26 pmset_batt.txt
+-rw-r--r--  1 tawsifx  staff   28 Nov 17 01:26 pmset_general.txt
+-rw-r--r--  1 tawsifx  staff  119 Nov 17 01:26 scutil_nwi.txt
+-rw-r--r--  1 tawsifx  staff   93 Nov 17 01:26 scutil_query.txt
+-rw-r--r--  1 tawsifx  staff   21 Nov 17 01:26 xattr.txt
+=== SMOKE TEST ===
+"""Temporary proof test for the centralized test-support harness.
+
+The lead deletes this file before final verification. It exists only to prove
+that Task 1's shared fakes, server, and guards work end-to-end without any
+PYTHONPATH environment variable.
+"""
+
+from __future__ import annotations
+
+import socket
+import subprocess
+
+import pytest
+from tests.support.fakes import FakeAria2Server, FakeClock, FakeKeychain, make_target_info
+from tests.support.guards import (  # noqa: F401 -- fixtures registered by import
+    forbid_untracked_subprocess,
+    forbid_wan_sockets,
+)
+from tests.support.macos_fake import FakeMacOSRunner
+from tests.support.server import throttle_server  # noqa: F401 -- fixture registered by import
+
+
+def test_fake_clock_advances_deterministically() -> None:
+    from paradl.core.clock import FakeClock as CoreFakeClock
+
+    clock = FakeClock(initial_time=100.0, initial_mono=10.0)
+    assert isinstance(clock, CoreFakeClock)  # single source of truth
+    assert clock.now() == 100.0
+    assert clock.monotonic() == 10.0
+    clock.sleep(2.5)
+    assert clock.now() == 102.5
+    assert clock.monotonic() == 12.5
+    assert clock.sleep_history == [2.5]
+    clock.jump_wall(5.0)
+    assert clock.now() == 107.5
+    assert clock.monotonic() == 12.5
+
+
+def test_make_target_info_mirrors_sample() -> None:
+    base = make_target_info()
+    assert base.clean_url == "https://example.com/file.zip"
+    assert base.filename_hint == "file.zip"
+    assert base.content_length == 1048576
+    assert base.accept_ranges is True
+    changed = make_target_info(filename_hint="other.zip", content_length=42)
+    assert changed.filename_hint == "other.zip"
+    assert changed.content_length == 42
+    assert base.filename_hint == "file.zip"  # no cross-instance leakage
+
+
+def test_keychain_and_aria2_fakes() -> None:
+    keychain = FakeKeychain()
+    keychain.set("pdl", "user", "secret")
+    assert keychain.get("pdl", "user") == "secret"
+    keychain.delete("pdl", "user")
+    assert keychain.get("pdl", "user") is None
+
+    daemon = FakeAria2Server(status="active", completed_length=50, download_speed=2048)
+    assert daemon.tell_status("gid-1")["status"] == "active"
+    assert daemon.get_global_stat()["downloadSpeed"] == 2048
+    daemon.update(status="complete")
+    assert daemon.tell_status("gid-1")["status"] == "complete"
+
+
+def test_throttle_server_serves_206_range(request: pytest.FixtureRequest) -> None:
+    import httpx
+
+    server = request.getfixturevalue("throttle_server")
+    with httpx.Client() as client:
+        resp = client.get(server.url, headers={"Range": "bytes=0-3"})
+    assert resp.status_code == 206
+    assert resp.content == server.body[:4]
+    assert resp.headers["content-range"] == f"bytes 0-3/{len(server.body)}"
+    assert resp.headers["accept-ranges"] == "bytes"
+
+
+def test_fake_macos_runner_returns_golden_pmset() -> None:
+    runner = FakeMacOSRunner()
+    batt = runner.pmset("-g", "batt")
+    assert "Battery Power" in batt
+    assert "85%" in batt
+    assert batt == runner.golden("pmset_batt.txt")
+
+
+def test_forbid_wan_sockets_blocks_non_loopback() -> None:
+    with (
+        pytest.raises(RuntimeError, match="Blocked non-loopback"),
+        socket.create_connection(("8.8.8.8", 53), timeout=0.1),
+    ):
+        pass
+
+
+def test_forbid_untracked_subprocess_is_opt_in(request: pytest.FixtureRequest) -> None:
+    guard = request.getfixturevalue("forbid_untracked_subprocess")
+    with pytest.raises(AssertionError, match="Untracked subprocess call"):
+        subprocess.run(["not-allowed-program"], check=False)  # guard raises before exec
+    guard.allow("mypy")
+    assert "mypy" in guard.allowed

@@ -9,6 +9,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import ClassVar
 from urllib.parse import urlparse
@@ -21,6 +22,40 @@ from paradl.ui import UI, print_plain
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_MIRROR_FAILURES = 2
+
+
+@lru_cache(maxsize=8)
+def _parse_mirrors_json(path_str: str, mtime_ns: int, size: int) -> dict[str, tuple[str, ...]]:
+    """Parse mirrors.json, cached by file identity so unchanged files are read once."""
+    try:
+        raw = json.loads(Path(path_str).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Failed to load mirrors.json at %s: %s", path_str, exc)
+        return {}
+
+    mapping: dict[str, tuple[str, ...]] = {}
+    if isinstance(raw, dict):
+        # Support {"mirrors": {...}} or {"rules": [{"pattern": ..., "mirrors": [...]}]} or flat dict
+        if "rules" in raw and isinstance(raw["rules"], list):
+            for rule in raw["rules"]:
+                if isinstance(rule, dict) and isinstance(rule.get("pattern"), str):
+                    m_list = rule.get("mirrors", [])
+                    if isinstance(m_list, str):
+                        m_list = [m_list]
+                    if isinstance(m_list, list):
+                        mapping[rule["pattern"]] = tuple(
+                            str(x).strip() for x in m_list if str(x).strip()
+                        )
+            return mapping
+
+        source_dict = raw.get("mirrors") if isinstance(raw.get("mirrors"), dict) else raw
+        if isinstance(source_dict, dict):
+            for pat, val in source_dict.items():
+                if isinstance(val, str) and val.strip():
+                    mapping[str(pat)] = (val.strip(),)
+                elif isinstance(val, list):
+                    mapping[str(pat)] = tuple(str(x).strip() for x in val if str(x).strip())
+    return mapping
 
 
 @dataclass
@@ -135,35 +170,28 @@ class MirrorManager:
         m_file = path or get_mirrors_file()
         if not m_file.is_file():
             return {}
-        try:
-            raw = json.loads(m_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Failed to load mirrors.json at %s: %s", m_file, exc)
-            return {}
+        st = m_file.stat()
+        cached = _parse_mirrors_json(str(m_file), st.st_mtime_ns, st.st_size)
+        # Return fresh lists so callers cannot mutate cached state.
+        return {pattern: list(mirrors) for pattern, mirrors in cached.items()}
 
-        mapping: dict[str, list[str]] = {}
-        if isinstance(raw, dict):
-            # Support {"mirrors": {...}} or {"rules": [{"pattern": ..., "mirrors": [...]}]} or flat dict
-            if "rules" in raw and isinstance(raw["rules"], list):
-                for rule in raw["rules"]:
-                    if isinstance(rule, dict) and isinstance(rule.get("pattern"), str):
-                        m_list = rule.get("mirrors", [])
-                        if isinstance(m_list, str):
-                            m_list = [m_list]
-                        if isinstance(m_list, list):
-                            mapping[rule["pattern"]] = [
-                                str(x).strip() for x in m_list if str(x).strip()
-                            ]
-                return mapping
-
-            source_dict = raw.get("mirrors") if isinstance(raw.get("mirrors"), dict) else raw
-            if isinstance(source_dict, dict):
-                for pat, val in source_dict.items():
-                    if isinstance(val, str) and val.strip():
-                        mapping[str(pat)] = [val.strip()]
-                    elif isinstance(val, list):
-                        mapping[str(pat)] = [str(x).strip() for x in val if str(x).strip()]
-        return mapping
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _matched_mirrors_cached(
+        primary_url: str, path_str: str, mtime_ns: int, size: int
+    ) -> tuple[str, ...]:
+        """Memoize a lookup that is pure in (URL, config file identity)."""
+        cfg = MirrorManager.load_mirrors_config(path=Path(path_str))
+        matched: list[str] = []
+        seen: set[str] = set()
+        for pattern, mirror_templates in cfg.items():
+            if _pattern_matches_url(primary_url, pattern):
+                for tmpl in mirror_templates:
+                    expanded = _expand_mirror_template(primary_url, pattern, tmpl)
+                    if expanded and expanded != primary_url and expanded not in seen:
+                        seen.add(expanded)
+                        matched.append(expanded)
+        return tuple(matched)
 
     @classmethod
     def match_configured_mirrors(
@@ -173,15 +201,13 @@ class MirrorManager:
         mirrors_file: Path | None = None,
     ) -> list[str]:
         """Return expanded alternate URLs from $PARADL_HOME/mirrors.json matching `primary_url`."""
-        cfg = cls.load_mirrors_config(path=mirrors_file)
-        matched: list[str] = []
-        for pattern, mirror_templates in cfg.items():
-            if _pattern_matches_url(primary_url, pattern):
-                for tmpl in mirror_templates:
-                    expanded = _expand_mirror_template(primary_url, pattern, tmpl)
-                    if expanded and expanded != primary_url and expanded not in matched:
-                        matched.append(expanded)
-        return matched
+        m_file = mirrors_file or get_mirrors_file()
+        if not m_file.is_file():
+            return []
+        st = m_file.stat()
+        return list(
+            cls._matched_mirrors_cached(primary_url, str(m_file), st.st_mtime_ns, st.st_size)
+        )
 
     @classmethod
     def _probe_uri_with_failure_tracking(
@@ -229,9 +255,11 @@ class MirrorManager:
         """
         cfg_mirrors = cls.match_configured_mirrors(primary_url, mirrors_file=mirrors_file)
         candidate_mirrors: list[str] = []
+        seen_candidates: set[str] = set()
         for m in [*(item_mirrors or []), *(cli_mirrors or []), *cfg_mirrors]:
             m_clean = (m or "").strip()
-            if m_clean and m_clean != primary_url and m_clean not in candidate_mirrors:
+            if m_clean and m_clean != primary_url and m_clean not in seen_candidates:
+                seen_candidates.add(m_clean)
                 candidate_mirrors.append(m_clean)
 
         # Check for Metalink (.meta4 / .metalink) companion
@@ -250,7 +278,8 @@ class MirrorManager:
             if filename_hint is None and metalink_comp.filename is not None:
                 filename_hint = metalink_comp.filename
             for m_url in metalink_comp.urls:
-                if m_url != primary_url and m_url not in candidate_mirrors:
+                if m_url != primary_url and m_url not in seen_candidates:
+                    seen_candidates.add(m_url)
                     candidate_mirrors.append(m_url)
 
         # Fast path when no mirrors exist and caller already probed primary_url
@@ -288,8 +317,8 @@ class MirrorManager:
                     auth_ranges = p_probe.accept_ranges
                 if not auth_filename and p_probe.filename:
                     auth_filename = p_probe.filename
-                if not auth_digest and p_probe.etag_sha256:
-                    auth_digest = f"sha256:{p_probe.etag_sha256}"
+                if not auth_digest and p_probe.verified_sha256:
+                    auth_digest = f"sha256:{p_probe.verified_sha256}"
             else:
                 if p_dropped:
                     dropped_failed_mirrors.append(primary_url)
@@ -340,8 +369,8 @@ class MirrorManager:
 
             if auth_length is None and m_len is not None:
                 auth_length = m_len
-            if not auth_digest and m_probe.etag_sha256:
-                auth_digest = f"sha256:{m_probe.etag_sha256}"
+            if not auth_digest and m_probe.verified_sha256:
+                auth_digest = f"sha256:{m_probe.verified_sha256}"
             if not auth_filename and m_probe.filename:
                 auth_filename = m_probe.filename
             if m_probe.accept_ranges:
@@ -402,6 +431,7 @@ def parse_metalink_bytes(raw_bytes: bytes, *, source: str = "metalink") -> Metal
     expected_len: int | None = None
     expected_digest: str | None = None
     urls: list[str] = []
+    seen_urls: set[str] = set()
 
     for elem in root.iter():
         el_tag = elem.tag.split("}", 1)[-1].lower()
@@ -421,7 +451,8 @@ def parse_metalink_bytes(raw_bytes: bytes, *, source: str = "metalink") -> Metal
                 expected_digest = f"{algo}:{elem.text.strip().lower()}"
         elif el_tag == "url" and elem.text:
             u = elem.text.strip()
-            if u.startswith(("http://", "https://", "ftp://")) and u not in urls:
+            if u.startswith(("http://", "https://", "ftp://")) and u not in seen_urls:
+                seen_urls.add(u)
                 urls.append(u)
 
     return MetalinkCompanion(

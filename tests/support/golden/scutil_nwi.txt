@@ -1,0 +1,3 @@
+Network interfaces: en0 utun3
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST>
+address: aa:bb:cc:dd:ee:ff

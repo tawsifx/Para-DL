@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -431,6 +432,59 @@ class PyPIEngine:
         return reqs
 
     @classmethod
+    def _fetch_dependency_batch(
+        cls,
+        engine: PyPIEngine,
+        current_batch: list[str],
+        tmp_path: Path,
+        connections: int,
+        target_py_ver: tuple[int, int] | None,
+        probe: Any,
+    ) -> list[tuple[str, str, list[str]] | None]:
+        """Pre-fetch a batch of dependency wheels with bounded concurrency.
+
+        Returns one record per input requirement, in input order: ``None`` when
+        no compatible wheel was found, otherwise
+        ``(dep_req, package_name, sub_dependencies)``. Workers never mutate the
+        shared ``downloaded_pkgs``/``queue`` containers; the caller merges the
+        returned records after collecting all futures.
+        """
+
+        def fetch_one(dep_req: str) -> tuple[str, str, list[str]] | None:
+            for attempt_req in (
+                dep_req,
+                dep_req.split("==")[0] if "==" in dep_req else None,
+            ):
+                if not attempt_req:
+                    break
+                try:
+                    dep_target = f"pip:{attempt_req}"
+                    dep_info = probe(dep_target, py_version=target_py_ver)
+                    if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
+                        res_dep = engine.execute(dep_info, tmp_path, connections=connections)
+                        if res_dep.success and res_dep.file_path and res_dep.file_path.is_file():
+                            d_meta = dep_info.pypi_meta or {}
+                            d_pkg_name = d_meta.get("package", "").lower().replace("_", "-")
+                            sub_deps: list[str] = []
+                            if res_dep.file_path.suffix.lower() == ".whl":
+                                sub_deps = cls.extract_wheel_dependencies(res_dep.file_path)
+                            return dep_req, d_pkg_name, sub_deps
+                except Exception as dep_exc:
+                    logger.debug(
+                        "Failed to pre-fetch wheel for dependency %s: %s",
+                        attempt_req,
+                        dep_exc,
+                    )
+            return None
+
+        safe_conn = min(max(int(connections), 1), 16)
+        max_workers = max(1, min(len(current_batch), safe_conn))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(fetch_one, dep_req) for dep_req in current_batch]
+            # .result() in submission order preserves the original output order.
+            return [future.result() for future in futures]
+
+    @classmethod
     def install(
         cls,
         target: str,
@@ -604,48 +658,27 @@ class PyPIEngine:
                     f"  [dim]•[/dim] [white]Pre-fetching {len(current_batch)} Python dependency wheel(s) with 16 parallel channels:[/white] [cyan]{batch_label}[/cyan]"
                 )
 
-                for dep_req in current_batch:
-                    dep_resolved = False
-                    for attempt_req in (
-                        dep_req,
-                        dep_req.split("==")[0] if "==" in dep_req else None,
-                    ):
-                        if not attempt_req:
-                            break
-                        try:
-                            dep_target = f"pip:{attempt_req}"
-                            dep_info = probe_target(dep_target, py_version=target_py_ver)
-                            if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
-                                res_dep = engine.execute(
-                                    dep_info, tmp_path, connections=connections
-                                )
-                                if (
-                                    res_dep.success
-                                    and res_dep.file_path
-                                    and res_dep.file_path.is_file()
-                                ):
-                                    d_meta = dep_info.pypi_meta or {}
-                                    d_pkg_name = d_meta.get("package", "").lower().replace("_", "-")
-                                    if d_pkg_name:
-                                        downloaded_pkgs.add(d_pkg_name)
-                                    if res_dep.file_path.suffix.lower() == ".whl":
-                                        sub_deps = cls.extract_wheel_dependencies(res_dep.file_path)
-                                        queue.extend(
-                                            sd for sd in sub_deps if sd not in visited_reqs
-                                        )
-                                    dep_resolved = True
-                                    break
-                        except Exception as dep_exc:
-                            logger.debug(
-                                "Failed to pre-fetch wheel for dependency %s: %s",
-                                attempt_req,
-                                dep_exc,
-                            )
-                    if not dep_resolved:
+                batch_results = cls._fetch_dependency_batch(
+                    engine,
+                    current_batch,
+                    tmp_path,
+                    connections,
+                    target_py_ver,
+                    probe_target,
+                )
+                # Merge worker results on the main thread: shared containers
+                # (downloaded_pkgs, queue) are never mutated from workers.
+                for dep_req, record in zip(current_batch, batch_results, strict=True):
+                    if record is None:
                         logger.debug(
                             "No compatible wheel found for dependency %s (skipping pre-fetch)",
                             dep_req,
                         )
+                        continue
+                    _dep_req, d_pkg_name, sub_deps = record
+                    if d_pkg_name:
+                        downloaded_pkgs.add(d_pkg_name)
+                    queue.extend(sd for sd in sub_deps if sd not in visited_reqs)
 
             # Strict offline installation: enforce --no-index to prevent single-stream offloading
             installer_base = (

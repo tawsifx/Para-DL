@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+from tests.support.fakes import NoSleepClock
+
 from paradl.engines.aria2 import (
     _DAEMON_POOL,
     Aria2DaemonPool,
@@ -145,15 +147,6 @@ class TestAria2EngineMissingBinary(unittest.TestCase):
         self.assertIn("aria2c", result.error)
 
 
-class TestWatchdogModes(unittest.TestCase):
-    """Tests for WatchdogMode enum used in aria2."""
-
-    def test_values(self) -> None:
-        self.assertEqual(WatchdogMode.V1, "v1")
-        self.assertEqual(WatchdogMode.V2, "v2")
-        self.assertEqual(WatchdogMode.OFF, "off")
-
-
 class TestAria2DaemonPool(unittest.TestCase):
     """Tests for the persistent aria2c daemon pool."""
 
@@ -258,6 +251,123 @@ class TestAdaptiveConcurrency(unittest.TestCase):
 
         # Floor at 4 connections
         self.assertEqual(compute_budget(999.0, 99.0), 4)
+
+
+class TestSmallFileScalingAndHostCaps(unittest.TestCase):
+    """Tests for small-file connection scaling and per-host refusal cap learning."""
+
+    def setUp(self) -> None:
+        import os
+        import tempfile
+
+        self.tmpdir = tempfile.mkdtemp()
+        self.env_patch = patch.dict(os.environ, {"PARADL_HOME": self.tmpdir}, clear=False)
+        self.env_patch.start()
+
+    def tearDown(self) -> None:
+        self.env_patch.stop()
+        import shutil
+
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_scale_item_connections(self) -> None:
+        from paradl.engines.aria2 import _scale_item_connections
+
+        self.assertEqual(_scale_item_connections(16, 10_000, supports_range=True), 1)
+        self.assertEqual(_scale_item_connections(16, 128 * 1024, supports_range=True), 2)
+        self.assertEqual(_scale_item_connections(16, 100 * 1024 * 1024, supports_range=True), 16)
+        self.assertEqual(_scale_item_connections(16, 100 * 1024 * 1024, supports_range=False), 1)
+
+    def test_is_concurrency_refusal(self) -> None:
+        from paradl.engines.aria2 import _is_concurrency_refusal
+
+        self.assertTrue(_is_concurrency_refusal("22", "HTTP response 429 Too Many Requests"))
+        self.assertTrue(_is_concurrency_refusal("29", "Server overloaded"))
+        self.assertTrue(_is_concurrency_refusal("1", "Connection reset by peer"))
+        self.assertFalse(_is_concurrency_refusal("8", "No URI available"))
+
+    def test_host_connection_cap_learning_and_decay(self) -> None:
+        from paradl.storage.history import HOST_CAP_DECAY_SEC, HistoryManager
+
+        # First refusal is treated as a transient hiccup (not enforced yet)
+        self.assertIsNone(HistoryManager.record_host_refusal("cdn.example.com", 4, now_epoch=1000.0))
+        self.assertIsNone(HistoryManager.get_host_connection_cap("cdn.example.com", now_epoch=1005.0))
+
+        # Second refusal enforces the max working connections seen
+        cap = HistoryManager.record_host_refusal("cdn.example.com", 3, now_epoch=1010.0)
+        self.assertEqual(cap, 4)
+        self.assertEqual(
+            HistoryManager.get_host_connection_cap("cdn.example.com", now_epoch=1020.0), 4
+        )
+
+        # More active working connections later raise the cap
+        HistoryManager.record_host_working("cdn.example.com", 6, now_epoch=1030.0)
+        self.assertEqual(
+            HistoryManager.get_host_connection_cap("cdn.example.com", now_epoch=1040.0), 6
+        )
+
+        # Cap decays after HOST_CAP_DECAY_SEC
+        self.assertIsNone(
+            HistoryManager.get_host_connection_cap(
+                "cdn.example.com", now_epoch=1030.0 + HOST_CAP_DECAY_SEC + 1.0
+            )
+        )
+
+    def test_watchdog_v2_does_not_set_lowest_speed_limit(self) -> None:
+        """Ensure aria2c is not given a high lowest-speed-limit that kills 30-40 kbps flows."""
+        from pathlib import Path
+
+        captured_opts: list[dict] = []
+
+        class FakeDaemon:
+            def add_uri(self, uris, opts):
+                captured_opts.append(dict(opts))
+                return "gid-1"
+
+            def get_global_stat(self):
+                return {"downloadSpeed": "0"}
+
+            def tell_status(self, gid):
+                return {
+                    "status": "complete",
+                    "completedLength": "1048576",
+                    "totalLength": "1048576",
+                    "files": [{"path": str(Path(self.tmpdir) / "file.bin")}],
+                }
+
+        fake_daemon = FakeDaemon()
+        fake_daemon.tmpdir = self.tmpdir  # type: ignore[attr-defined]
+        Path(self.tmpdir, "file.bin").write_bytes(b"x" * 1048576)
+
+        fake_pool = MagicMock()
+        fake_pool.acquire.return_value = fake_daemon
+        fake_toolchain = MagicMock()
+        fake_toolchain.aria2c = "/usr/bin/aria2c"
+
+        with (
+            patch("paradl.engines.aria2.TOOLCHAIN", fake_toolchain),
+            patch("paradl.engines.aria2.get_daemon_pool", return_value=fake_pool),
+            patch("paradl.engines.aria2.get_clock", return_value=NoSleepClock()),
+        ):
+            res = Aria2Engine.download(
+                TargetInfo(
+                    raw="https://example.com/file.bin",
+                    target_type=TargetType.DIRECT,
+                    clean_url="https://example.com/file.bin",
+                    filename_hint="file.bin",
+                    content_length=1048576,
+                    accept_ranges=True,
+                ),
+                out_dir=Path(self.tmpdir),
+                connections=16,
+                watchdog_mode=WatchdogMode.V2,
+                anti_throttle="4MBps",
+                write_xattr=False,
+            )
+
+        self.assertTrue(res.success)
+        self.assertEqual(len(captured_opts), 1)
+        self.assertNotIn("lowest-speed-limit", captured_opts[0])
 
 
 if __name__ == "__main__":

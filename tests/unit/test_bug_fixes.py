@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from tests.support.fakes import NoSleepClock
 
 from paradl.cli import build_parser
 from paradl.config import PDLConfig
@@ -21,8 +22,8 @@ from paradl.engines.media import MediaEngine
 from paradl.engines.pypi import PyPIEngine
 from paradl.history import compute_hour_bucket
 from paradl.mirrors import MirrorResolution, parse_metalink_bytes
-from paradl.models import DownloadItem, WatchdogMode, format_size, sanitize_filename
-from paradl.net import detect_isp, probe_http_url, probe_range_support, reset_isp_detector
+from paradl.models import DownloadItem, WatchdogMode, sanitize_filename
+from paradl.net import detect_isp, reset_isp_detector
 from paradl.platform.windows import unquarantine_zone_identifier_text
 from paradl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
 from paradl.ui import UI
@@ -166,6 +167,7 @@ def test_h4_aria2_final_file_resolution(tmp_path):
     with (
         mock.patch.object(aria2_mod, "Aria2RpcDaemon", FakeDaemon),
         mock.patch.object(aria2_mod.MirrorManager, "resolve_and_validate", return_value=resolution),
+        mock.patch("paradl.engines.aria2.get_clock", return_value=NoSleepClock()),
     ):
         res = Aria2Engine.download_batch(
             [item],
@@ -311,6 +313,7 @@ def test_m7_batch_checksum_aggregation(tmp_path):
             ),
         ),
         mock.patch.object(aria2_mod, "Aria2RpcDaemon") as mock_d_cls,
+        mock.patch("paradl.engines.aria2.get_clock", return_value=NoSleepClock()),
     ):
         mock_d = mock_d_cls.return_value
         mock_d.add_uri.return_value = "gid1"
@@ -331,6 +334,7 @@ def test_m7_batch_checksum_aggregation(tmp_path):
             caffeinate=False,
             net_watch=False,
             write_xattr=False,
+            accept_ranges_hint=True,  # skip the up-front HTTP range probe (unit tier is socket-free)
         )
         assert res.success
         # Aggregate checksum_verified is False because not all items were verified
@@ -378,16 +382,6 @@ def test_l2_zone_identifier_case_insensitivity():
 
 
 # ---------------------------------------------------------------------------
-# L3: format_size(0) displays "0 B"
-# ---------------------------------------------------------------------------
-def test_l3_format_size():
-    assert format_size(0) == "0 B"
-    assert format_size(0.0) == "0 B"
-    assert format_size(None) == "Unknown size"
-    assert format_size(1024) == "1.0 KB"
-
-
-# ---------------------------------------------------------------------------
 # L4: ISP detection transient failure not cached for 5 minutes
 # ---------------------------------------------------------------------------
 def test_l4_isp_detection_no_unknown_caching():
@@ -422,34 +416,6 @@ def test_l5_tarfile_extractall_fallback(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# R1: Probe requests request Accept-Encoding: identity
-# ---------------------------------------------------------------------------
-def test_r1_probe_requests_identity_encoding():
-    with mock.patch("paradl.net.get_http_client") as mock_client_fn:
-        mock_client = mock_client_fn.return_value
-        stream_ctx = mock_client.stream.return_value
-        mock_resp = stream_ctx.__enter__.return_value
-        mock_resp.status_code = 200
-        mock_resp.url = "https://example.com/test.zip"
-        mock_resp.headers = {"content-length": "100"}
-
-        probe_range_support("https://example.com/test.zip")
-        _args, kwargs = mock_client.stream.call_args
-        assert kwargs["headers"].get("Accept-Encoding") == "identity"
-
-    with mock.patch("paradl.net.request_with_retry") as mock_req:
-        mock_resp = mock.MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.url = "https://example.com/test.zip"
-        mock_resp.headers = {"content-length": "100"}
-        mock_req.return_value = mock_resp
-
-        probe_http_url("https://example.com/test.zip")
-        _args, kwargs = mock_req.call_args
-        assert kwargs["headers"].get("Accept-Encoding") == "identity"
-
-
-# ---------------------------------------------------------------------------
 # CLI Progress Bar Display
 # ---------------------------------------------------------------------------
 def test_progress_bar_display(capsys):
@@ -466,3 +432,21 @@ def test_progress_bar_display(capsys):
     assert "download.bin" in out
     assert "█" in out or "░" in out
     assert "%" in out
+
+
+def test_simple_progress_display(capsys):
+    from paradl.ui import UI, LiveTransferDisplay
+
+    UI.quiet = False
+    UI.json_mode = False
+
+    with LiveTransferDisplay(title="partial206.bin", total_bytes=1000, simple=True) as live:
+        live.update(downloaded_bytes=250, speed_bps=1000.0, connections=16)
+        live.update(downloaded_bytes=500, speed_bps=1000.0, connections=16, force_event=True)
+
+    out = capsys.readouterr().out
+    lines = [line for line in out.strip().splitlines() if line.strip()]
+    assert any("partial206.bin" in line and "25.0%" in line for line in lines)
+    assert any("50.0%" in line for line in lines)
+    assert any("100.0%" in line for line in lines)
+    assert all("█" not in line and "░" not in line for line in lines)

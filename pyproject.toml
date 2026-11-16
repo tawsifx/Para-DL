@@ -60,7 +60,6 @@ Issues = "https://github.com/tawsifx/Para-DL/issues"
 [project.scripts]
 paradl = "paradl.cli:main"
 parallel-dl = "paradl.cli:main"
-pdl = "paradl.cli:main"
 
 [dependency-groups]
 dev = [
@@ -113,6 +112,12 @@ lint.ignore = [
 format.quote-style = "double"
 format.docstring-code-format = true
 isort.known-first-party = ["paradl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+python_files = ["test_*.py"]
+markers = ["slow: end-to-end or multi-second transfer tests"]
 
 [tool.mypy]
 python_version = "3.11"

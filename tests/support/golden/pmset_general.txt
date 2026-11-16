@@ -1,0 +1,2 @@
+cidEnabled 0
+lowpowermode 0

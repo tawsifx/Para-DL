@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Ensure src/paradl is importable without installation
-SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+# Autouse hermeticity guard: block every non-loopback socket connection.
+from tests.support.guards import forbid_wan_sockets  # noqa: F401
+
+from paradl.net import reset_isp_detector
 
 
 @pytest.fixture(autouse=True)
@@ -78,8 +77,6 @@ def sample_target_info():
 @pytest.fixture(autouse=True)
 def reset_isp_cache():
     """Reset ISP detection cache between tests."""
-    from paradl.net import reset_isp_detector
-
     reset_isp_detector()
     yield
     reset_isp_detector()

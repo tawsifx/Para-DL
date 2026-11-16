@@ -20,7 +20,6 @@ from paradl.throttle.models import (
     VerdictClass,
     VerdictNote,
 )
-from paradl.throttle.store import ThrottleStore
 
 
 def mann_whitney_u_test(sample_a: list[float], sample_b: list[float]) -> tuple[float, float]:
@@ -75,11 +74,70 @@ def mann_whitney_u_test(sample_a: list[float], sample_b: list[float]) -> tuple[f
     return round(u_stat, 3), round(min(1.0, max(0.0, p_val)), 6)
 
 
+def _compute_next_best_hours(samples: list[SampleRecord]) -> list[str]:
+    """Compute next-best-hour suggestions directly from ``samples``.
+
+    This reproduces, byte-for-byte, the suggestion list produced by the
+    next-best-hour half of ``ThrottleStore.build_coverage_matrix`` without
+    materializing the discarded 24-hour x weekday/weekend ``CoverageCell``
+    matrix.  Per-cell effective weights are computed with the same
+    ``round(..., 2)`` and summed in the same order so the formatted ``.1f``
+    suggestion strings are identical.
+    """
+    cells: dict[tuple[int, bool], list[SampleRecord]] = {
+        (h, wk): [] for wk in (False, True) for h in range(24)
+    }
+    for s in samples:
+        if s.download_bps > 0:
+            cells[(int(s.hour) % 24, bool(s.is_weekend))].append(s)
+
+    eff_weight: dict[tuple[int, bool], float] = {}
+    has_data: dict[tuple[int, bool], bool] = {}
+    for wk in (False, True):
+        for h in range(24):
+            bucket = cells[(h, wk)]
+            act = sum(1 for x in bucket if x.source == "active")
+            pas = sum(1 for x in bucket if x.source != "active")
+            eff_weight[(h, wk)] = round(act * 1.0 + pas * 0.35, 2)
+            has_data[(h, wk)] = (act + pas) > 0
+
+    def _window_weight(hours: range, is_wk: bool) -> float:
+        return sum(eff_weight[(h, is_wk)] for h in hours)
+
+    suggestions: list[str] = []
+    wd_peak_w = _window_weight(range(19, 24), False)
+    wd_offpeak_w = _window_weight(range(1, 11), False)
+    wd_afternoon_w = _window_weight(range(11, 19), False)
+    wk_peak_w = _window_weight(range(19, 24), True)
+
+    if wd_peak_w < 3.0:
+        suggestions.append(
+            f"run one sample around 21:00 on a weekday (evening peak window has weight {wd_peak_w:.1f}/3.0)"
+        )
+    if wd_offpeak_w < 3.0:
+        suggestions.append(
+            f"run one sample around 09:00 on a weekday (morning/off-peak baseline has weight {wd_offpeak_w:.1f}/3.0)"
+        )
+    if wd_afternoon_w < 2.0:
+        suggestions.append("run one sample around 15:00 on a weekday (daytime comparison window)")
+    if wk_peak_w < 2.0:
+        suggestions.append("run one sample around 21:00 on a weekend (weekend peak comparison)")
+
+    if not suggestions:
+        # Find any specific 4-hour block with zero data.
+        for h_rep in (21, 9, 15, 3):
+            if not has_data[(h_rep, False)]:
+                suggestions.append(f"run one sample around {h_rep:02d}:00 on a weekday")
+                break
+
+    return suggestions
+
+
 def _evaluate_time_of_day(
     samples: list[SampleRecord],
 ) -> tuple[Verdict | None, VerdictNote | None, str, list[str]]:
     """Evaluate M8 time-of-day samples with strict coverage and Mann-Whitney U significance gates."""
-    _matrix, next_best_hours = ThrottleStore.build_coverage_matrix(samples)
+    next_best_hours = _compute_next_best_hours(samples)
     if not samples:
         note = VerdictNote(
             code="insufficient_time_data",

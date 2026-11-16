@@ -1,0 +1,582 @@
+=== DIFF STAT (Task 3 scope) ===
+ src/paradl/api/server.py   |  65 ++++++++++++++++++---------
+ src/paradl/engines/hf.py   |  43 +++++++++++++-----
+ src/paradl/engines/pypi.py | 109 +++++++++++++++++++++++++++++----------------
+ 3 files changed, 146 insertions(+), 71 deletions(-)
+=== FULL DIFF ===
+diff --git a/src/paradl/api/server.py b/src/paradl/api/server.py
+index 33565c7..3273625 100644
+--- a/src/paradl/api/server.py
++++ b/src/paradl/api/server.py
+@@ -336,15 +336,42 @@ class _TaskRunner:
+         with self._lock:
+             return self._active
+ 
+-    def _inc_active(self) -> None:
+-        with self._lock:
+-            self._active += 1
+-
+     def _dec_active(self) -> None:
+         with self._lock:
+             self._active = max(0, self._active - 1)
+             self._condition.notify_all()
+ 
++    def _try_reserve_slot(self) -> bool:
++        """Atomically reserve a concurrency slot for a worker.
++
++        Returns False (without reserving) when the pool is full. Every
++        successful reservation must be released with :meth:`_dec_active` in
++        the worker's ``finally`` block.
++        """
++        with self._lock:
++            if self._active >= self.max_concurrent:
++                return False
++            self._active += 1
++            return True
++
++    def _spawn_worker(self, task: _ApiTask) -> threading.Thread | None:
++        """Reserve a slot and start a worker for *task*; None if the pool is full."""
++        if not self._try_reserve_slot():
++            return None
++        # Mark running optimistically; _execute will correct on failure.
++        self.store.update(task.id, status="running", updated_at=self._now())
++        stop_event = threading.Event()
++        self.store.set_stop_event(task.id, stop_event)
++        worker = threading.Thread(
++            target=self._execute,
++            args=(task,),
++            name=f"pdl-api-worker-{task.id[:8]}",
++            daemon=True,
++        )
++        self.store.set_thread(task.id, worker)
++        worker.start()
++        return worker
++
+     def _wait_for_slot(self) -> bool:
+         """Block until a concurrency slot is free or the runner is stopped."""
+         with self._condition:
+@@ -367,9 +394,12 @@ class _TaskRunner:
+     # -- single task execution --------------------------------------------
+ 
+     def _execute(self, task: _ApiTask) -> None:
+-        """Run one download task to completion (or until stopped/failed)."""
++        """Run one download task to completion (or until stopped/failed).
++
++        The concurrency slot is reserved by :meth:`_spawn_worker` before this
++        worker starts; we only release it here in the ``finally`` block.
++        """
+         task_id = task.id
+-        self._inc_active()
+         stop_event = self.store.get_stop_event(task_id)
+         try:
+             # Respect external stop before starting
+@@ -542,8 +572,6 @@ class _TaskRunner:
+             for task in queued:
+                 if self._stop.is_set():
+                     break
+-                if self._active_count() >= self.max_concurrent:
+-                    break
+                 # Skip if already assigned to a running thread
+                 thread = self.store.get_thread(task.id)
+                 if thread is not None and thread.is_alive():
+@@ -552,19 +580,14 @@ class _TaskRunner:
+                 if self.store.is_stopped(task.id):
+                     continue
+ 
+-                # Mark running optimistically; _execute will correct on failure
+-                self.store.update(task.id, status="running", updated_at=self._now())
+-                stop_event = threading.Event()
+-                self.store.set_stop_event(task.id, stop_event)
+-
+-                worker = threading.Thread(
+-                    target=self._execute,
+-                    args=(task,),
+-                    name=f"pdl-api-worker-{task.id[:8]}",
+-                    daemon=True,
+-                )
+-                self.store.set_thread(task.id, worker)
+-                worker.start()
++                # Reserve a concurrency slot atomically and start the worker.
++                # The worker returns the slot in _execute's finally block.
++                # Reserving before starting (instead of checking the count and
++                # letting the worker increment later) closes the race where a
++                # burst of dispatches could spawn more than max_concurrent
++                # workers before any of them incremented the counter.
++                if self._spawn_worker(task) is None:
++                    break
+ 
+         # Drain: wait for active workers to finish (best effort)
+         with self.store._lock:
+diff --git a/src/paradl/engines/hf.py b/src/paradl/engines/hf.py
+index 602e039..e61e961 100644
+--- a/src/paradl/engines/hf.py
++++ b/src/paradl/engines/hf.py
+@@ -8,6 +8,7 @@ import logging
+ import os
+ import re
+ import time
++from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
+ from typing import Any
+ 
+@@ -356,10 +357,10 @@ class HuggingFaceEngine:
+                     f"  [dim]• Downloading {len(valid_files)} files from {repo_id} via huggingface_hub (hf_xet)...[/dim]"
+                 )
+                 t0 = time.time()
+-                downloaded_paths: list[Path] = []
+-                total_bytes = 0
+                 token = cls.get_token()
+-                for f_entry in valid_files:
++
++                def download_one(f_entry: dict[str, Any]) -> tuple[Path, int, bool]:
++                    """Download and verify one file; preserve auth + SHA-256 checks."""
+                     rfilename = f_entry["rfilename"]
+                     local_p = Path(
+                         hf_hub_download(
+@@ -371,9 +372,10 @@ class HuggingFaceEngine:
+                             token=token,
+                         )
+                     )
+-                    downloaded_paths.append(local_p)
++                    size = 0
++                    verified_ok = True
+                     if local_p.exists() and local_p.is_file():
+-                        total_bytes += local_p.stat().st_size
++                        size = local_p.stat().st_size
+                         lfs_info = (
+                             f_entry.get("lfs") if isinstance(f_entry.get("lfs"), dict) else None
+                         )
+@@ -391,13 +393,30 @@ class HuggingFaceEngine:
+                                 verified=matched,
+                                 source="hf_lfs_oid",
+                             )
+-                            if not matched:
+-                                return TransferResult(
+-                                    success=False,
+-                                    file_path=local_p,
+-                                    error=f"HF LFS SHA-256 mismatch on {local_p.name}",
+-                                    exit_code=int(ExitCode.VERIFICATION_FAILED),
+-                                )
++                            verified_ok = matched
++                    return local_p, size, verified_ok
++
++                # Bounded fan-out capped by the existing global connection limit
++                # (safe_conn <= 16) and the number of files. Futures are kept in
++                # submission order and read with .result() so the resulting
++                # file list and the first verification failure match the old
++                # sequential loop exactly.
++                max_workers = min(len(valid_files), safe_conn)
++                downloaded_paths: list[Path] = []
++                total_bytes = 0
++                with ThreadPoolExecutor(max_workers=max_workers) as executor:
++                    futures = [executor.submit(download_one, entry) for entry in valid_files]
++                    for future in futures:
++                        local_p, size, verified_ok = future.result()
++                        downloaded_paths.append(local_p)
++                        total_bytes += size
++                        if not verified_ok:
++                            return TransferResult(
++                                success=False,
++                                file_path=local_p,
++                                error=f"HF LFS SHA-256 mismatch on {local_p.name}",
++                                exit_code=int(ExitCode.VERIFICATION_FAILED),
++                            )
+                 dur = max(time.time() - t0, 0.001)
+                 return TransferResult(
+                     success=True,
+diff --git a/src/paradl/engines/pypi.py b/src/paradl/engines/pypi.py
+index 43b1051..9aea41c 100644
+--- a/src/paradl/engines/pypi.py
++++ b/src/paradl/engines/pypi.py
+@@ -10,6 +10,7 @@ import shutil
+ import subprocess
+ import sys
+ import tempfile
++from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
+ from typing import Any
+ from urllib.parse import urlparse
+@@ -430,6 +431,59 @@ class PyPIEngine:
+             logger.debug("Failed to read metadata from wheel %s: %s", wheel_path, exc)
+         return reqs
+ 
++    @classmethod
++    def _fetch_dependency_batch(
++        cls,
++        engine: PyPIEngine,
++        current_batch: list[str],
++        tmp_path: Path,
++        connections: int,
++        target_py_ver: tuple[int, int] | None,
++        probe: Any,
++    ) -> list[tuple[str, str, list[str]] | None]:
++        """Pre-fetch a batch of dependency wheels with bounded concurrency.
++
++        Returns one record per input requirement, in input order: ``None`` when
++        no compatible wheel was found, otherwise
++        ``(dep_req, package_name, sub_dependencies)``. Workers never mutate the
++        shared ``downloaded_pkgs``/``queue`` containers; the caller merges the
++        returned records after collecting all futures.
++        """
++
++        def fetch_one(dep_req: str) -> tuple[str, str, list[str]] | None:
++            for attempt_req in (
++                dep_req,
++                dep_req.split("==")[0] if "==" in dep_req else None,
++            ):
++                if not attempt_req:
++                    break
++                try:
++                    dep_target = f"pip:{attempt_req}"
++                    dep_info = probe(dep_target, py_version=target_py_ver)
++                    if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
++                        res_dep = engine.execute(dep_info, tmp_path, connections=connections)
++                        if res_dep.success and res_dep.file_path and res_dep.file_path.is_file():
++                            d_meta = dep_info.pypi_meta or {}
++                            d_pkg_name = d_meta.get("package", "").lower().replace("_", "-")
++                            sub_deps: list[str] = []
++                            if res_dep.file_path.suffix.lower() == ".whl":
++                                sub_deps = cls.extract_wheel_dependencies(res_dep.file_path)
++                            return dep_req, d_pkg_name, sub_deps
++                except Exception as dep_exc:
++                    logger.debug(
++                        "Failed to pre-fetch wheel for dependency %s: %s",
++                        attempt_req,
++                        dep_exc,
++                    )
++            return None
++
++        safe_conn = min(max(int(connections), 1), 16)
++        max_workers = max(1, min(len(current_batch), safe_conn))
++        with ThreadPoolExecutor(max_workers=max_workers) as executor:
++            futures = [executor.submit(fetch_one, dep_req) for dep_req in current_batch]
++            # .result() in submission order preserves the original output order.
++            return [future.result() for future in futures]
++
+     @classmethod
+     def install(
+         cls,
+@@ -604,48 +658,27 @@ class PyPIEngine:
+                     f"  [dim]•[/dim] [white]Pre-fetching {len(current_batch)} Python dependency wheel(s) with 16 parallel channels:[/white] [cyan]{batch_label}[/cyan]"
+                 )
+ 
+-                for dep_req in current_batch:
+-                    dep_resolved = False
+-                    for attempt_req in (
+-                        dep_req,
+-                        dep_req.split("==")[0] if "==" in dep_req else None,
+-                    ):
+-                        if not attempt_req:
+-                            break
+-                        try:
+-                            dep_target = f"pip:{attempt_req}"
+-                            dep_info = probe_target(dep_target, py_version=target_py_ver)
+-                            if dep_info.target_type == TargetType.PYPI and dep_info.clean_url:
+-                                res_dep = engine.execute(
+-                                    dep_info, tmp_path, connections=connections
+-                                )
+-                                if (
+-                                    res_dep.success
+-                                    and res_dep.file_path
+-                                    and res_dep.file_path.is_file()
+-                                ):
+-                                    d_meta = dep_info.pypi_meta or {}
+-                                    d_pkg_name = d_meta.get("package", "").lower().replace("_", "-")
+-                                    if d_pkg_name:
+-                                        downloaded_pkgs.add(d_pkg_name)
+-                                    if res_dep.file_path.suffix.lower() == ".whl":
+-                                        sub_deps = cls.extract_wheel_dependencies(res_dep.file_path)
+-                                        queue.extend(
+-                                            sd for sd in sub_deps if sd not in visited_reqs
+-                                        )
+-                                    dep_resolved = True
+-                                    break
+-                        except Exception as dep_exc:
+-                            logger.debug(
+-                                "Failed to pre-fetch wheel for dependency %s: %s",
+-                                attempt_req,
+-                                dep_exc,
+-                            )
+-                    if not dep_resolved:
++                batch_results = cls._fetch_dependency_batch(
++                    engine,
++                    current_batch,
++                    tmp_path,
++                    connections,
++                    target_py_ver,
++                    probe_target,
++                )
++                # Merge worker results on the main thread: shared containers
++                # (downloaded_pkgs, queue) are never mutated from workers.
++                for dep_req, record in zip(current_batch, batch_results, strict=True):
++                    if record is None:
+                         logger.debug(
+                             "No compatible wheel found for dependency %s (skipping pre-fetch)",
+                             dep_req,
+                         )
++                        continue
++                    _dep_req, d_pkg_name, sub_deps = record
++                    if d_pkg_name:
++                        downloaded_pkgs.add(d_pkg_name)
++                    queue.extend(sd for sd in sub_deps if sd not in visited_reqs)
+ 
+             # Strict offline installation: enforce --no-index to prevent single-stream offloading
+             installer_base = (
+=== NEW FILE tests/test_wave2_concurrency.py ===
+"""Wave-2 concurrency parity tests.
+
+These tests pin three invariants before/after the bounded-concurrency changes:
+
+1. API task dispatch never runs more workers than ``max_concurrent`` (atomic
+   slot reservation), even when many dispatches happen at once.
+2. Multi-file Hugging Face downloads preserve input order and still call the
+   auth-carrying downloader and SHA-256 verifier exactly once per file.
+3. PyPI dependency pre-fetch preserves input order and still runs the
+   SHA-256-verifying ``execute()`` path exactly once per wheel.
+
+All fakes are local; no network, real downloads, or real subprocesses occur.
+"""
+
+from __future__ import annotations
+
+import sys
+import threading
+import types
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from paradl.core.models import TargetType, TransferResult
+
+# ---------------------------------------------------------------------------
+# 1. API dispatch slot safety (deterministic, barrier-based)
+# ---------------------------------------------------------------------------
+
+
+class _FakeStore:
+    """Minimal _TaskStore surface used by _TaskRunner._spawn_worker()."""
+
+    def __init__(self) -> None:
+        self.threads: dict[str, threading.Thread] = {}
+        self.stop_events: dict[str, threading.Event] = {}
+        self.updates: list[tuple[str, dict[str, Any]]] = []
+
+    def set_thread(self, task_id: str, thread: threading.Thread) -> None:
+        self.threads[task_id] = thread
+
+    def set_stop_event(self, task_id: str, event: threading.Event) -> None:
+        self.stop_events[task_id] = event
+
+    def update(self, task_id: str, **kwargs: Any) -> None:
+        self.updates.append((task_id, kwargs))
+
+
+class TestApiDispatchSlotSafety:
+    def _make_runner(self, max_concurrent: int = 3):
+        from paradl.api.server import _TaskRunner
+
+        store = _FakeStore()
+        runner = _TaskRunner(store=store, config=object(), max_concurrent=max_concurrent)  # type: ignore[arg-type]
+        return runner, store
+
+    def test_concurrent_dispatch_never_exceeds_max(self) -> None:
+        """N simultaneous dispatch attempts must reserve at most max slots."""
+        runner, _store = self._make_runner(max_concurrent=3)
+
+        release = threading.Event()
+        peak = {"value": 0}
+        count_lock = threading.Lock()
+        spawned: list[threading.Thread | None] = []
+        barrier = threading.Barrier(16)
+
+        # Replace the real _execute with a fake that records the active count
+        # while it "runs", then releases its slot in a finally block (matching
+        # the real _execute contract).
+        def fake_execute(task: Any) -> None:
+            with count_lock:
+                peak["value"] = max(peak["value"], runner._active_count())
+            try:
+                release.wait(timeout=5.0)
+            finally:
+                runner._dec_active()
+
+        runner._execute = fake_execute  # type: ignore[method-assign]
+
+        def dispatch(idx: int) -> None:
+            task = types.SimpleNamespace(id=f"task-{idx:02d}")
+            barrier.wait()  # all dispatch attempts start together
+            spawned.append(runner._spawn_worker(task))
+
+        threads = [threading.Thread(target=dispatch, args=(i,)) for i in range(16)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10.0)
+
+        # Exactly max workers were spawned; the rest saw a full pool.
+        assert sum(1 for w in spawned if w is not None) == 3
+        assert peak["value"] <= 3
+        assert runner._active_count() == 3
+
+        # Let the workers finish; every reserved slot is returned.
+        release.set()
+        for w in spawned:
+            if w is not None:
+                w.join(timeout=10.0)
+        assert runner._active_count() == 0
+
+    def test_released_slot_can_be_reused(self) -> None:
+        """After a worker finishes, a new dispatch must be able to reserve."""
+        runner, _store = self._make_runner(max_concurrent=1)
+
+        release = threading.Event()
+
+        def fake_execute(task: Any) -> None:
+            try:
+                release.wait(timeout=5.0)
+            finally:
+                runner._dec_active()
+
+        runner._execute = fake_execute  # type: ignore[method-assign]
+
+        worker_a = runner._spawn_worker(types.SimpleNamespace(id="task-a"))
+        assert worker_a is not None
+        assert runner._spawn_worker(types.SimpleNamespace(id="task-b")) is None
+
+        release.set()
+        worker_a.join(timeout=5.0)
+        assert runner._active_count() == 0
+
+        worker_c = runner._spawn_worker(types.SimpleNamespace(id="task-c"))
+        assert worker_c is not None
+        worker_c.join(timeout=5.0)
+
+
+# ---------------------------------------------------------------------------
+# 2. Hugging Face multi-file order + auth + verification parity
+# ---------------------------------------------------------------------------
+
+
+class TestHfConcurrentParity:
+    def test_multifile_download_preserves_order_and_verifies_each(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from paradl.engines import hf as hf_mod
+
+        files = ["model-a.gguf", "model-b.gguf", "model-c.gguf", "model-d.gguf"]
+        infos = [
+            {"rfilename": name, "lfs": {"oid": f"{i + 1:064x}"}}
+            for i, name in enumerate(files)
+        ]
+        repo_info = {"siblings": infos}
+
+        monkeypatch.setattr(hf_mod, "_has_hf_xet", lambda: True)
+        monkeypatch.setattr(
+            hf_mod.HuggingFaceEngine,
+            "fetch_hf_info",
+            classmethod(lambda cls, repo_id, repo_type="model": repo_info),
+        )
+        monkeypatch.setattr(
+            hf_mod.HuggingFaceEngine, "get_token", classmethod(lambda cls: "TEST_HF_TOKEN")
+        )
+        monkeypatch.setattr(hf_mod.UI, "can_prompt", lambda select_requested=False: False)
+
+        download_calls: list[tuple[str, str | None]] = []
+
+        def fake_hf_hub_download(**kwargs: Any) -> str:
+            filename = kwargs["filename"]
+            download_calls.append((filename, kwargs.get("token")))
+            dest = tmp_path / filename
+            dest.write_bytes(b"x" * 16)
+            return str(dest)
+
+        fake_module = types.ModuleType("huggingface_hub")
+        fake_module.hf_hub_download = fake_hf_hub_download  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "huggingface_hub", fake_module)
+
+        verify_calls: list[str] = []
+
+        def fake_verify(path: Path, expected: str) -> tuple[bool, str, str]:
+            verify_calls.append(path.name)
+            return True, "sha256", expected.split(":", 1)[-1]
+
+        monkeypatch.setattr(hf_mod.ChecksumEngine, "verify", staticmethod(fake_verify))
+
+        result = hf_mod.HuggingFaceEngine.download(
+            meta={"repo_id": "org/repo", "revision": "main", "repo_type": "model"},
+            out_dir=tmp_path,
+            connections=16,
+        )
+
+        assert result.success, result.error
+        # Output order is preserved even though workers finish out of order.
+        assert [p.name for p in result.files] == files
+        # Auth + verification happen exactly once per file (order-independent).
+        assert sorted(name for name, _ in download_calls) == sorted(files)
+        assert [token for _, token in download_calls] == ["TEST_HF_TOKEN"] * len(files)
+        assert sorted(verify_calls) == sorted(files)
+
+
+# ---------------------------------------------------------------------------
+# 3. PyPI dependency pre-fetch order + verification parity
+# ---------------------------------------------------------------------------
+
+
+class TestPypiConcurrentParity:
+    def test_batch_results_preserve_order_and_verify_each(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from paradl.engines import aria2 as aria2_mod
+        from paradl.engines import pypi as pypi_mod
+
+        deps = ["dep-a==1.0", "dep-b==2.0", "dep-c", "dep-d==4.0"]
+
+        def fake_probe(target: str, py_version: Any = None) -> Any:
+            name = target.split("pip:", 1)[-1].split("==", 1)[0]
+            return types.SimpleNamespace(
+                target_type=TargetType.PYPI,
+                clean_url=f"https://example.invalid/{name}.whl",
+                pypi_meta={"package": name, "version": "1.0", "sha256": "ab" * 32},
+            )
+
+        # Real PyPIEngine.execute() runs, but its Aria2 download is faked so it
+        # produces a real on-disk file. The real execute() then performs the
+        # SHA-256 verification branch, which we count below.
+        def fake_aria2_download(*args: Any, **kwargs: Any) -> TransferResult:
+            out_dir = kwargs.get("out_dir") or (args[1] if len(args) > 1 else tmp_path)
+            path = Path(out_dir) / "fake.whl"
+            if not path.exists():
+                path.write_bytes(b"w" * 8)
+            return TransferResult(success=True, file_path=path)
+
+        monkeypatch.setattr(aria2_mod.Aria2Engine, "download", staticmethod(fake_aria2_download))
+
+        verify_calls: list[str] = []
+
+        def counting_verify(path: Path, expected: str) -> tuple[bool, str, str]:
+            verify_calls.append(path.name)
+            return True, "sha256", expected.split(":", 1)[-1]
+
+        monkeypatch.setattr(pypi_mod.ChecksumEngine, "verify", staticmethod(counting_verify))
+        monkeypatch.setattr(
+            pypi_mod.PyPIEngine,
+            "extract_wheel_dependencies",
+            classmethod(lambda cls, path: [f"sub-{path.parent.name}"]),
+        )
+
+        engine = pypi_mod.PyPIEngine()
+        results = pypi_mod.PyPIEngine._fetch_dependency_batch(
+            engine,
+            current_batch=deps,
+            tmp_path=tmp_path,
+            connections=16,
+            target_py_ver=None,
+            probe=fake_probe,
+        )
+
+        assert len(results) == len(deps)
+        # Order is preserved even though workers finish in arbitrary order.
+        assert [record[0] for record in results] == deps  # type: ignore[index]
+        # One SHA-256 verification per wheel (inside execute()).
+        assert len(verify_calls) == len(deps)

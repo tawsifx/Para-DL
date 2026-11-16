@@ -336,14 +336,62 @@ class _TaskRunner:
         with self._lock:
             return self._active
 
-    def _inc_active(self) -> None:
-        with self._lock:
-            self._active += 1
-
     def _dec_active(self) -> None:
         with self._lock:
+            # Keep the clamp: _spawn_worker's is_alive() check avoids the
+            # double-release in the normal partial-start case, but in the
+            # very narrow window where the native thread exists while
+            # is_alive() has not flipped yet a duplicate release could drive
+            # the count negative and let _wait_for_slot() admit extra workers.
             self._active = max(0, self._active - 1)
             self._condition.notify_all()
+
+    def _try_reserve_slot(self) -> bool:
+        """Atomically reserve a concurrency slot for a worker.
+
+        Returns False (without reserving) when the pool is full. Every
+        successful reservation must be released with :meth:`_dec_active` in
+        the worker's ``finally`` block.
+        """
+        with self._lock:
+            if self._active >= self.max_concurrent:
+                return False
+            self._active += 1
+            return True
+
+    def _spawn_worker(self, task: _ApiTask) -> threading.Thread | None:
+        """Reserve a slot and start a worker for *task*; None if the pool is full.
+
+        If any step between reserving the slot and starting the worker fails,
+        the reservation is returned before the exception is re-raised, so a
+        failed spawn can never leave the pool permanently full.
+        """
+        if not self._try_reserve_slot():
+            return None
+        worker: threading.Thread | None = None
+        try:
+            # Mark running optimistically; _execute will correct on failure.
+            self.store.update(task.id, status="running", updated_at=self._now())
+            stop_event = threading.Event()
+            self.store.set_stop_event(task.id, stop_event)
+            worker = threading.Thread(
+                target=self._execute,
+                args=(task,),
+                name=f"pdl-api-worker-{task.id[:8]}",
+                daemon=True,
+            )
+            self.store.set_thread(task.id, worker)
+            worker.start()
+        except BaseException:
+            # Once the worker is running, _execute's finally block owns the
+            # release. Only undo the reservation when the worker never began
+            # running (e.g. Thread.start() raised RuntimeError on exhaustion,
+            # or the store/thread construction raised). Checking is_alive()
+            # avoids a double-decrement if start() partially succeeded.
+            if worker is None or not worker.is_alive():
+                self._dec_active()
+            raise
+        return worker
 
     def _wait_for_slot(self) -> bool:
         """Block until a concurrency slot is free or the runner is stopped."""
@@ -367,9 +415,12 @@ class _TaskRunner:
     # -- single task execution --------------------------------------------
 
     def _execute(self, task: _ApiTask) -> None:
-        """Run one download task to completion (or until stopped/failed)."""
+        """Run one download task to completion (or until stopped/failed).
+
+        The concurrency slot is reserved by :meth:`_spawn_worker` before this
+        worker starts; we only release it here in the ``finally`` block.
+        """
         task_id = task.id
-        self._inc_active()
         stop_event = self.store.get_stop_event(task_id)
         try:
             # Respect external stop before starting
@@ -542,8 +593,6 @@ class _TaskRunner:
             for task in queued:
                 if self._stop.is_set():
                     break
-                if self._active_count() >= self.max_concurrent:
-                    break
                 # Skip if already assigned to a running thread
                 thread = self.store.get_thread(task.id)
                 if thread is not None and thread.is_alive():
@@ -552,19 +601,14 @@ class _TaskRunner:
                 if self.store.is_stopped(task.id):
                     continue
 
-                # Mark running optimistically; _execute will correct on failure
-                self.store.update(task.id, status="running", updated_at=self._now())
-                stop_event = threading.Event()
-                self.store.set_stop_event(task.id, stop_event)
-
-                worker = threading.Thread(
-                    target=self._execute,
-                    args=(task,),
-                    name=f"pdl-api-worker-{task.id[:8]}",
-                    daemon=True,
-                )
-                self.store.set_thread(task.id, worker)
-                worker.start()
+                # Reserve a concurrency slot atomically and start the worker.
+                # The worker returns the slot in _execute's finally block.
+                # Reserving before starting (instead of checking the count and
+                # letting the worker increment later) closes the race where a
+                # burst of dispatches could spawn more than max_concurrent
+                # workers before any of them incremented the counter.
+                if self._spawn_worker(task) is None:
+                    break
 
         # Drain: wait for active workers to finish (best effort)
         with self.store._lock:

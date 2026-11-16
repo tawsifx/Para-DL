@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -356,10 +357,10 @@ class HuggingFaceEngine:
                     f"  [dim]• Downloading {len(valid_files)} files from {repo_id} via huggingface_hub (hf_xet)...[/dim]"
                 )
                 t0 = time.time()
-                downloaded_paths: list[Path] = []
-                total_bytes = 0
                 token = cls.get_token()
-                for f_entry in valid_files:
+
+                def download_one(f_entry: dict[str, Any]) -> tuple[Path, int, bool]:
+                    """Download and verify one file; preserve auth + SHA-256 checks."""
                     rfilename = f_entry["rfilename"]
                     local_p = Path(
                         hf_hub_download(
@@ -371,9 +372,10 @@ class HuggingFaceEngine:
                             token=token,
                         )
                     )
-                    downloaded_paths.append(local_p)
+                    size = 0
+                    verified_ok = True
                     if local_p.exists() and local_p.is_file():
-                        total_bytes += local_p.stat().st_size
+                        size = local_p.stat().st_size
                         lfs_info = (
                             f_entry.get("lfs") if isinstance(f_entry.get("lfs"), dict) else None
                         )
@@ -391,13 +393,30 @@ class HuggingFaceEngine:
                                 verified=matched,
                                 source="hf_lfs_oid",
                             )
-                            if not matched:
-                                return TransferResult(
-                                    success=False,
-                                    file_path=local_p,
-                                    error=f"HF LFS SHA-256 mismatch on {local_p.name}",
-                                    exit_code=int(ExitCode.VERIFICATION_FAILED),
-                                )
+                            verified_ok = matched
+                    return local_p, size, verified_ok
+
+                # Bounded fan-out capped by the existing global connection limit
+                # (safe_conn <= 16) and the number of files. Futures are kept in
+                # submission order and read with .result() so the resulting
+                # file list and the first verification failure match the old
+                # sequential loop exactly.
+                max_workers = min(len(valid_files), safe_conn)
+                downloaded_paths: list[Path] = []
+                total_bytes = 0
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(download_one, entry) for entry in valid_files]
+                    for future in futures:
+                        local_p, size, verified_ok = future.result()
+                        downloaded_paths.append(local_p)
+                        total_bytes += size
+                        if not verified_ok:
+                            return TransferResult(
+                                success=False,
+                                file_path=local_p,
+                                error=f"HF LFS SHA-256 mismatch on {local_p.name}",
+                                exit_code=int(ExitCode.VERIFICATION_FAILED),
+                            )
                 dur = max(time.time() - t0, 0.001)
                 return TransferResult(
                     success=True,

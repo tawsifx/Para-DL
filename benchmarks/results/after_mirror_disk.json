@@ -1,0 +1,48 @@
+{
+  "tag": "after_mirror_disk",
+  "python": "3.12.16",
+  "results": [
+    {
+      "case": "mirrors.match_configured_mirrors_disk",
+      "scale": 200,
+      "iterations": 30,
+      "units_per_call": 200,
+      "p50_ms": 0.014583999472961295,
+      "p95_ms": 0.01731454894979833,
+      "p99_ms": 0.029374248988460763,
+      "mean_ms": 0.015458466623385902,
+      "throughput_units_per_s": 12937893.83336609,
+      "traced_peak_kb": 10.154296875,
+      "rss_delta_mb": 0.03125,
+      "label": "small"
+    },
+    {
+      "case": "mirrors.match_configured_mirrors_disk",
+      "scale": 2000,
+      "iterations": 9,
+      "units_per_call": 2000,
+      "p50_ms": 0.014582999938284047,
+      "p95_ms": 0.028750000637955957,
+      "p99_ms": 0.03335000074002892,
+      "mean_ms": 0.01778233329079942,
+      "throughput_units_per_s": 112471179.52933659,
+      "traced_peak_kb": 1.0390625,
+      "rss_delta_mb": 0.03125,
+      "label": "medium"
+    },
+    {
+      "case": "mirrors.match_configured_mirrors_disk",
+      "scale": 20000,
+      "iterations": 9,
+      "units_per_call": 20000,
+      "p50_ms": 0.014624998584622517,
+      "p95_ms": 0.045433400009642334,
+      "p99_ms": 0.06055308032955508,
+      "mean_ms": 0.020407444228314694,
+      "throughput_units_per_s": 980034529.3728955,
+      "traced_peak_kb": 1.203125,
+      "rss_delta_mb": 0.0,
+      "label": "stress"
+    }
+  ]
+}
