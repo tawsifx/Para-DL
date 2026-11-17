@@ -485,7 +485,7 @@ class WatchdogController:
                 self.sustained_low_speed_cycles = 0
                 self.sustained_throttle_detected = False
 
-            # Relative per-connection straggler check (MDM shed_slow pattern):
+            # Relative per-connection straggler check (a shed-slow pattern):
             # catch a single throttled/congested TCP flow (< best / straggler_ratio)
             # even when aggregate speed meets the floor.
             if self.supports_range and per_conn_speeds and len(per_conn_speeds) >= 2:

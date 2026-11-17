@@ -1,7 +1,7 @@
 # Workspace for the in-process Rust download engine that replaces the aria2 JSON-RPC
 # control plane in paradl. The engine core is a trimmed, in-process Rust port.
 [workspace]
-members = ["mdm-engine", "paradl-rs"]
+members = ["rapids", "paradl-rs"]
 resolver = "2"
 
 [workspace.package]

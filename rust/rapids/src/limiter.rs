@@ -1,4 +1,4 @@
-// Modifications: removed MDM's inline `#[cfg(test)] mod tests;` (tests are in src/tests.rs).
+// Modifications: removed the original engine's inline `#[cfg(test)] mod tests;` (tests are in src/tests.rs).
 //! Per-download speed limiter (IDM: "Maximum download speed for one file", notes/ENGINE.md §4).
 //! A token bucket shared by all of a download's connections; the limit can change while the
 //! download runs, and a new limit applies to the waits already started too (#621). Throttling

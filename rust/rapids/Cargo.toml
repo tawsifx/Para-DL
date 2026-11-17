@@ -1,6 +1,6 @@
 [package]
-name = "mdm-engine"
-description = "Trimmed MDM download engine: planner, resume state, limiter, verifier, Tokio workers"
+name = "rapids"
+description = "In-process download engine: planner, resume state, limiter, verifier, Tokio workers"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

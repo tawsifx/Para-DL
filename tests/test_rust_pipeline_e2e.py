@@ -5,7 +5,7 @@ observable contracts of the pipeline:
 
 * final file bytes are byte-identical to the server payload;
 * the SHA-256 digest reported by the adapter matches the real bytes;
-* the ``.mdm.part`` / ``.mdm.json`` sidecars are cleaned up on success;
+* the ``.pdl.part`` / ``.pdl.json`` sidecars are cleaned up on success;
 * JSONL events (``verification``) are emitted with the right verdict and no
   ``error`` event leaks on a successful transfer;
 * the ``ExitCode`` is 0 (or the documented failure code for the failure case).
@@ -89,7 +89,7 @@ def assert_clean_pipeline_result(
     assert digest.endswith(result.checksum_digest)
 
     # Sidecar cleanup: nothing may be left for a spurious resume.
-    leftovers = list(out.rglob("*.mdm.part")) + list(out.rglob("*.mdm.json"))
+    leftovers = list(out.rglob("*.pdl.part")) + list(out.rglob("*.pdl.json"))
     assert leftovers == [], f"sidecars not cleaned up: {leftovers}"
 
     # JSONL events: a verification event with a correct verdict and no error.
@@ -332,7 +332,7 @@ def test_e2e_4_cookie_scoped_across_cross_host_redirect(
 
 
 # ---------------------------------------------------------------------------
-# Scenario 5: resume after interrupt (.mdm.part + .mdm.json -> identical bytes)
+# Scenario 5: resume after interrupt (.pdl.part + .pdl.json -> identical bytes)
 # ---------------------------------------------------------------------------
 
 
@@ -360,10 +360,10 @@ def test_e2e_5_resume_after_interrupt_is_byte_identical(
     finally:
         server.throttle_bps = 0.0
 
-    part_files = list(out.rglob("*.mdm.part"))
-    state_files = list(out.rglob("*.mdm.json"))
-    assert part_files, "no .mdm.part persisted after interruption"
-    assert state_files, "no .mdm.json state persisted after interruption"
+    part_files = list(out.rglob("*.pdl.part"))
+    state_files = list(out.rglob("*.pdl.json"))
+    assert part_files, "no .pdl.part persisted after interruption"
+    assert state_files, "no .pdl.json state persisted after interruption"
 
     # Adapter side: resuming detects the sidecars and completes the transfer.
     info = target_info(

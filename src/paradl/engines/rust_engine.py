@@ -1,4 +1,4 @@
-"""Native Rust (``mdm-engine``) download engine adapter.
+"""Native Rust (``rapids``) download engine adapter.
 
 Conforms to :class:`paradl.engines.base.Engine` and preserves the exact
 ``TransferResult`` / ``ExitCode`` / JSONL event contract of the legacy aria2
@@ -579,7 +579,7 @@ class RustEngine:
                 out_dir.mkdir(parents=True, exist_ok=True)
                 resume = any(
                     Path(f"{out_path}{suffix}").exists()
-                    for suffix in (".mdm.part", ".mdm.json", ".aria2")
+                    for suffix in (".pdl.part", ".pdl.json", ".aria2")
                 )
                 handle = _start_handle(
                     item.url,

@@ -1,6 +1,6 @@
 [package]
 name = "paradl-rs"
-description = "PyO3 bindings exposing the trimmed MDM engine as paradl._rust_engine"
+description = "PyO3 bindings exposing the rapids engine as paradl._rust_engine"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,7 +13,7 @@ name = "_rust_engine"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-mdm-engine = { path = "../mdm-engine" }
+rapids = { path = "../rapids" }
 tokio.workspace = true
 url.workspace = true
 pyo3 = { version = "0.27", features = ["auto-initialize"] }

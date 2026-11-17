@@ -199,7 +199,7 @@ Recipes:
         choices=sorted(VALID_ENGINES),
         default=config.engine,
         action=_EngineAction,
-        help="HTTP(S) transfer backend: 'rust' (default, in-process mdm-engine) or 'aria2' (legacy JSON-RPC fallback).",
+        help="HTTP(S) transfer backend: 'rust' (default, in-process rapids) or 'aria2' (legacy JSON-RPC fallback).",
     )
     parser.add_argument(
         "-o",

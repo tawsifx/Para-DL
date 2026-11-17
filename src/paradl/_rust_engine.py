@@ -1,4 +1,4 @@
-"""Python shim for the native ``mdm-engine`` PyO3 extension.
+"""Python shim for the native ``rapids`` PyO3 extension.
 
 The compiled extension is published as ``paradl._rust_engine`` (maturin writes a
 ``.so`` that shadows this source file once built).  Before it is compiled — or
@@ -34,7 +34,7 @@ __all__ = [
 _NATIVE_CANDIDATES: tuple[str, ...] = (
     "paradl._rust_engine_native",
     "paradl._paradl_rs",
-    "paradl._mdm_engine",
+    "paradl._rapids",
     "_paradl_rs",
     "_rust_engine_native",
 )

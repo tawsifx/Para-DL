@@ -1,13 +1,13 @@
-# Rust `mdm-engine` + `paradl-rs`
+# Rust `rapids` + `paradl-rs`
 
 In-process replacement for paradl's external `aria2c` daemon + JSON-RPC control plane.
-This workspace is **Task 1** of `docs/superpowers/plans/2026-11-17-rust-mdm-engine.md`.
+This workspace is **Task 1** of `docs/superpowers/plans/2026-11-17-rust-rapids.md`.
 
 ## Layout
 
 | Path | Role |
 |---|---|
-| `mdm-engine/` | Trimmed, vendored MDM engine: pure planner, resume state, token-bucket limiter, checksum verifier, Range probe, Tokio worker pool |
+| `rapids/` | Trimmed, vendored the original engine engine: pure planner, resume state, token-bucket limiter, checksum verifier, Range probe, Tokio worker pool |
 | `paradl-rs/` | PyO3 crate built by maturin as `paradl._rust_engine` |
 
 Only crates.io dependencies are used. No git-patched deps, no `wreq`/BoringSSL, no
@@ -34,7 +34,7 @@ MSRV: Rust 1.98 (edition 2024). Verified with Rust 1.100.
 - `start_download(url, out_dir, filename=None, connections=None, headers=None, cookies=None,
   referer=None, user_agent=None, proxy=None, ip_family=None, mirrors=None, checksum=None,
   rate_limit_bps=None) -> DownloadHandle`
-- `resume_download(...)` — same arguments; resumes from `<dest>.mdm.part` + `<dest>.mdm.json`.
+- `resume_download(...)` — same arguments; resumes from `<dest>.pdl.part` + `<dest>.pdl.json`.
 - `DownloadHandle.poll_snapshot() -> dict` — exactly
   `{downloaded, total, speed_bps, connections, state}` with states
   `queued|probing|downloading|paused|verifying|done|failed|cancelled`.
@@ -57,21 +57,21 @@ download whose only URI came from a 302 lost the redirected URI pool, yielding
 3. Committed byte offsets and the part file are untouched; the next ranges start at those
    offsets. No URI is ever re-derived from a daemon-held handle.
 
-`mdm-engine/src/tests.rs::fault_injected_recycle_preserves_offsets_and_uri_pool` proves
+`rapids/src/tests.rs::fault_injected_recycle_preserves_offsets_and_uri_pool` proves
 this against a loopback Range server that drops connections mid-body.
 
 ## Engine module layout
 
-The `mdm-engine` crate contains a segmentation planner, crash-safe resume state,
+The `rapids` crate contains a segmentation planner, crash-safe resume state,
 token-bucket limiter, checksum verifier, Range probe, and a bounded Tokio worker
 pool. `paradl-rs` exposes them to Python as `paradl._rust_engine`.
 
 | File | Role |
 |---|---|
-| `mdm-engine/src/planner.rs` | dynamic segmentation planner (pure logic) |
-| `mdm-engine/src/state.rs` | resume state + atomic sidecar writes |
-| `mdm-engine/src/limiter.rs` | per-download token-bucket speed limiter |
-| `mdm-engine/src/verify.rs` | whole-file checksum parse/verify |
-| `mdm-engine/src/naming.rs` | `.pdl.part` / `.pdl.json` path helpers |
-| `mdm-engine/src/probe.rs` | GET-only probe capturing the final post-redirect URL |
-| `mdm-engine/src/download.rs` | Tokio worker pool + in-process socket recycle |
+| `rapids/src/planner.rs` | dynamic segmentation planner (pure logic) |
+| `rapids/src/state.rs` | resume state + atomic sidecar writes |
+| `rapids/src/limiter.rs` | per-download token-bucket speed limiter |
+| `rapids/src/verify.rs` | whole-file checksum parse/verify |
+| `rapids/src/naming.rs` | `.pdl.part` / `.pdl.json` path helpers |
+| `rapids/src/probe.rs` | GET-only probe capturing the final post-redirect URL |
+| `rapids/src/download.rs` | Tokio worker pool + in-process socket recycle |

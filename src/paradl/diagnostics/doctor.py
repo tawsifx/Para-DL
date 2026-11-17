@@ -117,7 +117,7 @@ def run_doctor() -> int:
         rust_ver = TOOLCHAIN.rust_engine_version
         core_items.append(
             ToolCheck(
-                "Rust Engine (native mdm-engine)",
+                "Rust Engine (native rapids)",
                 "ready",
                 f"v{rust_ver}" if rust_ver else "available",
             )
@@ -127,7 +127,7 @@ def run_doctor() -> int:
         fixes.append(fix)
         core_items.append(
             ToolCheck(
-                "Rust Engine (native mdm-engine)",
+                "Rust Engine (native rapids)",
                 "optional_missing",
                 "not built (HTTP(S) falls back to --engine aria2)",
                 fix=fix,

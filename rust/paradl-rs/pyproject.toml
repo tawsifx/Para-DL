@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "paradl-rust-engine"
 version = "0.1.0"
-description = "Native Rust download engine for paradl (vendored MDM engine)"
+description = "Native Rust download engine for paradl"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 

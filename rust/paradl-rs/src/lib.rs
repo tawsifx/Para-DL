@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
-use mdm_engine::download::StartOptions;
-use mdm_engine::{Download, Error, Hash, Snapshot, State};
+use rapids::download::StartOptions;
+use rapids::{Download, Error, Hash, Snapshot, State};
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -268,12 +268,12 @@ fn do_probe(
     headers: Option<HashMap<String, String>>,
 ) -> PyResult<Py<PyAny>> {
     let url = Url::parse(&url).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let headers = mdm_engine::probe::headers_from_pairs(headers.as_ref());
+    let headers = rapids::probe::headers_from_pairs(headers.as_ref());
     let info = py.detach(|| {
-        let client = mdm_engine::probe::build_client(None, None, Duration::from_secs(15))
+        let client = rapids::probe::build_client(None, None, Duration::from_secs(15))
             .map_err(py_error)?;
         cfg.rt
-            .block_on(mdm_engine::probe::probe(&client, url, headers, None))
+            .block_on(rapids::probe::probe(&client, url, headers, None))
             .map_err(py_error)
     })?;
     let d = PyDict::new(py);
@@ -330,7 +330,7 @@ fn do_start(
         std::fs::create_dir_all(parent).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     }
 
-    let mut hdrs = mdm_engine::probe::headers_from_pairs(headers.as_ref());
+    let mut hdrs = rapids::probe::headers_from_pairs(headers.as_ref());
     if let Some(ua) = user_agent.or_else(|| cfg.user_agent.clone()) {
         hdrs.insert(
             "user-agent",

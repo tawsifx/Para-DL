@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Audit and harden the in-process PyO3 `paradl._rust_engine` (vendored `mdm-engine`) across four independent workstreams: Rust core efficiency/correctness, PyO3 boundary/adapter, full URL→Rust→filesystem pipeline proof, and an honest aria2 comparison harness — with every fix proven RED→GREEN and every diff reviewed.
+**Goal:** Audit and harden the in-process PyO3 `paradl._rust_engine` (vendored `rapids`) across four independent workstreams: Rust core efficiency/correctness, PyO3 boundary/adapter, full URL→Rust→filesystem pipeline proof, and an honest aria2 comparison harness — with every fix proven RED→GREEN and every diff reviewed.
 
-**Architecture:** Four disjoint-ownership implementers run concurrently in the `feat/rust-mdm-engine` worktree. The lead owns integration, per-diff spec+quality review, the license note, and the final verification gate. No commits on shared branches; nothing committed unless the maintainer asked.
+**Architecture:** Four disjoint-ownership implementers run concurrently in the `feat/rust-rapids` worktree. The lead owns integration, per-diff spec+quality review, the license note, and the final verification gate. No commits on shared branches; nothing committed unless the maintainer asked.
 
 **Tech Stack:** Rust 1.100 / edition 2024 / Tokio / reqwest(rustls) / PyO3 0.27 / maturin 1.16; Python 3.12, pytest, ruff, mypy; aria2c (legacy comparison).
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Worktree `feat/rust-mdm-engine` only; NEVER touch `main` or `perf/max-efficiency`. BASE = 48379b7.
+- Worktree `feat/rust-rapids` only; NEVER touch `main` or `perf/max-efficiency`. BASE = 48379b7.
 - Preserve every CLI flag, `ExitCode` (0/1/3/4/130), `TransferResult` fields, JSONL event shapes, shim modules, mirror/metalink/cookie/proxy/ip_family behavior.
 - Max 16 connections; all concurrency bounded; all waits have timeouts. No thread/JoinSet leaks.
 - Honest benchmarks only: warm-cache hits and ~1.2–1.3× drift are NOT wins. Report medians + spreads; `null` + reason for unfair metrics.
@@ -29,19 +29,19 @@
 - CLI flags `checksum`/`cookies` reaching the native call (prior silent-drop bug) → S2 (verify, already patched).
 - `recycle_connections()` no-op on terminal handles → S1 + S2.
 - Cookie host-scoping across 302 to a different host → S2 + S3.
-- SHA-256 mismatch → ExitCode 3; crash resume from `.mdm.part` + `.mdm.json` byte-identical → S1 + S3.
+- SHA-256 mismatch → ExitCode 3; crash resume from `.pdl.part` + `.pdl.json` byte-identical → S1 + S3.
 
 ---
 
 ### Task 1 (S1): Rust core efficiency & correctness
 
-**Files (owned):** `rust/mdm-engine/**` only.
+**Files (owned):** `rust/rapids/**` only.
 **Report:** `.superpowers/audit/task1-report.md`
 
 - [ ] Step 1: Fix the 4 baseline clippy findings (download.rs:196, 759, 960; probe.rs:176). Run from `rust/`: `PYO3_PYTHON=... cargo clippy --all -- -D warnings` → exit 0. (`cargo clippy` counts as a TDD verification gate, not new behavior.)
 - [ ] Step 2: Root-cause L1 (30 s close-delimited transfer). Add a Rust `#[test]` that reproduces EOF handling with a bounded read timeout on a close-delimited body; watch RED; apply the single minimal fix in `download.rs`; watch GREEN. Record root cause in report (systematic-debugging Phase 1–4).
-- [ ] Step 3: Audit planner/state/limiter/verify logic drift vs MDM originals at `/tmp/archive-ref/crates/engine/src/` (if present); list any drift with file:line in report. Do not blindly port changes.
-- [ ] Step 4: Fault-injection tests (Rust `#[test]`): dropped connections; 5xx mirror failover; no-Content-Length EOF completes; recycle mid-transfer; crash-resume from `.mdm.part` + `.mdm.json`; SHA-256 mismatch → error. Verify `py.detach` releases GIL on all long calls in `paradl-rs` (report only — do not edit paradl-rs, that is S2).
+- [ ] Step 3: Audit planner/state/limiter/verify logic drift vs the original engine originals at `/tmp/archive-ref/crates/engine/src/` (if present); list any drift with file:line in report. Do not blindly port changes.
+- [ ] Step 4: Fault-injection tests (Rust `#[test]`): dropped connections; 5xx mirror failover; no-Content-Length EOF completes; recycle mid-transfer; crash-resume from `.pdl.part` + `.pdl.json`; SHA-256 mismatch → error. Verify `py.detach` releases GIL on all long calls in `paradl-rs` (report only — do not edit paradl-rs, that is S2).
 - [ ] Step 5: Liveness tests: no hang when all workers retire; `wait(timeout=)` honored; `recycle_connections()` no-op on terminal handles.
 - [ ] Step 6: `cargo test --all` (8+ pass) + `cargo clippy --all -- -D warnings` clean. Write report with per-finding evidence.
 
@@ -67,7 +67,7 @@
   2. GitHub `/archive/` via auto-acceleration (URL routing in accelerate.py — assert mirror chosen; use configured mirror, no real WAN);
   3. mirror failover (500 on primary → success from mirror);
   4. cookie/header/Bearer scoping across redirect (host-scoped cookie NOT leaked cross-host);
-  5. resume after interrupt (`.mdm.part` + `.mdm.json` → byte-identical);
+  5. resume after interrupt (`.pdl.part` + `.pdl.json` → byte-identical);
   6. metalink/torrent still delegated to aria2 (assert `--engine aria2` / delegation path).
 - [ ] Step 2: Fix L2 (loopback server teardown exception traceback) in the shared test server helper — root-cause with systematic-debugging, not a sleep hack. Watch RED→GREEN.
 - [ ] Step 3: Verify the L1 fix from S1 through the Python adapter: the cookie-redirect test should drop from ~30 s to ~2 s. Report before/after timing (fresh output).

@@ -89,7 +89,7 @@ fn planner_split_resume_release_preserves_offsets() {
 fn state_save_load_round_trip() {
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("a.bin");
-    let part = std::fs::File::create(dir.path().join("a.bin.mdm.part")).unwrap();
+    let part = std::fs::File::create(dir.path().join("a.bin.pdl.part")).unwrap();
     let url: url::Url = "http://x/a.bin".parse().unwrap();
     let validators = Validators::from_response(Some("\"e\""), None, None, Some("x"));
     let mut s = ResumeState::new(url.clone(), url, dest.clone(), 100, validators);
@@ -104,7 +104,7 @@ fn state_save_load_round_trip() {
     assert_eq!(loaded.segments, segs);
     assert_eq!(
         crate::naming::part_path(&dest),
-        dir.path().join("a.bin.mdm.part")
+        dir.path().join("a.bin.pdl.part")
     );
 }
 
@@ -159,7 +159,7 @@ async fn limiter_bounds_average_rate() {
 // ---------------------------------------------------------------------------
 
 /// Minimal loopback HTTP Range server with mid-body connection drops (fault injection).
-/// Adapted from MDM's labserver *pattern*; written from scratch here, not copied.
+/// Adapted from the original engine's labserver *pattern*; written from scratch here, not copied.
 async fn spawn_fault_range_server(payload: Arc<Vec<u8>>, faults: Arc<AtomicUsize>) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -742,7 +742,7 @@ async fn mirror_failover_on_5xx_completes_byte_exact() {
 }
 
 // ---------------------------------------------------------------------------
-// Crash resume: a part file plus its .mdm.json sidecar (committed cursor at the
+// Crash resume: a part file plus its .pdl.json sidecar (committed cursor at the
 // halfway point) must resume at that offset and produce a byte-identical file,
 // then remove the sidecar.
 // ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ With `--watchdog off`, no `NET_CHANGE` cycle occurs and aria2 streams normally
 
 ## Why this matters for the Rust migration
 This is a concrete example of the JSON-RPC/aria2 control-plane fragility the
-`mdm-engine` migration is meant to remove. In the Rust engine, socket recycling
+`rapids` migration is meant to remove. In the Rust engine, socket recycling
 must be implemented as an in-process worker cancellation/reconnect on the same
 `Range` offsets — never as a pause/unpause of a daemon-held URI list. The parity
 tests in the migration must assert that a mid-transfer recycle preserves the

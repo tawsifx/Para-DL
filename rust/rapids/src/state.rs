@@ -1,9 +1,9 @@
 // Modifications:
 //   - craft_atomic::atomic_write -> std write-temp-then-rename (`atomic_write` below),
 //     per the trimmed-vendoring ruling (no git-patched deps).
-//   - Removed MDM's `migrate_legacy` (.idmnext renaming) and inline tests;
+//   - Removed the original engine's `migrate_legacy` (.idmnext renaming) and inline tests;
 //     the latter live in src/tests.rs. Credentials/request headers remain deliberately unstored.
-//! Resume state: `<file>.mdm.json` beside the part file (notes/ENGINE.md §3).
+//! Resume state: `<file>.pdl.json` beside the part file (notes/ENGINE.md §3).
 //!
 //! Request headers (cookies, authorization) are deliberately not stored: whoever resumes the
 //! download supplies them again, so no credentials sit in the download folder.
@@ -121,7 +121,7 @@ impl ResumeState {
     }
 }
 
-/// Replacement for MDM's `craft_atomic::atomic_write`: write to a sibling temp file,
+/// Replacement for the original engine's `craft_atomic::atomic_write`: write to a sibling temp file,
 /// flush it, then rename over the destination. A reader sees either the old or the new file.
 fn atomic_write(path: &Path, data: &[u8]) -> io::Result<()> {
     // F13: a unique temp name avoids two concurrent writers clobbering each other's file.
@@ -215,9 +215,9 @@ fn is_strong_date(last_modified: &str, date: Option<&str>) -> bool {
     date >= lm + std::time::Duration::from_secs(1)
 }
 
-/// `<dest>.mdm.json`.
+/// `<dest>.pdl.json`.
 pub fn state_path(dest: &Path) -> PathBuf {
     let mut s = dest.as_os_str().to_owned();
-    s.push(".mdm.json");
+    s.push(".pdl.json");
     PathBuf::from(s)
 }

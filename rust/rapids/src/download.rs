@@ -1,4 +1,4 @@
-// Modifications: MDM's 5731-line download.rs is NOT copied. This is a small focused Tokio
+// Modifications: the original engine's 5731-line download.rs is NOT copied. This is a small focused Tokio
 // worker pool driven by the vendored planner. The URI pool is created once from the probe's
 // post-redirect URL and is never rebuilt; `recycle_connections` cancels workers, releases
 // uncommitted claims, and reassigns from committed offsets over the SAME pool. This is the
@@ -56,7 +56,7 @@ fn read_timeout() -> Duration {
 
 const MAX_RETRIES: u32 = 3;
 const COMMANDS: usize = 16;
-/// Periodic crash-safe sidecar save interval (MDM: "several times per minute").
+/// Periodic crash-safe sidecar save interval (the original: "several times per minute").
 const SAVE_INTERVAL: Duration = Duration::from_secs(2);
 /// Sentinel planner size for a single-stream download with no known Content-Length
 /// (the GitHub -> codeload case in docs/diagnostics/watchdog-cycle-aria2-bug.md).

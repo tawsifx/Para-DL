@@ -64,8 +64,8 @@ class PDLApp:
         target_dir = Path(target_dir).expanduser().resolve()
         patterns = [
             "*.aria2",  # legacy aria2 control files
-            "*.mdm.part",  # native Rust partial data
-            "*.mdm.json",  # native Rust resume sidecar
+            "*.pdl.part",  # native Rust partial data
+            "*.pdl.json",  # native Rust resume sidecar
             ".pdl_raw_*",
             "*.part",
             "*.ytdl",

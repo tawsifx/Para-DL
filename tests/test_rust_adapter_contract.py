@@ -1,4 +1,4 @@
-"""Contract tests for the Python adapter around the native Rust mdm-engine.
+"""Contract tests for the Python adapter around the native Rust rapids.
 
 TDD for Task 2: a fake native module is injected via ``monkeypatch`` so these
 contracts run before Subagent 1's PyO3 extension has been compiled.  They pin
