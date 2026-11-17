@@ -70,9 +70,11 @@ except ImportError:  # pragma: no cover - depends on optional install
         def __init__(self, default: Any = None, **_kw: Any) -> None:
             self.default = default
 
-    def ConfigDict(**_kw: Any) -> dict[str, Any]:  # type: ignore[no-redef]
+    class ConfigDict(dict[str, Any]):  # type: ignore[no-redef]
         """Stand-in for pydantic's ConfigDict when the api extra is absent."""
-        return dict(_kw)
+
+        def __init__(self, **_kw: Any) -> None:
+            super().__init__(_kw)
 
 
 # ===========================================================================
