@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.100 / edition 2024 / Tokio / reqwest(rustls) / PyO3 0.27 / maturin 1.16; Python 3.12, pytest, ruff, mypy; aria2c (legacy comparison).
 
-**Spec:** Mission brief (master prompt) + `PARALLEL_DL_DEV_CONTEXT.md` (read in full) + `docs/diagnostics/watchdog-cycle-aria2-bug.md` + `.superpowers/rust-mdm-ledger.md`.
+**Spec:** Mission brief (master prompt) + `PARALLEL_DL_DEV_CONTEXT.md` (read in full) + `docs/diagnostics/watchdog-cycle-aria2-bug.md` + `.superpowers/engine-audit-ledger.md`.
 
 ## Global Constraints
 

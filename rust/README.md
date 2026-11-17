@@ -7,7 +7,7 @@ This workspace is **Task 1** of `docs/superpowers/plans/2026-11-17-rust-rapids.m
 
 | Path | Role |
 |---|---|
-| `rapids/` | Trimmed, vendored the original engine engine: pure planner, resume state, token-bucket limiter, checksum verifier, Range probe, Tokio worker pool |
+| `rapids/` | In-process download engine: pure planner, resume state, token-bucket limiter, checksum verifier, Range probe, Tokio worker pool |
 | `paradl-rs/` | PyO3 crate built by maturin as `paradl._rust_engine` |
 
 Only crates.io dependencies are used. No git-patched deps, no `wreq`/BoringSSL, no

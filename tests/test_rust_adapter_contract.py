@@ -202,7 +202,7 @@ def test_shim_imports_cleanly_without_native(monkeypatch: pytest.MonkeyPatch) ->
     real_import = importlib.import_module
 
     def _blocked(name: str, *args: Any, **kwargs: Any) -> Any:
-        if name.startswith(("paradl._rust", "_paradl_rs", "_rust_engine", "paradl._mdm")):
+        if name.startswith(("paradl._rust", "_paradl_rs", "_rust_engine")):
             raise ImportError("native module intentionally blocked")
         return real_import(name, *args, **kwargs)
 

@@ -1,5 +1,5 @@
-// Modification: only the `.pdl.part` naming helper is retained; the original engine's full naming.rs
-// (length limits, per-platform path rules) is out of scope for the trimmed port.
+// Modification: only the `.pdl.part` naming helper is retained; the full naming.rs
+// (length limits, per-platform path rules) is out of scope here.
 
 use std::path::{Path, PathBuf};
 

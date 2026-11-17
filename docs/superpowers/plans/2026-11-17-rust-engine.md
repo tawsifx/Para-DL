@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (edition 2024, MSRV as the original engine requires), Tokio, reqwest(rustls), PyO3, maturin; Python 3.12, pytest, ruff, mypy.
 
-**Spec:** Mission brief (this conversation); the original engine reference at `/tmp/mdm-ref/src`; diagnosis at `docs/diagnostics/watchdog-cycle-aria2-bug.md`.
+**Spec:** Mission brief (this conversation); the original engine reference at `/tmp/archive-ref/src`; diagnosis at `docs/diagnostics/watchdog-cycle-aria2-bug.md`.
 
 ## Global Constraints
 
@@ -32,7 +32,7 @@
 
 - **Trimmed vendor, not full workspace.** the original engine's workspace pins git forks (storytold/craft-libs, third-party/egui/rqbit) and `rust-version = 1.98`. Vendor only `planner.rs`, `state.rs`, `limiter.rs`, `verify.rs` (+ new `probe.rs`, `download.rs`, `error.rs`, `lib.rs`) into `rust/rapids`, replacing `craft-atomic::atomic_write` with std temp-file+rename and using crates.io deps only. Do NOT pull `wreq`/BoringSSL (needs CMake/NASM/libclang), `rquickjs` (C build), FTP, torrent, or site modules.
 - **Maturin config lives at `rust/paradl-rs/pyproject.toml`**, not the root, so the existing Python build backend stays intact. The built module is imported as `paradl._rust_engine` via a Python shim + `.pyi` stub.
-- **aria2 stays for torrent/magnet/metalink** in v1 (the original engine's `mdm-torrent` is out of scope); Rust becomes the default for HTTP(S) only. This avoids silently breaking those CLI contracts.
+- **aria2 stays for torrent/magnet/metalink** in v1 (the original engine's the torrent module is out of scope); Rust becomes the default for HTTP(S) only. This avoids silently breaking those CLI contracts.
 - Toolchain install via `brew install rust` (documented fallback: the mandated `paradl` downloader binary is absent at `/opt/homebrew/bin/paradl`, and the in-repo `paradl` CLI cannot fetch the the original engine archive because of the diagnosed watchdog bug).
 - Parallel implementers authorized: S1 writes `rust/`, S2 writes `src/paradl/`, S3 writes `tests/`+`benchmarks/` — disjoint.
 
@@ -50,7 +50,7 @@
 | Custom headers/UA/Referer/Bearer/cookies | reqwest `RequestBuilder` | host-scoped cookie injection |
 | `ip_family`, proxy, rate limit | reqwest + `Limiter` | options on `start_download`/`set_limit` |
 | Size + SHA-256 verification | `verify.rs` (`Hash::parse`, `matches`) | preserve `VERIFICATION_FAILED` |
-| Torrent/magnet/.meta4/.metalink | `mdm-torrent`, aria2 metalink | keep aria2 fallback (ruling) |
+| Torrent/magnet/.meta4/.metalink | the torrent module, aria2 metalink | keep aria2 fallback (ruling) |
 | Poll snapshots / JSONL events | `Event`/`Snapshot` → Python dict | callback into `LiveTransferDisplay`/`UI.emit_event` |
 | Watchdog v2 integration | in-process `recycle_connections()` | wire `WatchdogController` action to handle method |
 

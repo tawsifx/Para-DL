@@ -7,7 +7,7 @@ exits 1. The CLI error line is empty (`✗ Download failed: <url>` with no reaso
 
 ## Reproduction (deterministic)
 ```
-paradl <github.com/.../archive/.../main.zip> -o /tmp/mdm-ref --non-interactive -c 1
+paradl <github.com/.../archive/.../main.zip> -o /tmp/archive-ref --non-interactive -c 1
 ```
 Instrumenting `Aria2RpcDaemon.tell_status` shows:
 

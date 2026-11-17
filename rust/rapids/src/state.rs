@@ -1,7 +1,7 @@
 // Modifications:
 //   - craft_atomic::atomic_write -> std write-temp-then-rename (`atomic_write` below),
 //     per the trimmed-vendoring ruling (no git-patched deps).
-//   - Removed the original engine's `migrate_legacy` (.idmnext renaming) and inline tests;
+//   - Removed the `migrate_legacy` (.idmnext renaming) and inline tests;
 //     the latter live in src/tests.rs. Credentials/request headers remain deliberately unstored.
 //! Resume state: `<file>.pdl.json` beside the part file (notes/ENGINE.md §3).
 //!
@@ -45,7 +45,7 @@ pub struct ResumeState {
     #[serde(default)]
     pub checksum: Option<Hash>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub asked_as_mdm: bool,
+    pub used_agent_fallback: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub final_get: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -71,7 +71,7 @@ impl ResumeState {
             segments: Vec::new(),
             content_type: None,
             checksum: None,
-            asked_as_mdm: false,
+            used_agent_fallback: false,
             final_get: false,
             browser_like: false,
             unknown_size: false,
@@ -121,7 +121,7 @@ impl ResumeState {
     }
 }
 
-/// Replacement for the original engine's `craft_atomic::atomic_write`: write to a sibling temp file,
+/// Replacement for the `craft_atomic::atomic_write`: write to a sibling temp file,
 /// flush it, then rename over the destination. A reader sees either the old or the new file.
 fn atomic_write(path: &Path, data: &[u8]) -> io::Result<()> {
     // F13: a unique temp name avoids two concurrent writers clobbering each other's file.

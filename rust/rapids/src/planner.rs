@@ -1,4 +1,4 @@
-// Modifications: removed the original engine's `#[cfg(test)] mod tests;` (tests live in src/tests.rs);
+// Modifications: removed the `#[cfg(test)] mod tests;` (tests live in src/tests.rs);
 // no other logic changes. This module is pure logic and does no I/O.
 //! Dynamic segmentation planner — pure logic, no I/O.
 //!

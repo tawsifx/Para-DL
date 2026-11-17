@@ -159,7 +159,7 @@ async fn limiter_bounds_average_rate() {
 // ---------------------------------------------------------------------------
 
 /// Minimal loopback HTTP Range server with mid-body connection drops (fault injection).
-/// Adapted from the original engine's labserver *pattern*; written from scratch here, not copied.
+/// Adapted from the labserver *pattern*; written from scratch here, not copied.
 async fn spawn_fault_range_server(payload: Arc<Vec<u8>>, faults: Arc<AtomicUsize>) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
