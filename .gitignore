@@ -43,3 +43,7 @@ _original/
 sample_report/
 .agents/
 com.pdl.throttle.sample.plist
+
+# Local download artifacts / test scratch (never commit)
+downloads/
+test.jpg
