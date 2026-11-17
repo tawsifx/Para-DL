@@ -457,16 +457,12 @@ def test_metalink_and_magnet_batch_stay_on_legacy_aria2(
     monkeypatch.setattr(shim, "is_available", lambda: True)
     previous_engine = get_active_engine()
     set_active_engine("rust")
-    monkeypatch.setattr(
-        "paradl.core.config.get_active_engine", lambda: "rust"
-    )
+    monkeypatch.setattr("paradl.core.config.get_active_engine", lambda: "rust")
 
     legacy = MagicMock(name="legacy_download_batch")
     rust = MagicMock(name="rust_download_batch")
     monkeypatch.setattr(aria2_mod.Aria2Engine, "_legacy_download_batch", legacy)
-    monkeypatch.setattr(
-        "paradl.engines.rust_engine.RustEngine.download_batch", rust
-    )
+    monkeypatch.setattr("paradl.engines.rust_engine.RustEngine.download_batch", rust)
 
     item = DownloadItem(url=url, out_dir=Path("/tmp"))
     aria2_mod.Aria2Engine.download_batch([item], Path("/tmp"), connections=2)
@@ -484,9 +480,7 @@ def test_metalink_path_single_target_stays_on_legacy_aria2(
     from paradl.engines import aria2 as aria2_mod
 
     monkeypatch.setattr(shim, "is_available", lambda: True)
-    monkeypatch.setattr(
-        "paradl.core.config.get_active_engine", lambda: "rust"
-    )
+    monkeypatch.setattr("paradl.core.config.get_active_engine", lambda: "rust")
     legacy = MagicMock(name="legacy_download")
     rust = MagicMock(name="rust_download")
     monkeypatch.setattr(aria2_mod.Aria2Engine, "_legacy_download", legacy)
@@ -565,9 +559,7 @@ def _assert_native_error_mapping(
         filename_hint="file.bin",
         expected_digest="sha256:" + "0" * 64,
     )
-    result = rust_engine.RustEngine().execute(
-        info, tmp_path, connections=2, poll_interval=0.0
-    )
+    result = rust_engine.RustEngine().execute(info, tmp_path, connections=2, poll_interval=0.0)
     assert isinstance(result, TransferResult)
     assert result.success is False
     assert result.exit_code == expected_exit_code, result.error
@@ -590,10 +582,6 @@ def test_verification_error_maps_to_verification_failed(
     )
 
 
-def test_download_error_maps_to_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_download_error_maps_to_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     error = _native_exception("DownloadError", "download failed: HTTP 500")
-    _assert_native_error_mapping(
-        monkeypatch, tmp_path, error, int(ExitCode.FAILURE)
-    )
+    _assert_native_error_mapping(monkeypatch, tmp_path, error, int(ExitCode.FAILURE))

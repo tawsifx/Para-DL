@@ -13,4 +13,10 @@ from paradl.storage.mirrors import (
     parse_metalink_bytes,
 )
 
-__all__ = ["MetalinkCompanion", "MirrorManager", "MirrorResolution", "find_or_fetch_metalink", "parse_metalink_bytes"]
+__all__ = [
+    "MetalinkCompanion",
+    "MirrorManager",
+    "MirrorResolution",
+    "find_or_fetch_metalink",
+    "parse_metalink_bytes",
+]

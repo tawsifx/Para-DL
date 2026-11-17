@@ -56,6 +56,7 @@ _UNAVAILABLE_MSG = getattr(
     "Native Rust engine is not available; build it or use --engine aria2.",
 )
 
+
 def _native_exceptions(*names: str) -> tuple[type[BaseException], ...]:
     """Collect exception classes actually exposed by the compiled extension."""
     found: list[type[BaseException]] = []
@@ -70,9 +71,7 @@ def _native_exceptions(*names: str) -> tuple[type[BaseException], ...]:
 # cancellation / unavailability variants).  The Python shim exposes
 # RustEngineUnavailable before the extension is built.  All of them, plus an
 # unexpected Exception, must be converted to a TransferResult at the boundary.
-_VERIFICATION_ERRORS: tuple[type[BaseException], ...] = _native_exceptions(
-    "VerificationError"
-)
+_VERIFICATION_ERRORS: tuple[type[BaseException], ...] = _native_exceptions("VerificationError")
 _DOWNLOAD_ERRORS: tuple[type[BaseException], ...] = _native_exceptions("DownloadError")
 _UNAVAILABLE_ERRORS: tuple[type[BaseException], ...] = (
     ImportError,
@@ -99,6 +98,7 @@ def _native_error_exit_code(exc: Exception) -> int:
         return int(ExitCode.INTERRUPTED)
     # DownloadError and any other native/runtime failure.
     return int(ExitCode.FAILURE)
+
 
 _TERMINAL_STATES = frozenset(
     {"complete", "completed", "done", "finished", "error", "failed", "cancelled", "canceled"}
@@ -197,8 +197,7 @@ def _map_native_result(
     data = _coerce_mapping(native)
     state = str(_first(data, ("state", "status"), default="")).lower()
     success = bool(
-        _first(data, ("success", "ok", "completed"), default=False)
-        or state in _SUCCESS_STATES
+        _first(data, ("success", "ok", "completed"), default=False) or state in _SUCCESS_STATES
     )
     error_value = _first(data, ("error", "message", "error_message"))
     error = str(error_value) if error_value else None
@@ -520,9 +519,7 @@ class RustEngine:
         if not power_ok:
             err_msg = power_err or "Power policy check failed."
             UI.emit_event("error", reason="power_policy", message=err_msg)
-            return TransferResult(
-                success=False, error=err_msg, exit_code=int(ExitCode.FAILURE)
-            )
+            return TransferResult(success=False, error=err_msg, exit_code=int(ExitCode.FAILURE))
 
         first_url = items[0].url if items else ""
         if when_fast_bps > 0 and first_url.startswith(("http://", "https://")):
@@ -534,8 +531,7 @@ class RustEngine:
             )
             if not fast_ok:
                 err_msg = (
-                    fast_err
-                    or f"Deferred by --when-fast (measured {format_speed(measured_bps)})"
+                    fast_err or f"Deferred by --when-fast (measured {format_speed(measured_bps)})"
                 )
                 print_plain(f"  [warning]⏸ {err_msg}[/warning]", force=True)
                 UI.emit_event(
@@ -545,9 +541,7 @@ class RustEngine:
                     threshold_bps=round(when_fast_bps, 2),
                     message=err_msg,
                 )
-                return TransferResult(
-                    success=False, error=err_msg, exit_code=int(ExitCode.FAILURE)
-                )
+                return TransferResult(success=False, error=err_msg, exit_code=int(ExitCode.FAILURE))
 
         # Resilience events (WAKE / NET_CHANGE / STALL) drive the same watchdog
         # state machine as the legacy aria2 loop.  Without this, RESILIENCE_RECYCLE
@@ -604,9 +598,11 @@ class RustEngine:
                 )
                 started.append((item, out_path, handle))
 
-            primary_total = int(
-                _snapshot_field(started[0][2].poll_snapshot(), "total", 0) or 0
-            ) if started else 0
+            primary_total = (
+                int(_snapshot_field(started[0][2].poll_snapshot(), "total", 0) or 0)
+                if started
+                else 0
+            )
             display = LiveTransferDisplay(
                 title=Path(_filename_for(items[0].url, items[0].filename)).name
                 if items
@@ -642,9 +638,7 @@ class RustEngine:
 
                     delta = max(now_mono - last_mono, 0.0)
                     if delta > 0:
-                        instant_speed = max(
-                            0.0, (aggregate_downloaded - last_downloaded) / delta
-                        )
+                        instant_speed = max(0.0, (aggregate_downloaded - last_downloaded) / delta)
                         if instant_speed > 0:
                             speed_samples.append(instant_speed)
                     else:
@@ -665,7 +659,12 @@ class RustEngine:
                         watchdog_state=watchdog.status_label(),
                     )
                     if on_progress is not None:
-                        on_progress(aggregate_downloaded, aggregate_total or None, smooth_speed, aggregate_connections)
+                        on_progress(
+                            aggregate_downloaded,
+                            aggregate_total or None,
+                            smooth_speed,
+                            aggregate_connections,
+                        )
 
                     decision = watchdog.step(
                         elapsed_sec=now_mono - mono_start,
@@ -697,10 +696,7 @@ class RustEngine:
 
                     if all_terminal:
                         break
-                    if (
-                        max_duration_sec is not None
-                        and (now_mono - mono_start) >= max_duration_sec
-                    ):
+                    if max_duration_sec is not None and (now_mono - mono_start) >= max_duration_sec:
                         for _item, _out_path, handle in started:
                             handle.cancel()
                         break

@@ -135,9 +135,7 @@ class TargetInspector:
         from rich import box
         from rich.table import Table
 
-        table = Table(
-            title=f"Target Inspector: {target}", box=box.HORIZONTALS, pad_edge=False
-        )
+        table = Table(title=f"Target Inspector: {target}", box=box.HORIZONTALS, pad_edge=False)
         table.add_column("Property", style="bold cyan")
         table.add_column("Value", style="white")
         for k, v in props.items():

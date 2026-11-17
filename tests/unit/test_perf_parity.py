@@ -55,7 +55,7 @@ def test_sanitize_filename_matches_reference_on_tricky_corpus():
         "  spaced  name.zip  ",
         "../etc/passwd",
         "..\\windows\\system32",
-        "a/b:c*d?e\"f<g>h|i\0j",
+        'a/b:c*d?e"f<g>h|i\0j',
         "...",
         " . ",
         "",

@@ -1195,8 +1195,7 @@ class PDLApp:
                 detail = res.get("error")
                 reason = f" — {detail}" if detail else ""
                 con.print(
-                    f"  [bold red]✗ Download failed:[/bold red] "
-                    f"[dim]{res['target']}{reason}[/dim]"
+                    f"  [bold red]✗ Download failed:[/bold red] [dim]{res['target']}{reason}[/dim]"
                 )
             con.print()
             return

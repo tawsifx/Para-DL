@@ -97,9 +97,7 @@ def _disk_progress(items: Any, completed_paths: dict[int, Path]) -> int:
     return written
 
 
-def _restore_uris_after_recycle(
-    daemon: Any, gid_to_idx: dict[str, int], items: list[Any]
-) -> None:
+def _restore_uris_after_recycle(daemon: Any, gid_to_idx: dict[str, int], items: list[Any]) -> None:
     """Restore each GID's URI pool after a pause/unpause recycle.
 
     aria2 consumes the effective URI of a redirected transfer when a download is
@@ -689,8 +687,7 @@ def _is_concurrency_refusal(err_code: str, err_msg: str) -> bool:
     if str(err_code) in ("22", "29"):
         return True
     return any(
-        tok in msg
-        for tok in ("429", "503", "too many", "connection refused", "connection reset")
+        tok in msg for tok in ("429", "503", "too many", "connection refused", "connection reset")
     )
 
 
@@ -1040,9 +1037,7 @@ class Aria2Engine:
         # Host learning state is constant for the lifetime of one transfer.
         # Resolve it once here instead of reopening the history SQLite database
         # on every outer poll iteration.
-        host_strategy = (
-            HistoryManager.get_host_strategy(parsed_host) if parsed_host else None
-        )
+        host_strategy = HistoryManager.get_host_strategy(parsed_host) if parsed_host else None
         avg_rtt_ms = host_strategy.avg_rtt_ms if host_strategy else 0.0
         pkt_loss_pct = host_strategy.packet_loss_pct if host_strategy else 0.0
         learned_cap = (
@@ -1087,9 +1082,7 @@ class Aria2Engine:
                 effective_cap = cap_override
                 if learned_cap is not None:
                     effective_cap = (
-                        learned_cap
-                        if effective_cap is None
-                        else min(effective_cap, learned_cap)
+                        learned_cap if effective_cap is None else min(effective_cap, learned_cap)
                     )
                 if supports_range and effective_cap is not None and effective_cap < budget:
                     budget = max(1, effective_cap)

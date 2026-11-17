@@ -339,7 +339,9 @@ def terminal_success(result: Any, snapshot: Any = None) -> bool:
     return False
 
 
-def call_flexible(fn: Callable[..., Any], positional: tuple[Any, ...], candidates: dict[str, Any]) -> Any:
+def call_flexible(
+    fn: Callable[..., Any], positional: tuple[Any, ...], candidates: dict[str, Any]
+) -> Any:
     """Call ``fn`` passing only the kwargs its signature accepts.
 
     The native API is still being finalised by other subagents; this keeps the
@@ -349,14 +351,14 @@ def call_flexible(fn: Callable[..., Any], positional: tuple[Any, ...], candidate
     try:
         params = inspect.signature(fn).parameters
     except (TypeError, ValueError):
-        return fn(*positional, **{k: v for k, v in candidates.items() if k not in ("url", "out_path")})
+        return fn(
+            *positional, **{k: v for k, v in candidates.items() if k not in ("url", "out_path")}
+        )
     # PyO3 builtins expose **_kwargs, so a naive VAR_KEYWORD pass forwards the
     # same `url`/`out_path` that are already positional. Drop every candidate
     # whose name matches a positionally supplied parameter.
     positional_names = [
-        name
-        for name, p in params.items()
-        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+        name for name, p in params.items() if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
     ]
     supplied = set(positional_names[: len(positional)])
     candidates = {k: v for k, v in candidates.items() if k not in supplied}
@@ -527,8 +529,7 @@ def test_cookie_does_not_leak_to_cross_host_redirect(
 ) -> None:
     cookie_file = tmp_path / "cookies.txt"
     cookie_file.write_text(
-        "# Netscape HTTP Cookie File\n"
-        "127.0.0.1\tFALSE\t/\tFALSE\t2000000000\tsession\tsecret123\n"
+        "# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t2000000000\tsession\tsecret123\n"
     )
     info = target_info(
         server.url("/redirect"),
@@ -631,9 +632,7 @@ def test_checksum_mismatch_yields_verification_failed(
     assert result.checksum_verified is False
 
 
-def test_generic_failure_yields_exit_code_one(
-    server: ThrottlingServer, tmp_path: Path
-) -> None:
+def test_generic_failure_yields_exit_code_one(server: ThrottlingServer, tmp_path: Path) -> None:
     info = target_info(server.url("/fail500"))
     out = tmp_path / "failure"
     out.mkdir()

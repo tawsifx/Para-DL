@@ -30,6 +30,7 @@ class _EngineAction(argparse.Action):
         set_active_engine(name)
         setattr(namespace, self.dest, name)
 
+
 SUBCOMMANDS = {
     "auth",
     "doctor",

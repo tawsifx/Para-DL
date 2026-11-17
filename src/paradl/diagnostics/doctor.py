@@ -138,7 +138,9 @@ def run_doctor() -> int:
     # aria2c (legacy opt-in fallback; no longer a hard requirement)
     if TOOLCHAIN.aria2c:
         core_items.append(
-            ToolCheck("aria2c (legacy JSON-RPC fallback)", "ready", TOOLCHAIN.aria2c, required=False)
+            ToolCheck(
+                "aria2c (legacy JSON-RPC fallback)", "ready", TOOLCHAIN.aria2c, required=False
+            )
         )
     else:
         fix = (

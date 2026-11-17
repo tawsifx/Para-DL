@@ -55,9 +55,7 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
     UI.non_interactive = bool(args.non_interactive)
     from paradl.cli.parser import configure_logging
 
-    configure_logging(
-        verbose=bool(args.verbose), debug=bool(args.debug), json_mode=bool(args.json)
-    )
+    configure_logging(verbose=bool(args.verbose), debug=bool(args.debug), json_mode=bool(args.json))
 
     # Disambiguate positional subcommands while preserving free-text targets
     pos: list[str] = list(args.targets or [])

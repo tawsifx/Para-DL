@@ -216,13 +216,9 @@ class WatchdogController:
                 LearnedProfile(
                     host=self.host,
                     hour_bucket=int(
-                        self.hour_bucket
-                        if self.hour_bucket is not None
-                        else compute_hour_bucket()
+                        self.hour_bucket if self.hour_bucket is not None else compute_hour_bucket()
                     ),
-                    network_id=str(
-                        self.network_id or platform.get_network_id() or "default"
-                    ),
+                    network_id=str(self.network_id or platform.get_network_id() or "default"),
                     connections=self.connections,
                     ip_family=self.ip_family,
                     recovery_action=WatchdogActionType.PAUSE_UNPAUSE.value,
@@ -494,9 +490,7 @@ class WatchdogController:
                 if best_conn >= 64 * 1024 and slowest_conn * self.straggler_ratio < best_conn:
                     self.straggler_consecutive += 1
                     straggler_limit = (
-                        self.sustained_throttle_threshold
-                        if self.sustained_throttle_detected
-                        else 2
+                        self.sustained_throttle_threshold if self.sustained_throttle_detected else 2
                     )
                     if self.straggler_consecutive >= straggler_limit:
                         return self._trigger_pause_unpause(

@@ -18,12 +18,16 @@ class _Daemon:
 
 def test_recycle_restores_redirected_uri() -> None:
     daemon = _Daemon()
-    item = SimpleNamespace(url="https://github.com/x/archive/main.zip",
-                           mirrors=["https://mirror.example/x.zip"])
+    item = SimpleNamespace(
+        url="https://github.com/x/archive/main.zip", mirrors=["https://mirror.example/x.zip"]
+    )
     _restore_uris_after_recycle(daemon, {"gid1": 0}, [item])
     assert daemon.calls == [
-        ("change_uri", "gid1", ["https://github.com/x/archive/main.zip",
-                                "https://mirror.example/x.zip"])
+        (
+            "change_uri",
+            "gid1",
+            ["https://github.com/x/archive/main.zip", "https://mirror.example/x.zip"],
+        )
     ]
 
 

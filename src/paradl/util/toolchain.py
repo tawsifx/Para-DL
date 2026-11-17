@@ -99,10 +99,10 @@ class Toolchain:
                 from paradl import _rust_engine
 
                 getter = getattr(_rust_engine, "version", None)
-                version_value = getter() if callable(getter) else getattr(_rust_engine, "__version__", None)
-                self._cache["rust_engine_version"] = (
-                    str(version_value) if version_value else None
+                version_value = (
+                    getter() if callable(getter) else getattr(_rust_engine, "__version__", None)
                 )
+                self._cache["rust_engine_version"] = str(version_value) if version_value else None
             except Exception as exc:  # pragma: no cover - defensive import
                 logger.debug("Native Rust engine version lookup failed: %s", exc)
                 self._cache["rust_engine_version"] = None

@@ -219,9 +219,7 @@ def test_gen_extractor_classes_cached_across_claims_url_calls(monkeypatch):
         cached.cache_clear()
     try:
         for i in range(10):
-            assert client_mod.ytdlp_extractor_claims_url(
-                f"https://example.org/watch?v={i}"
-            )
+            assert client_mod.ytdlp_extractor_claims_url(f"https://example.org/watch?v={i}")
         assert len(calls) == 1, f"gen_extractor_classes called {len(calls)} times"
     finally:
         if cached is not None:

@@ -21,9 +21,7 @@ def _install_signal_handlers() -> None:
 
         cleanup_children_and_temps(remove_partial_raw=False)
         if UI.json_mode:
-            UI.emit_event(
-                "interrupted", signal=signum, exit_code=int(ExitCode.INTERRUPTED)
-            )
+            UI.emit_event("interrupted", signal=signum, exit_code=int(ExitCode.INTERRUPTED))
         else:
             print_plain(
                 "\n  [warning]⚠ Download interrupted. Partial state preserved for instant resume.[/warning]",

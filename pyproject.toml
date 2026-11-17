@@ -111,7 +111,7 @@ lint.ignore = [
 ]
 format.quote-style = "double"
 format.docstring-code-format = true
-isort.known-first-party = ["paradl"]
+lint.isort.known-first-party = ["paradl"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

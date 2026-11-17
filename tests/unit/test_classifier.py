@@ -94,9 +94,7 @@ def test_next_best_hours_matches_coverage_matrix_edge_cases() -> None:
 
 def test_classify_dataset_next_best_hours_parity() -> None:
     samples = [_sample(h, is_weekend=h % 2 == 0, source="active") for h in (21, 22, 9, 15)]
-    dataset = MeasurementDataset(
-        m8_time_volume_upload=TimeVolumeUploadResult(samples=samples)
-    )
+    dataset = MeasurementDataset(m8_time_volume_upload=TimeVolumeUploadResult(samples=samples))
     expected = ThrottleStore.build_coverage_matrix(samples)[1]
     assert classify_dataset(dataset).next_best_hours == expected
 
@@ -119,9 +117,7 @@ def test_resolve_and_validate_candidate_mirror_dedup_order() -> None:
     ok_probe = HttpProbeResult(ok=True, final_url="", status_code=200, accept_ranges=True)
 
     with (
-        patch.object(
-            MirrorManager, "match_configured_mirrors", return_value=[m4, m1]
-        ),
+        patch.object(MirrorManager, "match_configured_mirrors", return_value=[m4, m1]),
         patch("paradl.storage.mirrors.find_or_fetch_metalink", return_value=metalink),
         patch.object(
             MirrorManager,

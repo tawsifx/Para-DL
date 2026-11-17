@@ -1035,9 +1035,7 @@ class HistoryManager:
     # Per-host concurrency refusal cap learning (10-min decay)
     # ------------------------------------------------------------------
     @classmethod
-    def get_host_connection_cap(
-        cls, host: str, *, now_epoch: float | None = None
-    ) -> int | None:
+    def get_host_connection_cap(cls, host: str, *, now_epoch: float | None = None) -> int | None:
         """Return learned per-host max connection cap if active, else None."""
         norm = (host or "").strip().lower()
         if not norm:

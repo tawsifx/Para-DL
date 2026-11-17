@@ -80,8 +80,7 @@ def _table_names(db_file: Path) -> set[str]:
     conn = sqlite3.connect(str(db_file))
     try:
         return {
-            row[0]
-            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
     finally:
         conn.close()
@@ -93,17 +92,13 @@ def _dump_profile_rows(db_file: Path) -> tuple[list[tuple], list[tuple]]:
         learned = conn.execute(
             "SELECT * FROM learned_profiles ORDER BY host, hour_bucket, network_id"
         ).fetchall()
-        strategies = conn.execute(
-            "SELECT * FROM host_strategies ORDER BY host"
-        ).fetchall()
+        strategies = conn.execute("SELECT * FROM host_strategies ORDER BY host").fetchall()
         return [tuple(row) for row in learned], [tuple(row) for row in strategies]
     finally:
         conn.close()
 
 
-def _fixture_inputs() -> tuple[
-    RecommendedProfile, list[ValidatedTarget], MeasurementDataset
-]:
+def _fixture_inputs() -> tuple[RecommendedProfile, list[ValidatedTarget], MeasurementDataset]:
     profile = RecommendedProfile(
         domestic_connections=12,
         international_connections=6,
@@ -165,11 +160,7 @@ def _expected_profiles(
     """Reproduce the exact LearnedProfile objects persist_recommended_profile builds."""
     dt = datetime.fromtimestamp(FIXED_NOW, tz=UTC).astimezone()
     hb = dt.hour // 4
-    net_id = (
-        dataset.m0_sanity.ssid
-        or dataset.m0_sanity.active_interface
-        or "default"
-    )
+    net_id = dataset.m0_sanity.ssid or dataset.m0_sanity.active_interface or "default"
     intl_1 = dataset.m10_local_vs_intl.international_median_bps or 500_000.0
     intl_16 = dataset.m10_local_vs_intl.international_16_bps or max(intl_1, 2_000_000.0)
     dom_16 = dataset.m10_local_vs_intl.domestic_16_bps or max(intl_16, 5_000_000.0)
@@ -274,9 +265,7 @@ def test_ddl_executed_at_most_once_for_repeated_connections(monkeypatch: pytest.
                 pass
 
     create_statements = [
-        statement
-        for statement in statements
-        if statement.strip().upper().startswith("CREATE")
+        statement for statement in statements if statement.strip().upper().startswith("CREATE")
     ]
     # 7 history tables + 3 throttle tables, initialized exactly once per process/file.
     assert len(create_statements) <= 10, create_statements
@@ -299,11 +288,15 @@ def test_reopen_after_delete_recreates_schema():
     assert not db_file.exists()
 
     with contextlib.closing(HistoryManager._connect()) as conn:
-        names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        names = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
     assert names >= HISTORY_TABLES
 
     with ThrottleStore._conn() as conn:
-        names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        names = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
     assert names >= THROTTLE_TABLES
 
     assert _dump_schema(db_file) == before
@@ -320,22 +313,16 @@ def test_persist_recommended_profile_uses_single_connection(monkeypatch: pytest.
         return real_connect.__func__(cls)
 
     monkeypatch.setattr(HistoryManager, "_connect", counting_connect)
-    monkeypatch.setattr(
-        "paradl.throttle.store.get_clock", lambda: FakeClock(FIXED_NOW)
-    )
+    monkeypatch.setattr("paradl.throttle.store.get_clock", lambda: FakeClock(FIXED_NOW))
 
     profile, targets, dataset = _fixture_inputs()
     ThrottleStore.persist_recommended_profile(profile, targets, dataset)
     assert len(calls) == 1, calls
 
 
-def test_batched_persistence_matches_one_by_one(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-):
+def test_batched_persistence_matches_one_by_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Rows written by the batched path must be byte-for-byte identical to per-profile saves."""
-    monkeypatch.setattr(
-        "paradl.throttle.store.get_clock", lambda: FakeClock(FIXED_NOW)
-    )
+    monkeypatch.setattr("paradl.throttle.store.get_clock", lambda: FakeClock(FIXED_NOW))
     profile, targets, dataset = _fixture_inputs()
     expected = _expected_profiles(profile, targets, dataset)
 

@@ -170,8 +170,7 @@ class TestHfConcurrentParity:
 
         files = ["model-a.gguf", "model-b.gguf", "model-c.gguf", "model-d.gguf"]
         infos = [
-            {"rfilename": name, "lfs": {"oid": f"{i + 1:064x}"}}
-            for i, name in enumerate(files)
+            {"rfilename": name, "lfs": {"oid": f"{i + 1:064x}"}} for i, name in enumerate(files)
         ]
         repo_info = {"siblings": infos}
 

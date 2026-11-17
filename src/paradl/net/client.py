@@ -864,9 +864,7 @@ def probe_targets_parallel(
     if len(targets) == 1:
         return [_pt(targets[0], allow_network_probe=allow_network_probe)]
     with ThreadPoolExecutor(max_workers=min(len(targets), 8)) as pool:
-        futures = [
-            pool.submit(_pt, t, allow_network_probe=allow_network_probe) for t in targets
-        ]
+        futures = [pool.submit(_pt, t, allow_network_probe=allow_network_probe) for t in targets]
         return [f.result() for f in futures]
 
 

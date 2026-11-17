@@ -102,7 +102,9 @@ def assert_clean_pipeline_result(
     return target
 
 
-def capture_jsonl(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> list[dict[str, Any]]:
+def capture_jsonl(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> list[dict[str, Any]]:
     """Enable UI JSON mode and drain emitted JSONL lines from stdout so far."""
     from paradl.ui import UI
 
@@ -167,9 +169,7 @@ def test_e2e_1_direct_range_capable_16_streams(
 ) -> None:
     events = capture_jsonl(monkeypatch, capsys)
     digest = "sha256:" + hashlib.sha256(payload).hexdigest()
-    info = target_info(
-        server.url("/file"), content_length=len(payload), expected_digest=digest
-    )
+    info = target_info(server.url("/file"), content_length=len(payload), expected_digest=digest)
     out = tmp_path / "direct"
     out.mkdir()
 
@@ -295,8 +295,7 @@ def test_e2e_4_cookie_scoped_across_cross_host_redirect(
     events = capture_jsonl(monkeypatch, capsys)
     cookie_file = tmp_path / "cookies.txt"
     cookie_file.write_text(
-        "# Netscape HTTP Cookie File\n"
-        "127.0.0.1\tFALSE\t/\tFALSE\t2000000000\tsession\tsecret123\n"
+        "# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t2000000000\tsession\tsecret123\n"
     )
     digest = "sha256:" + hashlib.sha256(payload).hexdigest()
     info = target_info(
@@ -366,9 +365,7 @@ def test_e2e_5_resume_after_interrupt_is_byte_identical(
     assert state_files, "no .pdl.json state persisted after interruption"
 
     # Adapter side: resuming detects the sidecars and completes the transfer.
-    info = target_info(
-        server.url("/file"), content_length=len(payload), expected_digest=digest
-    )
+    info = target_info(server.url("/file"), content_length=len(payload), expected_digest=digest)
     result = adapter_engine().execute(info, out, connections=8)
     events += all_jsonl(capsys)
 

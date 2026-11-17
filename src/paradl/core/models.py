@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-_UNSAFE_FILENAME_CHARS = "/\\:*?\"<>|\0"
+_UNSAFE_FILENAME_CHARS = '/\\:*?"<>|\0'
 _UNSAFE_FILENAME_TABLE = str.maketrans(dict.fromkeys(_UNSAFE_FILENAME_CHARS, "_"))
 _WINDOWS_RESERVED_NAMES = frozenset(
     {"CON", "PRN", "AUX", "NUL"}
