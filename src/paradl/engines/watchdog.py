@@ -67,6 +67,7 @@ class WatchdogController:
     host: str = ""
     supports_range: bool = True
     min_cooldown_sec: float = 2.0
+    recycle_interval_sec: float = 5.0
     max_recycles: int = 999999
     hour_bucket: int | None = None
     network_id: str | None = None
@@ -74,12 +75,15 @@ class WatchdogController:
     revalidation_ticks: int = 2
     now_epoch: float | None = None
     sustained_throttle_threshold: int = 10
+    straggler_ratio: float = 4.0
 
     # Runtime state
     initial_connections: int = 16
     cycle_count: int = 0
     warm_up_complete: bool = False
     low_speed_consecutive: int = 0
+    straggler_consecutive: int = 0
+    post_recycle_samples: list[float] = field(default_factory=list)
     sustained_low_speed_cycles: int = 0
     sustained_throttle_detected: bool = False
     speed_samples: list[float] = field(default_factory=list)
@@ -109,10 +113,11 @@ class WatchdogController:
 
         if not self.supports_range:
             # Single-stream fallback (200-only server): keep the watchdog
-            # active so it can still pause/unpause the sole connection to
-            # reset ISP per-flow throttling. Range support is not required
-            # for pause/resume-based anti-throttle on a single stream.
-            pass
+            # active for telemetry, p90 tracking, and sustained-throttle
+            # detection, locked to 1 stream. Socket cycling (pause/unpause)
+            # is avoided because non-Range servers cannot resume mid-stream.
+            self.initial_connections = 1
+            self.connections = 1
 
         if self.mode == WatchdogMode.OFF or self.user_floor_bps <= 0:
             self.disabled_reason = "off"
@@ -127,7 +132,7 @@ class WatchdogController:
             )
             if saved is not None:
                 self.applied_profile = saved
-                if saved.connections and 1 <= saved.connections <= 16:
+                if self.supports_range and saved.connections and 1 <= saved.connections <= 16:
                     self.connections = max(self.initial_connections, int(saved.connections))
                 if saved.ip_family in ("ipv4", "ipv6", "auto"):
                     self.ip_family = saved.ip_family
@@ -149,10 +154,64 @@ class WatchdogController:
     def reset_speed_baseline(self) -> None:
         """Reset rolling speed samples, hysteresis counters, and tracking."""
         self.speed_samples.clear()
+        self.post_recycle_samples.clear()
         self.low_speed_consecutive = 0
+        self.straggler_consecutive = 0
         self.sustained_low_speed_cycles = 0
         self.sustained_throttle_detected = False
         self.warm_up_complete = False
+
+    def _trigger_pause_unpause(
+        self,
+        *,
+        elapsed_sec: float,
+        speed_bps: float,
+        threshold: float,
+        p90: float,
+        reason: str,
+    ) -> WatchdogDecision:
+        """Record a socket-cycling recycle and persist the host profile."""
+        self.low_speed_consecutive = 0
+        self.straggler_consecutive = 0
+        self.cycle_count += 1
+        # Throughput actually observed since the previous recycle. On the first
+        # cycle there are no post-action samples, so fall back to current speed.
+        post_peak = max(self.post_recycle_samples) if self.post_recycle_samples else speed_bps
+        self.post_recycle_samples.clear()
+        self.last_recycle_elapsed = elapsed_sec
+        self.last_action_taken = WatchdogActionType.PAUSE_UNPAUSE.value
+
+        if self.host:
+            now_ts = get_clock().now() if self.now_epoch is None else float(self.now_epoch)
+            HistoryManager.save_learned_profile(
+                LearnedProfile(
+                    host=self.host,
+                    hour_bucket=int(
+                        self.hour_bucket
+                        if self.hour_bucket is not None
+                        else compute_hour_bucket()
+                    ),
+                    network_id=str(
+                        self.network_id or platform.get_network_id() or "default"
+                    ),
+                    connections=self.connections,
+                    ip_family=self.ip_family,
+                    recovery_action=WatchdogActionType.PAUSE_UNPAUSE.value,
+                    speed_before=speed_bps,
+                    speed_after=post_peak,
+                    supports_range=self.supports_range,
+                    updated_epoch=now_ts,
+                )
+            )
+
+        return WatchdogDecision(
+            action=WatchdogActionType.PAUSE_UNPAUSE,
+            reason=reason,
+            threshold_bps=threshold,
+            rolling_p90_bps=p90,
+            cycle=self.cycle_count,
+            new_connections=self.connections,
+        )
 
     def handle_resilience_event(
         self,
@@ -163,9 +222,24 @@ class WatchdogController:
         """Handle a WAKE, NET_CHANGE, or STALL event from ResilienceEventSource.
 
         Every event triggers the same action: recycle all connections, re-resolve DNS,
-        reset the speed baseline, and log the reason.
+        reset the speed baseline, and log the reason (unless Range is unsupported,
+        since forcePause/unpause on a 200-only server fails with CANNOT_RESUME).
         """
         self.reset_speed_baseline()
+        if not self.supports_range:
+            logger.info(
+                "Watchdog resilience event [%s] on non-Range single stream (skipping socket recycle): %s",
+                event.event_type.value,
+                event.reason,
+            )
+            return WatchdogDecision(
+                action=WatchdogActionType.NONE,
+                threshold_bps=self.current_threshold_bps(),
+                rolling_p90_bps=0.0,
+                cycle=self.cycle_count,
+                event_type=event.event_type.value,
+            )
+
         self.cycle_count += 1
         self.last_recycle_elapsed = elapsed_sec
         self.last_action_taken = WatchdogActionType.RESILIENCE_RECYCLE.value
@@ -214,6 +288,8 @@ class WatchdogController:
 
         if speed_bps > 0:
             self.speed_samples.append(speed_bps)
+            if self.last_recycle_elapsed >= 0 and elapsed_sec > self.last_recycle_elapsed:
+                self.post_recycle_samples.append(speed_bps)
 
         if not self.is_active:
             return WatchdogDecision(action=WatchdogActionType.NONE)
@@ -258,6 +334,13 @@ class WatchdogController:
                     self.ip_family = "auto"
                     self.last_action_taken = WatchdogActionType.PAUSE_UNPAUSE.value
                     self.reset_speed_baseline()
+                    if not self.supports_range:
+                        return WatchdogDecision(
+                            action=WatchdogActionType.NONE,
+                            threshold_bps=threshold,
+                            rolling_p90_bps=p90,
+                            cycle=self.cycle_count,
+                        )
                     self.cycle_count += 1
                     self.last_recycle_elapsed = elapsed_sec
                     return WatchdogDecision(
@@ -281,6 +364,7 @@ class WatchdogController:
         # Post-recycle warm-up cooldown: grant grace for sockets to establish TCP handshake
         if (elapsed_sec - self.last_recycle_elapsed) < self.min_cooldown_sec:
             self.low_speed_consecutive = 0
+            self.straggler_consecutive = 0
             return WatchdogDecision(
                 action=WatchdogActionType.NONE,
                 threshold_bps=threshold,
@@ -297,63 +381,62 @@ class WatchdogController:
                 cycle=self.cycle_count,
             )
 
+        # Periodic socket cycling on 206 Partial Content (supports_range=True)
+        # to continuously harvest ISP burst windows regardless of speed floor.
+        if self.supports_range and self.recycle_interval_sec > 0:
+            since_last = (
+                elapsed_sec - self.last_recycle_elapsed
+                if self.last_recycle_elapsed >= 0
+                else elapsed_sec
+            )
+            if since_last >= self.recycle_interval_sec:
+                return self._trigger_pause_unpause(
+                    elapsed_sec=elapsed_sec,
+                    speed_bps=speed_bps,
+                    threshold=threshold,
+                    p90=p90,
+                    reason=(
+                        f"Periodic {self.recycle_interval_sec:g}s cycle "
+                        f"(speed {format_speed(speed_bps)}); "
+                        f"cycling {self.connections} RPC sockets"
+                    ),
+                )
+
         # ------------------------------------------------------------------
         # Enhanced Watchdog: Strict 16-Channel Lock + Fast RPC Reset
         # ------------------------------------------------------------------
         if speed_bps < threshold:
             self.low_speed_consecutive += 1
+            self.straggler_consecutive = 0
             self.sustained_low_speed_cycles += 1
             if self.sustained_low_speed_cycles >= self.sustained_throttle_threshold:
                 self.sustained_throttle_detected = True
-            # Under sustained ISP throttling, reduce recycle frequency to avoid
-            # tearing down working connections when the bandwidth cap is the
-            # limiting factor, not a per-flow issue.
-            recycle_interval = (
-                self.sustained_throttle_threshold if self.sustained_throttle_detected else 2
-            )
+            # Cycle every 5 seconds to keep harvesting the ISP burst window.
+            # (Sustained-throttle back-off disabled: it previously stretched
+            # the interval to 10 ticks and stalled the cycle for 206 Partial
+            # Content responses.)
+            recycle_interval = 5
             if self.low_speed_consecutive >= recycle_interval:
-                self.low_speed_consecutive = 0
-                self.cycle_count += 1
-                self.last_recycle_elapsed = elapsed_sec
-                self.last_action_taken = WatchdogActionType.PAUSE_UNPAUSE.value
-
-                # Save best performance profile in history
-                if self.host:
-                    now_ts = get_clock().now() if self.now_epoch is None else float(self.now_epoch)
-                    HistoryManager.save_learned_profile(
-                        LearnedProfile(
-                            host=self.host,
-                            hour_bucket=int(
-                                self.hour_bucket
-                                if self.hour_bucket is not None
-                                else compute_hour_bucket()
-                            ),
-                            network_id=str(
-                                self.network_id or platform.get_network_id() or "default"
-                            ),
-                            connections=self.connections,
-                            ip_family=self.ip_family,
-                            recovery_action=WatchdogActionType.PAUSE_UNPAUSE.value,
-                            speed_before=speed_bps,
-                            speed_after=max(self.speed_samples)
-                            if self.speed_samples
-                            else speed_bps,
-                            supports_range=self.supports_range,
-                            updated_epoch=now_ts,
-                        )
+                if not self.supports_range:
+                    # 200-only endpoints reject Range resume (aria2 CANNOT_RESUME),
+                    # so keep monitoring without cycling the sole socket.
+                    self.low_speed_consecutive = 0
+                    return WatchdogDecision(
+                        action=WatchdogActionType.NONE,
+                        threshold_bps=threshold,
+                        rolling_p90_bps=p90,
+                        cycle=self.cycle_count,
                     )
-
-                return WatchdogDecision(
-                    action=WatchdogActionType.PAUSE_UNPAUSE,
+                return self._trigger_pause_unpause(
+                    elapsed_sec=elapsed_sec,
+                    speed_bps=speed_bps,
+                    threshold=threshold,
+                    p90=p90,
                     reason=(
                         f"Speed {format_speed(speed_bps)} < {format_speed(threshold)} floor; "
                         f"cycling {self.connections} RPC sockets"
                         + (" (sustained throttle)" if self.sustained_throttle_detected else "")
                     ),
-                    threshold_bps=threshold,
-                    rolling_p90_bps=p90,
-                    cycle=self.cycle_count,
-                    new_connections=self.connections,
                 )
         else:
             self.low_speed_consecutive = 0
@@ -361,6 +444,36 @@ class WatchdogController:
             if self.sustained_throttle_detected:
                 self.sustained_low_speed_cycles = 0
                 self.sustained_throttle_detected = False
+
+            # Relative per-connection straggler check (MDM shed_slow pattern):
+            # catch a single throttled/congested TCP flow (< best / straggler_ratio)
+            # even when aggregate speed meets the floor.
+            if self.supports_range and per_conn_speeds and len(per_conn_speeds) >= 2:
+                best_conn = max(per_conn_speeds)
+                slowest_conn = min(per_conn_speeds)
+                if best_conn >= 64 * 1024 and slowest_conn * self.straggler_ratio < best_conn:
+                    self.straggler_consecutive += 1
+                    straggler_limit = (
+                        self.sustained_throttle_threshold
+                        if self.sustained_throttle_detected
+                        else 2
+                    )
+                    if self.straggler_consecutive >= straggler_limit:
+                        return self._trigger_pause_unpause(
+                            elapsed_sec=elapsed_sec,
+                            speed_bps=speed_bps,
+                            threshold=threshold,
+                            p90=p90,
+                            reason=(
+                                f"Straggler connection {format_speed(slowest_conn)} "
+                                f"< {format_speed(best_conn)}/{int(self.straggler_ratio)}; "
+                                f"cycling {self.connections} RPC sockets"
+                            ),
+                        )
+                else:
+                    self.straggler_consecutive = 0
+            else:
+                self.straggler_consecutive = 0
 
         return WatchdogDecision(
             action=WatchdogActionType.NONE,

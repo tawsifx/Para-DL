@@ -60,7 +60,6 @@ Issues = "https://github.com/tawsifx/Para-DL/issues"
 [project.scripts]
 paradl = "paradl.cli:main"
 parallel-dl = "paradl.cli:main"
-pdl = "paradl.cli:main"
 
 [dependency-groups]
 dev = [

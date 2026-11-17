@@ -466,3 +466,21 @@ def test_progress_bar_display(capsys):
     assert "download.bin" in out
     assert "█" in out or "░" in out
     assert "%" in out
+
+
+def test_simple_progress_display(capsys):
+    from paradl.ui import UI, LiveTransferDisplay
+
+    UI.quiet = False
+    UI.json_mode = False
+
+    with LiveTransferDisplay(title="partial206.bin", total_bytes=1000, simple=True) as live:
+        live.update(downloaded_bytes=250, speed_bps=1000.0, connections=16)
+        live.update(downloaded_bytes=500, speed_bps=1000.0, connections=16, force_event=True)
+
+    out = capsys.readouterr().out
+    lines = [line for line in out.strip().splitlines() if line.strip()]
+    assert any("partial206.bin" in line and "25.0%" in line for line in lines)
+    assert any("50.0%" in line for line in lines)
+    assert any("100.0%" in line for line in lines)
+    assert all("█" not in line and "░" not in line for line in lines)

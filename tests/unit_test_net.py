@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from paradl.net import (
     HttpProbeResult,
     extract_etag_sha256,
+    extract_verified_sha256,
     parse_content_disposition_filename,
     probe_http_url,
     probe_range_support,
@@ -67,6 +68,54 @@ class TestExtractETagSHA256(unittest.TestCase):
     def test_no_etag(self) -> None:
         self.assertIsNone(extract_etag_sha256({}))
         self.assertIsNone(extract_etag_sha256({"etag": '"not-a-sha256"'}))
+
+    def test_verified_sha256_ignores_generic_and_weak_etags(self) -> None:
+        digest = "e227608b139118d71b3cc33ac50e511c2910f4c80b944e5205c0dfc7a0c410d4"
+        # GitHub codeload archive 64-hex ETag is NOT a body SHA-256
+        self.assertIsNone(
+            extract_verified_sha256(
+                {"etag": f'"{digest}"'},
+                url="https://codeload.github.com/goshitsarch-eng/gosh-dl/zip/refs/heads/main",
+            )
+        )
+        # Weak ETags are never trusted even on HF hosts
+        self.assertIsNone(
+            extract_verified_sha256(
+                {"etag": f'W/"{digest}"'},
+                url="https://huggingface.co/org/repo/resolve/main/model.bin",
+            )
+        )
+
+    def test_verified_sha256_accepts_explicit_and_hf_headers(self) -> None:
+        digest = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        self.assertEqual(
+            extract_verified_sha256(
+                {"x-linked-etag": f'"{digest}"'},
+                url="https://example.com/file.bin",
+            ),
+            digest,
+        )
+        self.assertEqual(
+            extract_verified_sha256(
+                {"x-checksum-sha256": digest},
+                url="https://example.com/file.bin",
+            ),
+            digest,
+        )
+        self.assertEqual(
+            extract_verified_sha256(
+                {"etag": f'"sha256:{digest}"'},
+                url="https://example.com/file.bin",
+            ),
+            digest,
+        )
+        self.assertEqual(
+            extract_verified_sha256(
+                {"etag": f'"{digest}"'},
+                url="https://huggingface.co/org/repo/resolve/main/model.bin",
+            ),
+            digest,
+        )
 
 
 class TestProbeRangeSupport(unittest.TestCase):

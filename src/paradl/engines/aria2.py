@@ -262,8 +262,8 @@ class Aria2RpcDaemon:
         self.ip_family = ip_family
         self.limit_rate = format_rate_for_aria2(limit_rate)
         self.check_integrity = check_integrity
-        # http3=None means auto-detect based on aria2c version (>= 1.36.0 supports QUIC).
-        self.http3 = self._aria2c_supports_http3() if http3 is None else http3
+        # http3=None means auto-detect based on the configured aria2c binary (>= 1.36.0 supports QUIC).
+        self.http3 = self._aria2c_supports_http3(self.aria2c_bin) if http3 is None else http3
         self.proxy = proxy
         self._proc: subprocess.Popen[Any] | None = None
         self._conf_path: Path | None = None
@@ -495,6 +495,32 @@ def _count_active_connections(servers_info: list[dict[str, Any]]) -> tuple[int, 
     return count, speeds
 
 
+def _scale_item_connections(
+    per_file_conn: int,
+    expected_length: int | None,
+    *,
+    supports_range: bool,
+) -> int:
+    """Scale connection count down for small files (64 KiB per connection)."""
+    if not supports_range:
+        return 1
+    if expected_length is not None and expected_length > 0:
+        by_size = max(1, (int(expected_length) + 65535) // 65536)
+        return max(1, min(per_file_conn, by_size))
+    return max(1, per_file_conn)
+
+
+def _is_concurrency_refusal(err_code: str, err_msg: str) -> bool:
+    """Return True when an aria2 error looks like a per-host connection/rate refusal."""
+    msg = (err_msg or "").lower()
+    if str(err_code) in ("22", "29"):
+        return True
+    return any(
+        tok in msg
+        for tok in ("429", "503", "too many", "connection refused", "connection reset")
+    )
+
+
 class Aria2Engine:
     """JSON-RPC Aria2 transport engine with Watchdog v1/v2 and Resilience Core support."""
 
@@ -699,8 +725,8 @@ class Aria2Engine:
                         items[0].filename = probe_res.filename
                     if not items[0].etag_sha256 and probe_res.etag_sha256:
                         items[0].etag_sha256 = probe_res.etag_sha256
-                        if not items[0].expected_digest:
-                            items[0].expected_digest = f"sha256:{probe_res.etag_sha256}"
+                    if not items[0].expected_digest and probe_res.verified_sha256:
+                        items[0].expected_digest = f"sha256:{probe_res.verified_sha256}"
 
         # B3: --when-fast pre-flight short speed test gate
         if when_fast_bps > 0 and first_url.startswith(("http://", "https://")):
@@ -796,16 +822,23 @@ class Aria2Engine:
             stall_timeout_sec=stall_timeout,
         )
 
+        cap_override: int | None = None
+        refusal_retries = 0
+
         with (
             platform.get_sleep_assertion(enabled=caffeinate),
             ev_src,
-            LiveTransferDisplay(title=title_label, total_bytes=total_expected) as live,
+            LiveTransferDisplay(
+                title=title_label,
+                total_bytes=total_expected,
+                simple=supports_range,
+            ) as live,
         ):
             while len(completed_items) < len(items):
                 remaining_indices = [i for i in range(len(items)) if i not in completed_items]
                 curr_conc = min(len(remaining_indices), max_conc)
 
-                # --- Adaptive concurrency based on per-host RTT/loss ---
+                # --- Adaptive concurrency based on per-host RTT/loss & refusal caps ---
                 # Read learned host strategy (RTT, loss) to tune connection count.
                 # High RTT or loss reduces concurrent flows to avoid head-of-line blocking
                 # and socket contention; clean paths can use the full budget.
@@ -815,12 +848,17 @@ class Aria2Engine:
                 )
                 avg_rtt_ms = host_strategy.avg_rtt_ms if host_strategy else 0.0
                 pkt_loss_pct = host_strategy.packet_loss_pct if host_strategy else 0.0
+                learned_cap = (
+                    HistoryManager.get_host_connection_cap(parsed_host)
+                    if (parsed_host and supports_range)
+                    else None
+                )
 
                 # Start from watchdog connection budget, then adapt:
                 #   RTT > 100ms  -> scale down toward 4 conns (high latency)
                 #   Loss > 5%    -> scale down toward 4 conns (unstable path)
                 #   RTT < 50ms & Loss < 1% -> keep full budget (clean path)
-                budget = watchdog.connections
+                budget = watchdog.connections if supports_range else 1
                 if supports_range and budget > 1:
                     rtt_factor = 1.0
                     if avg_rtt_ms > 100.0:
@@ -831,8 +869,18 @@ class Aria2Engine:
                     adaptive_factor = min(rtt_factor, loss_factor)
                     budget = max(4, int(budget * adaptive_factor))
 
+                effective_cap = cap_override
+                if learned_cap is not None:
+                    effective_cap = (
+                        learned_cap
+                        if effective_cap is None
+                        else min(effective_cap, learned_cap)
+                    )
+                if supports_range and effective_cap is not None and effective_cap < budget:
+                    budget = max(1, effective_cap)
+
                 # Global connection budget across concurrent files capped at safe_conn (<= 16)
-                per_file_conn = max(1, budget // max(curr_conc, 1))
+                per_file_conn = max(1, budget // max(curr_conc, 1)) if supports_range else 1
 
                 # Acquire a pooled daemon (reuses existing process instead of spawning a new one)
                 daemon = get_daemon_pool().acquire(
@@ -848,10 +896,15 @@ class Aria2Engine:
                     for idx in remaining_indices:
                         it = items[idx]
                         it.out_dir.mkdir(parents=True, exist_ok=True)
+                        item_conn = _scale_item_connections(
+                            per_file_conn,
+                            it.expected_length,
+                            supports_range=supports_range,
+                        )
                         opts: dict[str, Any] = {
                             "dir": str(it.out_dir),
-                            "split": str(per_file_conn),
-                            "max-connection-per-server": str(per_file_conn),
+                            "split": str(item_conn),
+                            "max-connection-per-server": str(item_conn),
                             "min-split-size": "1M",
                             "continue": "true" if supports_range else "false",
                             "allow-overwrite": "true",
@@ -871,14 +924,11 @@ class Aria2Engine:
                             opts["all-proxy"] = proxy
                         if len(it.mirrors) > 0:
                             opts["uri-selector"] = "adaptive"
-                        if (
-                            watchdog.mode == WatchdogMode.V2
-                            and watchdog.is_active
-                            and per_file_conn >= 1
-                        ):
-                            # Tier 1: native lowest-speed-limit for dead-slow individual flows
-                            lowest_lim = max(int(threshold_bps / (per_file_conn * 8)), 4096)
-                            opts["lowest-speed-limit"] = str(lowest_lim)
+                        # Do not set aria2's native `lowest-speed-limit`: under severe ISP
+                        # per-flow throttling (30-40 kbps / 4-5 KB/s or less), `lowest-speed-limit`
+                        # aborts live streams with TOO_SLOW_DOWNLOAD_SPEED (error 5) and burns
+                        # max-tries. Watchdog v2 (PAUSE_UNPAUSE / straggler detection) and
+                        # stall_timeout handle slow or stalled flows without aborting the transfer.
 
                         if idx in item_metalinks:
                             opts["check-integrity"] = "true"
@@ -898,6 +948,8 @@ class Aria2Engine:
                     restart_daemon_needed = False
                     last_watch_step_ts = 0.0
                     last_when_fast_check_ts = time.time()
+                    max_working_conns = 0
+                    last_raised_cap = learned_cap
 
                     while gid_to_idx and not restart_daemon_needed:
                         now = time.time()
@@ -941,6 +993,25 @@ class Aria2Engine:
                             elif status_str == "error":
                                 err_code = st.get("errorCode", "unknown")
                                 err_msg = st.get("errorMessage", "Transfer error")
+                                # Learn per-host concurrency cap on 429/503/refusal and step down
+                                if (
+                                    supports_range
+                                    and per_file_conn > 1
+                                    and parsed_host
+                                    and _is_concurrency_refusal(str(err_code), str(err_msg))
+                                    and refusal_retries < 2
+                                ):
+                                    safe_est = (
+                                        max(1, min(max_working_conns, per_file_conn - 1))
+                                        if max_working_conns > 0
+                                        else max(1, per_file_conn // 2)
+                                    )
+                                    HistoryManager.record_host_refusal(parsed_host, safe_est)
+                                    cap_override = min(cap_override or per_file_conn, safe_est)
+                                    refusal_retries += 1
+                                    del gid_to_idx[gid]
+                                    restart_daemon_needed = True
+                                    break
                                 # B1: If mirrors are available, record failure on current URI and fail over
                                 if items[idx].mirrors:
                                     bad_uri = items[idx].url
@@ -953,6 +1024,17 @@ class Aria2Engine:
                                 failed_error = f"aria2 error ({err_code}): {err_msg}"
                                 del gid_to_idx[gid]
                                 break
+
+                        working_now = sum(1 for s in conn_speeds if s > 0)
+                        if working_now > max_working_conns:
+                            max_working_conns = working_now
+                        if (
+                            parsed_host
+                            and last_raised_cap is not None
+                            and working_now > last_raised_cap
+                        ):
+                            HistoryManager.record_host_working(parsed_host, working_now)
+                            last_raised_cap = working_now
 
                         if restart_daemon_needed:
                             break
@@ -996,13 +1078,15 @@ class Aria2Engine:
                             except Exception:
                                 pass
 
+                        # Only show per-file sub-bars for multi-file transfers
+                        show_file_rows = len(all_file_progress) > 1 or len(items) > 1
                         live.update(
                             downloaded_bytes=total_done,
                             total_bytes=total_len,
                             speed_bps=global_speed,
                             connections=total_conns or per_file_conn,
                             watchdog_state=watchdog.status_label(),
-                            file_progress=all_file_progress if all_file_progress else None,
+                            file_progress=all_file_progress if show_file_rows else None,
                             connection_speeds=all_conn_speeds if all_conn_speeds else None,
                         )
 
@@ -1161,7 +1245,13 @@ class Aria2Engine:
                                         parsed_host, decision.reason, enabled=notify
                                     )
 
-                                if decision.action == WatchdogActionType.RESILIENCE_RECYCLE:
+                                if not supports_range:
+                                    # Non-Range (200-only) streams cannot resume after force_pause/unpause.
+                                    logger.debug(
+                                        "Skipping socket recycle on non-Range single stream (%s)",
+                                        decision.action.value,
+                                    )
+                                elif decision.action == WatchdogActionType.RESILIENCE_RECYCLE:
                                     # Every resilience event (WAKE, NET_CHANGE, STALL) triggers the same action:
                                     # 1. Re-resolve DNS (via DoH if configured)
                                     resolve_dns(parsed_host, doh_endpoint=doh_endpoint)

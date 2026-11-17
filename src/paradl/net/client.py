@@ -293,6 +293,47 @@ def extract_etag_sha256(headers: Any) -> str | None:
     return None
 
 
+def _is_trusted_etag_sha256_url(url: str) -> bool:
+    """Return True for hosts whose bare strong ETag is guaranteed to be a file SHA-256."""
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    return (
+        host == "huggingface.co"
+        or host.endswith(".huggingface.co")
+        or host == "hf.co"
+        or host.endswith(".hf.co")
+    )
+
+
+def extract_verified_sha256(headers: Any, *, url: str = "") -> str | None:
+    """Extract a trustworthy SHA-256 digest suitable for automatic integrity verification.
+
+    Explicit checksum headers (`x-linked-etag`, `x-checksum-sha256`) are always trusted.
+    A generic `etag` header is only trusted if it is strong (not `W/...`) AND either
+    explicitly prefixed with `sha256:` or served by a host whose ETags are file SHA-256s
+    (such as Hugging Face). Generic 64-hex ETags (e.g. GitHub's `codeload.github.com`
+    dynamic archive cache keys) are ignored to avoid false checksum failures.
+    """
+    if not headers:
+        return None
+    for h_name in ("x-linked-etag", "x-checksum-sha256"):
+        val = headers.get(h_name)
+        if val:
+            m = _SHA256_HEX_RE.search(str(val))
+            if m:
+                return m.group(1).lower()
+
+    etag_val = headers.get("etag")
+    if etag_val:
+        raw = str(etag_val).strip()
+        if not raw.startswith("W/") and (
+            "sha256:" in raw.lower() or (url and _is_trusted_etag_sha256_url(url))
+        ):
+            m = _SHA256_HEX_RE.search(raw)
+            if m:
+                return m.group(1).lower()
+    return None
+
+
 @dataclass
 class HttpProbeResult:
     ok: bool = False
@@ -303,6 +344,7 @@ class HttpProbeResult:
     filename: str | None = None
     accept_ranges: bool = False
     etag_sha256: str | None = None
+    verified_sha256: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
 
 
@@ -344,17 +386,20 @@ def probe_range_support(
 
             supports_206 = status == 206
             fname = parse_content_disposition_filename(cdisp)
+            final_u = str(resp.url)
             etag_hash = extract_etag_sha256(resp.headers)
+            verified_hash = extract_verified_sha256(resp.headers, url=final_u)
 
             return HttpProbeResult(
                 ok=status in (200, 206),
-                final_url=str(resp.url),
+                final_url=final_u,
                 status_code=status,
                 content_type=ctype,
                 content_length=total_len,
                 filename=fname,
                 accept_ranges=supports_206,
                 etag_sha256=etag_hash,
+                verified_sha256=verified_hash,
                 headers={k.lower(): v for k, v in resp.headers.items()},
             )
     except Exception as exc:
@@ -387,16 +432,19 @@ def probe_http_url(
             c_len_val = int(clen) if (clen and clen.isdigit()) else None
             acc_ranges = resp.headers.get("accept-ranges", "").lower() == "bytes"
             fname = parse_content_disposition_filename(cdisp)
+            final_u = str(resp.url)
             etag_hash = extract_etag_sha256(resp.headers)
+            verified_hash = extract_verified_sha256(resp.headers, url=final_u)
             head_res = HttpProbeResult(
                 ok=200 <= resp.status_code < 400,
-                final_url=str(resp.url),
+                final_url=final_u,
                 status_code=resp.status_code,
                 content_type=ctype,
                 content_length=c_len_val,
                 filename=fname,
                 accept_ranges=acc_ranges,
                 etag_sha256=etag_hash,
+                verified_sha256=verified_hash,
                 headers={k.lower(): v for k, v in resp.headers.items()},
             )
     except Exception as exc:
@@ -415,6 +463,8 @@ def probe_http_url(
                     range_res.content_length = head_res.content_length
                 if not range_res.etag_sha256 and head_res.etag_sha256:
                     range_res.etag_sha256 = head_res.etag_sha256
+                if not range_res.verified_sha256 and head_res.verified_sha256:
+                    range_res.verified_sha256 = head_res.verified_sha256
             return range_res
 
     return head_res if head_res is not None else HttpProbeResult(ok=False, final_url=url)
@@ -604,7 +654,7 @@ def probe_target(
 
                 p_res = _phu(direct_url, headers=hf_headers)
                 if p_res.ok:
-                    etag_sha = p_res.etag_sha256
+                    etag_sha = p_res.verified_sha256 or p_res.etag_sha256
                     content_len = p_res.content_length
                     acc_ranges = p_res.accept_ranges
             return TargetInfo(
@@ -685,8 +735,8 @@ def probe_target(
                         mime_type=p_res.content_type or "image/jpeg",
                         accept_ranges=p_res.accept_ranges,
                         etag_sha256=p_res.etag_sha256,
-                        expected_digest=f"sha256:{p_res.etag_sha256}"
-                        if p_res.etag_sha256
+                        expected_digest=f"sha256:{p_res.verified_sha256}"
+                        if p_res.verified_sha256
                         else None,
                     )
                 if p_res.status_code >= 400:
@@ -755,8 +805,8 @@ def probe_target(
                         mime_type=content_type,
                         accept_ranges=p_res.accept_ranges,
                         etag_sha256=p_res.etag_sha256,
-                        expected_digest=f"sha256:{p_res.etag_sha256}"
-                        if p_res.etag_sha256
+                        expected_digest=f"sha256:{p_res.verified_sha256}"
+                        if p_res.verified_sha256
                         else None,
                     )
 

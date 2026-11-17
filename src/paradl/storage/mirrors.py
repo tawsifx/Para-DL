@@ -288,8 +288,8 @@ class MirrorManager:
                     auth_ranges = p_probe.accept_ranges
                 if not auth_filename and p_probe.filename:
                     auth_filename = p_probe.filename
-                if not auth_digest and p_probe.etag_sha256:
-                    auth_digest = f"sha256:{p_probe.etag_sha256}"
+                if not auth_digest and p_probe.verified_sha256:
+                    auth_digest = f"sha256:{p_probe.verified_sha256}"
             else:
                 if p_dropped:
                     dropped_failed_mirrors.append(primary_url)
@@ -340,8 +340,8 @@ class MirrorManager:
 
             if auth_length is None and m_len is not None:
                 auth_length = m_len
-            if not auth_digest and m_probe.etag_sha256:
-                auth_digest = f"sha256:{m_probe.etag_sha256}"
+            if not auth_digest and m_probe.verified_sha256:
+                auth_digest = f"sha256:{m_probe.verified_sha256}"
             if not auth_filename and m_probe.filename:
                 auth_filename = m_probe.filename
             if m_probe.accept_ranges:

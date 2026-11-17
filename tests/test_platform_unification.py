@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from paradl import auth, doctor, hooks, paths
+from paradl import auth, doctor, paths
 
 
 class TestPlatformUnification(unittest.TestCase):
@@ -19,15 +19,27 @@ class TestPlatformUnification(unittest.TestCase):
             with patch.dict(os.environ, {"LOCALAPPDATA": fake_local_appdata}, clear=False):
                 if "PARADL_HOME" in os.environ:
                     del os.environ["PARADL_HOME"]
-                with patch("paradl.paths.is_windows", return_value=True):
+                with patch("paradl.core.paths.is_windows", return_value=True):
                     home = paths.get_paradl_home()
                     self.assertEqual(home, Path(fake_local_appdata) / "paradl")
 
     def test_auth_status_windows_source_name(self) -> None:
         """Verify auth status reports 'credential_manager' on Windows when configured."""
         with (
-            patch("paradl.auth.is_windows", return_value=True),
-            patch("paradl.auth.has_keychain_token", side_effect=lambda srv: srv == "hf"),
+            patch.dict(
+                os.environ,
+                {
+                    "HF_TOKEN": "",
+                    "HUGGING_FACE_HUB_TOKEN": "",
+                    "GITHUB_TOKEN": "",
+                    "GH_TOKEN": "",
+                },
+            ),
+            patch("paradl.auth.manager.is_windows", return_value=True),
+            patch(
+                "paradl.auth.manager.has_keychain_token",
+                side_effect=lambda srv: srv == "hf",
+            ),
         ):
             status = auth.get_auth_status()
             self.assertTrue(status["hf"]["configured"])
@@ -35,8 +47,12 @@ class TestPlatformUnification(unittest.TestCase):
 
     def test_hooks_notify_calls_platform_notification(self) -> None:
         """Verify hooks dispatch to platform display_notification."""
-        with patch("paradl.hooks.display_notification", return_value=True) as mock_notify:
-            hooks.notify_download_complete(
+        from paradl.resilience import hooks as resilience_hooks
+
+        with patch(
+            "paradl.resilience.hooks.display_notification", return_value=True
+        ) as mock_notify:
+            resilience_hooks.notify_download_complete(
                 "https://example.com/file.zip", Path("/tmp/file.zip"), 1024
             )
             self.assertTrue(mock_notify.called)
@@ -71,8 +87,11 @@ class TestPlatformUnification(unittest.TestCase):
         }
 
         with (
-            patch("paradl.doctor.is_windows", return_value=True),
-            patch("paradl.doctor.check_platform_utilities", return_value=fake_win_utils),
+            patch("paradl.diagnostics.doctor.is_windows", return_value=True),
+            patch(
+                "paradl.diagnostics.doctor.check_platform_utilities",
+                return_value=fake_win_utils,
+            ),
         ):
             from paradl.ui import UI
 
