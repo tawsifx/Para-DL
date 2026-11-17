@@ -119,9 +119,13 @@ class TestPDLConfigValidation:
         cfg.validate()
         assert cfg.isp == "auto"
 
-    def test_legacy_duronto_migrated_to_auto(self) -> None:
-        cfg = PDLConfig(isp="Duronto Internet")
-        cfg.validate()
+    def test_legacy_duronto_migrated_to_auto(self, isolate_paradl_home) -> None:
+        # The legacy "Duronto Internet" default is migrated to dynamic auto-detection
+        # while loading a config file (PDLConfig.load), not by validate() itself.
+        cfg_file = isolate_paradl_home / "config.json"
+        cfg_file.write_text(json.dumps({"isp": "Duronto Internet"}), encoding="utf-8")
+        with patch("paradl.core.config.get_config_file", return_value=cfg_file):
+            cfg = PDLConfig.load()
         assert cfg.isp == "auto"
 
 

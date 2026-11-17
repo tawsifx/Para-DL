@@ -113,6 +113,12 @@ format.quote-style = "double"
 format.docstring-code-format = true
 isort.known-first-party = ["paradl"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+python_files = ["test_*.py"]
+markers = ["slow: end-to-end or multi-second transfer tests"]
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true

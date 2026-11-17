@@ -7,7 +7,7 @@
 
 > Fast, multi-channel download accelerator that bypasses ISP throttling with 16 parallel streams, adaptive watchdog recovery, and cryptographic verification — on Windows and macOS.
 
-`parallel-dl` (invokable as `paradl`, `pdl`, or `parallel-dl`) saturates your connection by splitting downloads across concurrent range channels, then automatically resets throttled flows with an adaptive p90 watchdog. Every file is verified with SHA-256 checksums before it lands on disk.
+`parallel-dl` (invokable as `paradl` or `parallel-dl`) saturates your connection by splitting downloads across concurrent range channels, then automatically resets throttled flows with an adaptive p90 watchdog. Every file is verified with SHA-256 checksums before it lands on disk.
 
 ---
 
@@ -24,8 +24,8 @@
 | **Media & Audio** | YouTube/yt-dlp downloads with ID3 tagging, cover art, and 256kbps AAC extraction. |
 | **Hugging Face Models** | `hf:` prefixed downloads for GGUF weights, safetensors, and AI models. |
 | **Apple IPSW Firmware** | `ipsw:` prefixed downloads with TSS signature verification. |
-| **REST API** | `pdl server` — FastAPI server with task CRUD (mirrors Gopeed's MCP set). |
-| **Terminal UI** | `pdl tui` — Textual-based download manager with progress bars and categories. |
+| **REST API** | `paradl server` — FastAPI server with task CRUD (mirrors Gopeed's MCP set). |
+| **Terminal UI** | `paradl tui` — Textual-based download manager with progress bars and categories. |
 | **Download History** | `paradl history` — searchable, filterable SQLite-backed download log. |
 
 ---
@@ -155,7 +155,7 @@ Start a local API server for programmatic control:
 
 ```bash
 pip install "parallel-dl[api]"
-pdl server
+paradl server
 ```
 
 Default: `http://127.0.0.1:8000`
@@ -188,7 +188,7 @@ A visual download manager inside your terminal:
 
 ```bash
 pip install "parallel-dl[tui]"
-pdl tui
+paradl tui
 ```
 
 Features: task list with progress bars, pause/resume/delete, categories, search, and a persistent SQLite queue.
@@ -205,10 +205,9 @@ Features: task list with progress bars, pause/resume/delete, categories, search,
 
 ## CLI Entry Points
 
-All three commands invoke the same application:
+Both commands invoke the same application:
 
 - `paradl` — primary command
-- `pdl` — short alias
 - `parallel-dl` — full package name
 
 ---

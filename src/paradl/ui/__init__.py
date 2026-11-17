@@ -13,6 +13,12 @@ Used by the CLI and app layers for all user-facing output.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from paradl.core.config import PDLConfig
+    from paradl.ui.display import LiveTransferDisplay as LiveTransferDisplayType
+
 from paradl.ui.display import (
     UI,
     SecretRedactingFilter,
@@ -30,18 +36,20 @@ __all__ = [
 ]
 
 
-def run_tui():
+def run_tui(config: PDLConfig | None = None) -> None:
     """Launch the Textual-based TUI (lazy import to avoid circular imports)."""
     from paradl.ui.tui import run_tui as _run_tui
 
-    return _run_tui()
+    _run_tui(config)
 
 
-def LiveTransferDisplay(*args, **kwargs):
+def LiveTransferDisplay(
+    title: str, total_bytes: int | None = None, *, simple: bool = False
+) -> LiveTransferDisplayType:
     """Rich Live progress display (lazy import to avoid circular imports)."""
     from paradl.ui.display import LiveTransferDisplay as _LTD
 
-    return _LTD(*args, **kwargs)
+    return _LTD(title, total_bytes, simple=simple)
 
 
 __all__ += ["LiveTransferDisplay", "run_tui"]

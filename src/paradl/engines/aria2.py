@@ -121,14 +121,15 @@ class Aria2DaemonPool:
     """Thread-safe pool of reusable aria2c JSON-RPC daemon instances.
 
     Daemons are keyed by (ip_family, http3). Acquiring a daemon either returns
-    an existing idle one or starts a new one. Releasing returns it to the pool
-    without stopping the process. Idle daemons are shut down after
+    an existing idle one or starts a new one; a key can hold several daemons so
+    concurrent callers never share an in-use instance. Releasing returns it to
+    the pool without stopping the process. Idle daemons are shut down after
     ``idle_timeout_sec`` seconds.
     """
 
     def __init__(self, idle_timeout_sec: float = 60.0) -> None:
         self.idle_timeout_sec = idle_timeout_sec
-        self._entries: dict[tuple[str, bool], _DaemonPoolEntry] = {}
+        self._entries: dict[tuple[str, bool], list[_DaemonPoolEntry]] = {}
         self._lock = threading.Lock()
         self._started = False
 
@@ -151,24 +152,33 @@ class Aria2DaemonPool:
         self._startup()
         key = (ip_family, http3)
         with self._lock:
-            entry = self._entries.get(key)
-            if (
-                entry is not None
-                and entry.daemon._proc is not None
-                and entry.daemon._proc.poll() is None
-            ):
-                # Reuse existing healthy daemon
-                entry.in_use = True
-                entry.last_used = time.monotonic()
-                return entry.daemon
+            entries = self._entries.get(key, [])
 
-            # Stop any dead/stale daemon for this key
-            if entry is not None:
-                with contextlib.suppress(Exception):
-                    entry.daemon.stop(graceful=False)
-                del self._entries[key]
+            # Only an *idle* daemon may be reused. Handing an in-use daemon to
+            # a second caller makes two transfers share one RPC connection.
+            for entry in entries:
+                if (
+                    not entry.in_use
+                    and entry.daemon._proc is not None
+                    and entry.daemon._proc.poll() is None
+                ):
+                    entry.in_use = True
+                    entry.last_used = time.monotonic()
+                    return entry.daemon
 
-            # Start a new daemon
+            # Drop dead idle daemons; keep in-use ones even if their process
+            # died so the holder can still release them safely.
+            live: list[_DaemonPoolEntry] = []
+            for entry in entries:
+                if entry.in_use or (
+                    entry.daemon._proc is not None and entry.daemon._proc.poll() is None
+                ):
+                    live.append(entry)
+                else:
+                    with contextlib.suppress(Exception):
+                        entry.daemon.stop(graceful=False)
+
+            # All existing daemons are busy -> start another for this key.
             daemon = Aria2RpcDaemon(
                 aria2c_bin=aria2c_bin,
                 max_concurrent_downloads=max_concurrent_downloads,
@@ -181,54 +191,68 @@ class Aria2DaemonPool:
             entry = _DaemonPoolEntry(daemon)
             entry.in_use = True
             entry.last_used = time.monotonic()
-            self._entries[key] = entry
+            live.append(entry)
+            self._entries[key] = live
             return daemon
 
     def release(self, daemon: Aria2RpcDaemon) -> None:
         """Return a daemon to the pool without stopping it."""
         with self._lock:
-            for entry in self._entries.values():
-                if entry.daemon is daemon:
-                    entry.in_use = False
-                    entry.last_used = time.monotonic()
-                    break
+            for entries in self._entries.values():
+                for entry in entries:
+                    if entry.daemon is daemon:
+                        entry.in_use = False
+                        entry.last_used = time.monotonic()
+                        return
 
     def cleanup_idle(self) -> None:
         """Shut down daemons that have been idle beyond the timeout."""
         now = time.monotonic()
         with self._lock:
-            for key, entry in list(self._entries.items()):
-                if not entry.in_use and (now - entry.last_used) > self.idle_timeout_sec:
-                    with contextlib.suppress(Exception):
-                        entry.daemon.stop(graceful=False)
+            for key, entries in list(self._entries.items()):
+                remaining: list[_DaemonPoolEntry] = []
+                for entry in entries:
+                    if not entry.in_use and (now - entry.last_used) > self.idle_timeout_sec:
+                        with contextlib.suppress(Exception):
+                            entry.daemon.stop(graceful=False)
+                    else:
+                        remaining.append(entry)
+                if remaining:
+                    self._entries[key] = remaining
+                else:
                     del self._entries[key]
 
     def shutdown_all(self) -> None:
         """Stop all pooled daemons (called at exit)."""
         with self._lock:
-            for entry in list(self._entries.values()):
-                with contextlib.suppress(Exception):
-                    entry.daemon.stop(graceful=False)
+            for entries in self._entries.values():
+                for entry in entries:
+                    with contextlib.suppress(Exception):
+                        entry.daemon.stop(graceful=False)
             self._entries.clear()
 
 
 _DAEMON_POOL: Aria2DaemonPool | None = None
+_DAEMON_POOL_LOCK = threading.Lock()
 
 
 def get_daemon_pool() -> Aria2DaemonPool:
     """Return the module-level daemon pool, creating it on first use."""
     global _DAEMON_POOL  # noqa: PLW0603
     if _DAEMON_POOL is None:
-        _DAEMON_POOL = Aria2DaemonPool()
+        with _DAEMON_POOL_LOCK:
+            if _DAEMON_POOL is None:
+                _DAEMON_POOL = Aria2DaemonPool()
     return _DAEMON_POOL
 
 
 def shutdown_daemon_pool() -> None:
     """Shut down all pooled daemons."""
     global _DAEMON_POOL  # noqa: PLW0603
-    if _DAEMON_POOL is not None:
-        _DAEMON_POOL.shutdown_all()
-        _DAEMON_POOL = None
+    with _DAEMON_POOL_LOCK:
+        if _DAEMON_POOL is not None:
+            _DAEMON_POOL.shutdown_all()
+            _DAEMON_POOL = None
 
 
 atexit.register(shutdown_daemon_pool)
@@ -825,6 +849,20 @@ class Aria2Engine:
         cap_override: int | None = None
         refusal_retries = 0
 
+        # Host learning state is constant for the lifetime of one transfer.
+        # Resolve it once here instead of reopening the history SQLite database
+        # on every outer poll iteration.
+        host_strategy = (
+            HistoryManager.get_host_strategy(parsed_host) if parsed_host else None
+        )
+        avg_rtt_ms = host_strategy.avg_rtt_ms if host_strategy else 0.0
+        pkt_loss_pct = host_strategy.packet_loss_pct if host_strategy else 0.0
+        learned_cap = (
+            HistoryManager.get_host_connection_cap(parsed_host)
+            if (parsed_host and supports_range)
+            else None
+        )
+
         with (
             platform.get_sleep_assertion(enabled=caffeinate),
             ev_src,
@@ -839,20 +877,9 @@ class Aria2Engine:
                 curr_conc = min(len(remaining_indices), max_conc)
 
                 # --- Adaptive concurrency based on per-host RTT/loss & refusal caps ---
-                # Read learned host strategy (RTT, loss) to tune connection count.
+                # Host strategy and learned cap were resolved once per transfer above.
                 # High RTT or loss reduces concurrent flows to avoid head-of-line blocking
                 # and socket contention; clean paths can use the full budget.
-                parsed_host = (urlparse(first_url).hostname or "").lower()
-                host_strategy = (
-                    HistoryManager.get_host_strategy(parsed_host) if parsed_host else None
-                )
-                avg_rtt_ms = host_strategy.avg_rtt_ms if host_strategy else 0.0
-                pkt_loss_pct = host_strategy.packet_loss_pct if host_strategy else 0.0
-                learned_cap = (
-                    HistoryManager.get_host_connection_cap(parsed_host)
-                    if (parsed_host and supports_range)
-                    else None
-                )
 
                 # Start from watchdog connection budget, then adapt:
                 #   RTT > 100ms  -> scale down toward 4 conns (high latency)
@@ -959,6 +986,19 @@ class Aria2Engine:
                         if global_speed > 0:
                             all_speed_samples.append(global_speed)
 
+                        # Fetch each GID's status and server list exactly once per
+                        # tick. The status-processing pass and the progress-building
+                        # pass below both consume these snapshots; previously each
+                        # was fetched twice for every active GID on every tick.
+                        status_snapshot: dict[str, dict[str, Any]] = {}
+                        servers_snapshot: dict[str, list[dict[str, Any]]] = {}
+                        for gid in list(gid_to_idx.keys()):
+                            status_snapshot[gid] = daemon.tell_status(gid)
+                            try:
+                                servers_snapshot[gid] = daemon.get_servers(gid)
+                            except Exception:
+                                servers_snapshot[gid] = []
+
                         total_done = 0
                         total_len = 0
                         total_conns = 0
@@ -967,7 +1007,7 @@ class Aria2Engine:
 
                         for gid in list(gid_to_idx.keys()):
                             idx = gid_to_idx[gid]
-                            st = daemon.tell_status(gid)
+                            st = status_snapshot[gid]
                             status_str = st.get("status", "")
                             done_b = int(st.get("completedLength", 0) or 0)
                             len_b = int(st.get("totalLength", 0) or 0)
@@ -975,7 +1015,7 @@ class Aria2Engine:
                             total_len += len_b or (items[idx].expected_length or 0)
 
                             if status_str == "active":
-                                srvs = daemon.get_servers(gid)
+                                srvs = servers_snapshot[gid]
                                 c_cnt, c_spds = _count_active_connections(srvs)
                                 total_conns += c_cnt
                                 conn_speeds.extend(c_spds)
@@ -1053,7 +1093,7 @@ class Aria2Engine:
                         all_conn_speeds: list[float] = []
                         for gid in list(gid_to_idx.keys()):
                             idx = gid_to_idx[gid]
-                            st = daemon.tell_status(gid)
+                            st = status_snapshot[gid]
                             # Per-file progress from aria2 'files' array
                             for f in st.get("files", []) or []:
                                 f_path = f.get("path", "")
@@ -1067,10 +1107,9 @@ class Aria2Engine:
                                         "total": f_len if f_len > 0 else None,
                                     }
                                 )
-                            # Per-connection speeds from get_servers
+                            # Per-connection speeds from the per-tick get_servers snapshot
                             try:
-                                srvs = daemon.get_servers(gid)
-                                for srv_group in srvs:
+                                for srv_group in servers_snapshot.get(gid, []):
                                     for srv in srv_group.get("servers", []):
                                         spd = float(srv.get("downloadSpeed", 0) or 0)
                                         if spd > 0:
@@ -1335,8 +1374,8 @@ class Aria2Engine:
                         # Remove from pool so a fresh one is acquired next iteration
                         pool = get_daemon_pool()
                         with pool._lock:
-                            for key, entry in list(pool._entries.items()):
-                                if entry.daemon is daemon:
+                            for key, entries in list(pool._entries.items()):
+                                if any(entry.daemon is daemon for entry in entries):
                                     del pool._entries[key]
                                     break
                     else:

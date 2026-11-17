@@ -1,0 +1,48 @@
+{
+  "tag": "baseline_sanitize",
+  "python": "3.12.16",
+  "results": [
+    {
+      "case": "models.sanitize_filename",
+      "scale": 200,
+      "iterations": 3000,
+      "units_per_call": 200,
+      "p50_ms": 4.475333000300452,
+      "p95_ms": 5.28028539947627,
+      "p99_ms": 5.969273241225889,
+      "mean_ms": 4.642590387013722,
+      "throughput_units_per_s": 43079.39820825914,
+      "traced_peak_kb": 111.130859375,
+      "rss_delta_mb": 0.171875,
+      "label": "small"
+    },
+    {
+      "case": "models.sanitize_filename",
+      "scale": 2000,
+      "iterations": 300,
+      "units_per_call": 2000,
+      "p50_ms": 45.755604000078165,
+      "p95_ms": 47.7388850987154,
+      "p99_ms": 50.130929589904554,
+      "mean_ms": 45.95359387660816,
+      "throughput_units_per_s": 43522.167284027455,
+      "traced_peak_kb": 11.2041015625,
+      "rss_delta_mb": 0.0,
+      "label": "medium"
+    },
+    {
+      "case": "models.sanitize_filename",
+      "scale": 20000,
+      "iterations": 30,
+      "units_per_call": 20000,
+      "p50_ms": 474.27397899991774,
+      "p95_ms": 509.4268563995683,
+      "p99_ms": 517.0192871403378,
+      "mean_ms": 476.42689160014316,
+      "throughput_units_per_s": 41979.15850809205,
+      "traced_peak_kb": 4.2900390625,
+      "rss_delta_mb": 0.0,
+      "label": "stress"
+    }
+  ]
+}

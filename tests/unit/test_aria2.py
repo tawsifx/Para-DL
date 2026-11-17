@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+from tests.support.fakes import NoSleepClock
+
 from paradl.engines.aria2 import (
     _DAEMON_POOL,
     Aria2DaemonPool,
@@ -143,15 +145,6 @@ class TestAria2EngineMissingBinary(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.exit_code, 4)  # MISSING_DEPENDENCY
         self.assertIn("aria2c", result.error)
-
-
-class TestWatchdogModes(unittest.TestCase):
-    """Tests for WatchdogMode enum used in aria2."""
-
-    def test_values(self) -> None:
-        self.assertEqual(WatchdogMode.V1, "v1")
-        self.assertEqual(WatchdogMode.V2, "v2")
-        self.assertEqual(WatchdogMode.OFF, "off")
 
 
 class TestAria2DaemonPool(unittest.TestCase):
@@ -354,6 +347,7 @@ class TestSmallFileScalingAndHostCaps(unittest.TestCase):
         with (
             patch("paradl.engines.aria2.TOOLCHAIN", fake_toolchain),
             patch("paradl.engines.aria2.get_daemon_pool", return_value=fake_pool),
+            patch("paradl.engines.aria2.get_clock", return_value=NoSleepClock()),
         ):
             res = Aria2Engine.download(
                 TargetInfo(

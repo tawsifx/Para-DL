@@ -9,6 +9,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+_UNSAFE_FILENAME_CHARS = "/\\:*?\"<>|\0"
+_UNSAFE_FILENAME_TABLE = str.maketrans(dict.fromkeys(_UNSAFE_FILENAME_CHARS, "_"))
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+
 
 class TargetType(StrEnum):
     TORRENT = "torrent"
@@ -236,8 +244,7 @@ def format_rate_for_aria2(rate_str: str | None) -> str | None:
 
 def sanitize_filename(name: str) -> str:
     """Sanitize a filename by replacing unsafe characters and blocking traversal/reserved names."""
-    for ch in ["/", "\\", ":", "*", "?", '"', "<", ">", "|", "\0"]:
-        name = name.replace(ch, "_")
+    name = name.translate(_UNSAFE_FILENAME_TABLE)
     cleaned = name.strip()[:200]
     # Guard against dot-only names and directory traversal primitives
     stripped_dots = cleaned.strip(" .")
@@ -245,14 +252,7 @@ def sanitize_filename(name: str) -> str:
         return "download"
     # Guard against Windows reserved device names (e.g. CON, PRN, AUX, NUL, COM1..9, LPT1..9)
     base_stem = stripped_dots.split(".", 1)[0].upper()
-    if base_stem in {
-        "CON",
-        "PRN",
-        "AUX",
-        "NUL",
-        *(f"COM{i}" for i in range(1, 10)),
-        *(f"LPT{i}" for i in range(1, 10)),
-    }:
+    if base_stem in _WINDOWS_RESERVED_NAMES:
         return f"_{cleaned}"
     return cleaned or "download"
 

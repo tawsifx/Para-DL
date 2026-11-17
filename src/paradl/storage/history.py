@@ -8,11 +8,12 @@ import logging
 import os
 import shutil
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from paradl import platform
 from paradl.core.paths import get_history_db_file, get_legacy_history_file, get_paradl_home
@@ -127,6 +128,20 @@ class LearnedProfile:
 class HistoryManager:
     """SQLite WAL-backed manager for download history, host strategies, learned profiles, and HTTP ETag cache."""
 
+    # DDL/migrations are process-wide, once per physical DB file. The identity
+    # includes (resolved path, device, inode) so a rotated/recreated file reinitializes.
+    _schema_init_lock = threading.Lock()
+    _initialized_schemas: ClassVar[set[tuple[str, int, int]]] = set()
+
+    @classmethod
+    def _schema_guard_key(cls, db_file: Path) -> tuple[str, int, int] | None:
+        """Return a stable identity for an existing DB file, or None if it cannot be stat'ed."""
+        try:
+            st = db_file.stat()
+        except OSError:
+            return None
+        return (str(db_file.resolve()), int(st.st_dev), int(st.st_ino))
+
     @classmethod
     def _connect(cls) -> sqlite3.Connection:
         paradl_home = get_paradl_home()
@@ -155,8 +170,22 @@ class HistoryManager:
     def _open_and_init(cls, db_file: Path) -> sqlite3.Connection:
         conn = sqlite3.connect(str(db_file), timeout=10.0)
         conn.row_factory = sqlite3.Row
+        # These pragmas are per-connection: reapply on every new connection even
+        # when the schema has already been initialized in this process.
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
+
+        key = cls._schema_guard_key(db_file)
+        with cls._schema_init_lock:
+            if key is not None and key in cls._initialized_schemas:
+                return conn
+            cls._initialize_schema(conn)
+            if key is not None:
+                cls._initialized_schemas.add(key)
+        return conn
+
+    @classmethod
+    def _initialize_schema(cls, conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS schema_meta (
@@ -313,7 +342,6 @@ class HistoryManager:
         )
         conn.commit()
         cls._migrate_legacy_json_if_needed(conn)
-        return conn
 
     @classmethod
     def _migrate_legacy_json_if_needed(cls, conn: sqlite3.Connection) -> None:
@@ -631,6 +659,22 @@ class HistoryManager:
         """Persist a LearnedProfile keyed by (host, hour_bucket, network_id) and sync host_strategies."""
         if not profile.host:
             return
+        try:
+            with contextlib.closing(cls._connect()) as conn:
+                cls._save_learned_profile_with_conn(conn, profile)
+                conn.commit()
+        except sqlite3.Error as exc:
+            logger.debug("Failed to save learned profile for %s: %s", profile.host, exc)
+
+    @classmethod
+    def _save_learned_profile_with_conn(
+        cls, conn: sqlite3.Connection, profile: LearnedProfile
+    ) -> None:
+        """Write one profile's rows into `conn`; the caller owns commit/close.
+
+        Shared by the public single-profile API and the batched throttle-profile
+        path so both produce byte-identical rows.
+        """
         host_low = profile.host.lower()
         hb = compute_hour_bucket() if profile.hour_bucket < 0 else int(profile.hour_bucket)
         net_id = (profile.network_id or platform.get_network_id() or "default").strip() or "default"
@@ -652,58 +696,53 @@ class HistoryManager:
             None if profile.supports_range is None else (1 if profile.supports_range else 0)
         )
 
-        try:
-            with contextlib.closing(cls._connect()) as conn:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO learned_profiles
-                    (host, hour_bucket, network_id, connections, ip_family, recovery_action,
-                     speed_before, speed_after, supports_range, throttle_class, updated_at, updated_epoch, source,
-                     avg_rtt_ms, packet_loss_pct)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        host_low,
-                        hb,
-                        net_id,
-                        conns,
-                        profile.ip_family,
-                        profile.recovery_action,
-                        float(profile.speed_before),
-                        float(profile.speed_after),
-                        sup_range_db,
-                        profile.throttle_class,
-                        now_str,
-                        now_epoch,
-                        src_val,
-                        float(profile.avg_rtt_ms),
-                        float(profile.packet_loss_pct),
-                    ),
-                )
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO host_strategies
-                    (host, best_action, connections, ip_family, speed_before, speed_after,
-                     supports_range, throttle_class, updated_at, avg_rtt_ms, packet_loss_pct)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        host_low,
-                        profile.recovery_action,
-                        conns,
-                        profile.ip_family,
-                        float(profile.speed_before),
-                        float(profile.speed_after),
-                        sup_range_db,
-                        profile.throttle_class,
-                        now_str,
-                        float(profile.avg_rtt_ms),
-                        float(profile.packet_loss_pct),
-                    ),
-                )
-                conn.commit()
-        except sqlite3.Error as exc:
-            logger.debug("Failed to save learned profile for %s: %s", profile.host, exc)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO learned_profiles
+            (host, hour_bucket, network_id, connections, ip_family, recovery_action,
+             speed_before, speed_after, supports_range, throttle_class, updated_at, updated_epoch, source,
+             avg_rtt_ms, packet_loss_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                host_low,
+                hb,
+                net_id,
+                conns,
+                profile.ip_family,
+                profile.recovery_action,
+                float(profile.speed_before),
+                float(profile.speed_after),
+                sup_range_db,
+                profile.throttle_class,
+                now_str,
+                now_epoch,
+                src_val,
+                float(profile.avg_rtt_ms),
+                float(profile.packet_loss_pct),
+            ),
+        )
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO host_strategies
+            (host, best_action, connections, ip_family, speed_before, speed_after,
+             supports_range, throttle_class, updated_at, avg_rtt_ms, packet_loss_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                host_low,
+                profile.recovery_action,
+                conns,
+                profile.ip_family,
+                float(profile.speed_before),
+                float(profile.speed_after),
+                sup_range_db,
+                profile.throttle_class,
+                now_str,
+                float(profile.avg_rtt_ms),
+                float(profile.packet_loss_pct),
+            ),
+        )
 
     @classmethod
     def get_best_profile(

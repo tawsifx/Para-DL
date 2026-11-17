@@ -7,12 +7,13 @@ import json
 import logging
 import sqlite3
 import statistics
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from paradl.core.clock import get_clock
-from paradl.core.paths import get_throttle_dir
+from paradl.core.paths import get_history_db_file, get_throttle_dir
 from paradl.platform import macos
 from paradl.storage.history import HistoryManager, LearnedProfile, compute_hour_bucket
 from paradl.throttle.models import (
@@ -32,9 +33,34 @@ SAMPLE_IDEMPOTENCY_WINDOW_SEC = 45 * 60.0  # 45 minutes
 class ThrottleStore:
     """Manages SQLite tables (`throttle_samples`, `throttle_runs`, `asn_cache`) inside `$PARADL_HOME/history.db`."""
 
+    # Same once-per-process, per-physical-file guard as HistoryManager, but for
+    # the throttle-owned tables. Identity includes device+inode so a replaced DB
+    # file is reinitialized.
+    _schema_init_lock = threading.Lock()
+    _initialized_schemas: ClassVar[set[tuple[str, int, int]]] = set()
+
     @classmethod
     def _conn(cls) -> contextlib.AbstractContextManager[sqlite3.Connection]:
         conn = HistoryManager._connect()
+        key = cls._schema_guard_key()
+        with cls._schema_init_lock:
+            if key is None or key not in cls._initialized_schemas:
+                cls._initialize_schema(conn)
+                if key is not None:
+                    cls._initialized_schemas.add(key)
+        return contextlib.closing(conn)
+
+    @classmethod
+    def _schema_guard_key(cls) -> tuple[str, int, int] | None:
+        db_file = get_history_db_file()
+        try:
+            st = db_file.stat()
+        except OSError:
+            return None
+        return (str(db_file.resolve()), int(st.st_dev), int(st.st_ino))
+
+    @classmethod
+    def _initialize_schema(cls, conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS throttle_samples (
@@ -84,7 +110,6 @@ class ThrottleStore:
             """
         )
         conn.commit()
-        return contextlib.closing(conn)
 
     # ------------------------------------------------------------------
     # ASN & Country Cache
@@ -442,25 +467,22 @@ class ThrottleStore:
         dom_16 = dataset.m10_local_vs_intl.domestic_16_bps or max(intl_16, 5_000_000.0)
 
         primary_verdict = None
-        # Save global wildcard '*' starting profile for WatchdogController
-        HistoryManager.save_learned_profile(
-            LearnedProfile(
-                host="*",
-                hour_bucket=hb,
-                network_id=net_id,
-                connections=min(max(int(profile.default_connections), 1), 16),
-                ip_family=profile.ip_family,
-                recovery_action=profile.recovery_action,
-                speed_before=float(intl_1),
-                speed_after=float(intl_16),
-                supports_range=True,
-                throttle_class=primary_verdict,
-                updated_epoch=now_epoch,
-                source="throttle-probe",
-            )
+        global_profile = LearnedProfile(
+            host="*",
+            hour_bucket=hb,
+            network_id=net_id,
+            connections=min(max(int(profile.default_connections), 1), 16),
+            ip_family=profile.ip_family,
+            recovery_action=profile.recovery_action,
+            speed_before=float(intl_1),
+            speed_after=float(intl_16),
+            supports_range=True,
+            throttle_class=primary_verdict,
+            updated_epoch=now_epoch,
+            source="throttle-probe",
         )
 
-        # Save per-host profiles for each validated target
+        target_profiles: list[LearnedProfile] = []
         for t in targets:
             if not t.host or t.locality == "loopback":
                 continue
@@ -472,7 +494,7 @@ class ThrottleStore:
             if not t.supports_range:
                 conns = 1
             spd_after = dom_16 if t.locality == "domestic" else intl_16
-            HistoryManager.save_learned_profile(
+            target_profiles.append(
                 LearnedProfile(
                     host=t.host.lower(),
                     hour_bucket=hb,
@@ -490,3 +512,13 @@ class ThrottleStore:
                     source="throttle-probe",
                 )
             )
+
+        # One connection, one commit for the whole batch.
+        try:
+            with contextlib.closing(HistoryManager._connect()) as conn:
+                HistoryManager._save_learned_profile_with_conn(conn, global_profile)
+                for target_profile in target_profiles:
+                    HistoryManager._save_learned_profile_with_conn(conn, target_profile)
+                conn.commit()
+        except sqlite3.Error as exc:
+            logger.debug("Failed to persist recommended throttle profile: %s", exc)

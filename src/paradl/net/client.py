@@ -9,10 +9,12 @@ import random
 import re
 import socket
 import ssl
+import threading
 import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 from paradl import VERSION
@@ -28,6 +30,7 @@ from paradl.core.models import (
 logger = logging.getLogger(__name__)
 
 _SHARED_CLIENT: Any = None
+_HTTP_CLIENT_LOCK = threading.Lock()
 
 # Per-host TLS session ticket cache for 0-RTT / session resumption on repeat connections to CDNs.
 # Keyed by hostname -> SSLSession object.
@@ -60,39 +63,43 @@ def get_http_client() -> Any:
     """
     global _SHARED_CLIENT  # noqa: PLW0603
     if _SHARED_CLIENT is None:
-        import httpx
+        # Double-checked locking: concurrent first callers must not each build
+        # their own client. httpx.Client is thread-safe once constructed.
+        with _HTTP_CLIENT_LOCK:
+            if _SHARED_CLIENT is None:
+                import httpx
 
-        has_h2 = importlib.util.find_spec("h2") is not None
+                has_h2 = importlib.util.find_spec("h2") is not None
 
-        # Build a custom SSL context that supports session ticket persistence.
-        # The ticket callback caches sessions per-host so repeat connections to
-        # the same CDN can resume without a full handshake.
-        ssl_ctx = ssl.create_default_context()
+                # Build a custom SSL context that supports session ticket persistence.
+                # The ticket callback caches sessions per-host so repeat connections to
+                # the same CDN can resume without a full handshake.
+                ssl_ctx = ssl.create_default_context()
 
-        def _ssl_session_cb(ssl_connection: Any) -> None:
-            try:
-                sess = ssl_connection.get_session()
-                if sess is not None:
-                    server_name = ssl_connection.get_servername()
-                    if server_name:
-                        _TLS_SESSION_CACHE[str(server_name)] = sess
-            except Exception:
-                pass
+                def _ssl_session_cb(ssl_connection: Any) -> None:
+                    try:
+                        sess = ssl_connection.get_session()
+                        if sess is not None:
+                            server_name = ssl_connection.get_servername()
+                            if server_name:
+                                _TLS_SESSION_CACHE[str(server_name)] = sess
+                    except Exception:
+                        pass
 
-        # set_session_ticket_cb exists on Python < 3.15; on 3.15+ it was removed,
-        # so we guard it and degrade gracefully (session resumption still handled
-        # by the underlying OpenSSL/httpx keepalive).
-        if hasattr(ssl_ctx, "set_session_ticket_cb"):
-            ssl_ctx.set_session_ticket_cb(_ssl_session_cb)
+                # set_session_ticket_cb exists on Python < 3.15; on 3.15+ it was removed,
+                # so we guard it and degrade gracefully (session resumption still handled
+                # by the underlying OpenSSL/httpx keepalive).
+                if hasattr(ssl_ctx, "set_session_ticket_cb"):
+                    ssl_ctx.set_session_ticket_cb(_ssl_session_cb)
 
-        _SHARED_CLIENT = httpx.Client(
-            http2=has_h2,
-            follow_redirects=True,
-            timeout=httpx.Timeout(10.0, connect=4.0),
-            limits=httpx.Limits(max_keepalive_connections=20, max_connections=40),
-            headers={"User-Agent": f"pdl-accelerator/{VERSION}"},
-            verify=ssl_ctx,
-        )
+                _SHARED_CLIENT = httpx.Client(
+                    http2=has_h2,
+                    follow_redirects=True,
+                    timeout=httpx.Timeout(10.0, connect=4.0),
+                    limits=httpx.Limits(max_keepalive_connections=20, max_connections=40),
+                    headers={"User-Agent": f"pdl-accelerator/{VERSION}"},
+                    verify=ssl_ctx,
+                )
     return _SHARED_CLIENT
 
 
@@ -470,17 +477,24 @@ def probe_http_url(
     return head_res if head_res is not None else HttpProbeResult(ok=False, final_url=url)
 
 
+@lru_cache(maxsize=1)
+def _cached_extractor_classes() -> tuple[tuple[str, Any], ...]:
+    """Build (IE_NAME, class) pairs once; gen_extractor_classes() is expensive."""
+    from yt_dlp.extractor import gen_extractor_classes
+
+    return tuple(
+        (name, ie_cls)
+        for ie_cls in gen_extractor_classes()
+        if (name := getattr(ie_cls, "IE_NAME", "")) != "generic"
+    )
+
+
 def ytdlp_extractor_claims_url(url: str) -> bool:
     """Return True if a non-generic yt-dlp extractor explicitly matches the URL."""
     if is_media_domain(url):
         return True
     try:
-        from yt_dlp.extractor import gen_extractor_classes
-
-        for ie_cls in gen_extractor_classes():
-            ie_name = getattr(ie_cls, "IE_NAME", "")
-            if ie_name == "generic":
-                continue
+        for _ie_name, ie_cls in _cached_extractor_classes():
             if ie_cls.suitable(url):
                 return True
     except Exception as exc:
