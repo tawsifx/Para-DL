@@ -30,7 +30,7 @@
 
 ## Rulings
 
-- **Trimmed vendor, not full workspace.** MDM's workspace pins git forks (storytold/craft-libs, anefzaoui/egui/rqbit) and `rust-version = 1.98`. Vendor only `planner.rs`, `state.rs`, `limiter.rs`, `verify.rs` (+ new `probe.rs`, `download.rs`, `error.rs`, `lib.rs`) into `rust/mdm-engine`, replacing `craft-atomic::atomic_write` with std temp-file+rename and using crates.io deps only. Do NOT pull `wreq`/BoringSSL (needs CMake/NASM/libclang), `rquickjs` (C build), FTP, torrent, or site modules.
+- **Trimmed vendor, not full workspace.** MDM's workspace pins git forks (storytold/craft-libs, third-party/egui/rqbit) and `rust-version = 1.98`. Vendor only `planner.rs`, `state.rs`, `limiter.rs`, `verify.rs` (+ new `probe.rs`, `download.rs`, `error.rs`, `lib.rs`) into `rust/mdm-engine`, replacing `craft-atomic::atomic_write` with std temp-file+rename and using crates.io deps only. Do NOT pull `wreq`/BoringSSL (needs CMake/NASM/libclang), `rquickjs` (C build), FTP, torrent, or site modules.
 - **Maturin config lives at `rust/paradl-rs/pyproject.toml`**, not the root, so the existing Python build backend stays intact. The built module is imported as `paradl._rust_engine` via a Python shim + `.pyi` stub.
 - **aria2 stays for torrent/magnet/metalink** in v1 (MDM's `mdm-torrent` is out of scope); Rust becomes the default for HTTP(S) only. This avoids silently breaking those CLI contracts.
 - Toolchain install via `brew install rust` (documented fallback: the mandated `paradl` downloader binary is absent at `/opt/homebrew/bin/paradl`, and the in-repo `paradl` CLI cannot fetch the MDM archive because of the diagnosed watchdog bug).

@@ -40,7 +40,7 @@
 
 - [ ] Step 1: Fix the 4 baseline clippy findings (download.rs:196, 759, 960; probe.rs:176). Run from `rust/`: `PYO3_PYTHON=... cargo clippy --all -- -D warnings` → exit 0. (`cargo clippy` counts as a TDD verification gate, not new behavior.)
 - [ ] Step 2: Root-cause L1 (30 s close-delimited transfer). Add a Rust `#[test]` that reproduces EOF handling with a bounded read timeout on a close-delimited body; watch RED; apply the single minimal fix in `download.rs`; watch GREEN. Record root cause in report (systematic-debugging Phase 1–4).
-- [ ] Step 3: Audit planner/state/limiter/verify logic drift vs MDM originals at `/tmp/mdm-ref/src/misterdownloadmanager-main/crates/engine/src/` (if present); list any drift with file:line in report. Do not blindly port changes.
+- [ ] Step 3: Audit planner/state/limiter/verify logic drift vs MDM originals at `/tmp/archive-ref/crates/engine/src/` (if present); list any drift with file:line in report. Do not blindly port changes.
 - [ ] Step 4: Fault-injection tests (Rust `#[test]`): dropped connections; 5xx mirror failover; no-Content-Length EOF completes; recycle mid-transfer; crash-resume from `.mdm.part` + `.mdm.json`; SHA-256 mismatch → error. Verify `py.detach` releases GIL on all long calls in `paradl-rs` (report only — do not edit paradl-rs, that is S2).
 - [ ] Step 5: Liveness tests: no hang when all workers retire; `wait(timeout=)` honored; `recycle_connections()` no-op on terminal handles.
 - [ ] Step 6: `cargo test --all` (8+ pass) + `cargo clippy --all -- -D warnings` clean. Write report with per-finding evidence.

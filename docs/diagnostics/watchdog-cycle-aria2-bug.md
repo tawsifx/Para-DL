@@ -1,7 +1,7 @@
 # Diagnosis: Watchdog v2 socket-cycle corrupts redirected aria2 downloads
 
 ## Symptom
-`paradl https://github.com/anefzaoui/misterdownloadmanager/archive/refs/heads/main.zip`
+`paradl https://github.com/python/cpython/archive/refs/heads/main.zip`
 reports `100% / 31.8 MB` within seconds but leaves only ~50–400 KB on disk and
 exits 1. The CLI error line is empty (`✗ Download failed: <url>` with no reason).
 

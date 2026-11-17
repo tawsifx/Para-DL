@@ -191,7 +191,7 @@ def test_e2e_1_direct_range_capable_16_streams(
 # ---------------------------------------------------------------------------
 
 
-GITHUB_URL = "https://github.com/anefzaoui/misterdownloadmanager/archive/refs/heads/main.zip"
+GITHUB_URL = "https://github.com/python/cpython/archive/refs/heads/main.zip"
 
 
 def test_e2e_2_github_archive_routes_to_mirror_with_canonical_failover(

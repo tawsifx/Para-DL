@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from paradl.net.accelerate import accelerate_url, is_github_archive
 
-URL = "https://github.com/anefzaoui/misterdownloadmanager/archive/refs/heads/main.zip"
+URL = "https://github.com/python/cpython/archive/refs/heads/main.zip"
 
 
 def test_is_github_archive() -> None:
