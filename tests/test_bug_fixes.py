@@ -1,4 +1,4 @@
-"""Unit tests verifying all fixes for H1-H4, M1-M9, L1-L5, and R1."""
+"""Unit tests verifying fixes H1-H3, M1-M6 and M8, L1-L5, and R1."""
 
 from __future__ import annotations
 

@@ -18,6 +18,11 @@ use crate::error::{Error, Result};
 use crate::state::Validators;
 use crate::verify::Hash;
 
+/// Bound the probe's response-header wait. Without it, a server that accepts the
+/// TCP connection but never sends headers hangs `Download::start` forever — the
+/// global "all waits have timeouts" constraint is otherwise violated here.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
+
 /// Build the shared HTTP client. rustls only (no OpenSSL / native TLS), optional SOCKS proxy,
 /// optional IP-family pinning via a local bind. All timeouts are bounded.
 pub fn build_client(
@@ -66,6 +71,28 @@ pub fn headers_from_pairs(pairs: Option<&std::collections::HashMap<String, Strin
     out
 }
 
+/// Sensitive request headers must never cross to a different host. reqwest strips
+/// these during the probe's redirect chain, but workers issue *direct* requests to
+/// the redirect-derived final URI (and to mirrors), where reqwest has no redirect
+/// to policy over, so the same rule must be applied here explicitly. This mirrors
+/// reqwest's own sensitive-header set; benign headers (User-Agent, X-Trace-Id, …)
+/// pass through untouched.
+pub fn scope_headers(
+    headers: &HeaderMap,
+    allowed_host: Option<&str>,
+    target_host: Option<&str>,
+) -> HeaderMap {
+    let same_host = matches!((allowed_host, target_host), (Some(a), Some(t)) if a.eq_ignore_ascii_case(t));
+    if same_host {
+        return headers.clone();
+    }
+    let mut out = headers.clone();
+    let _ = out.remove(reqwest::header::AUTHORIZATION);
+    let _ = out.remove(reqwest::header::COOKIE);
+    let _ = out.remove(reqwest::header::PROXY_AUTHORIZATION);
+    out
+}
+
 /// What a one-request look at a URL tells us before downloading.
 #[derive(Clone, Debug)]
 pub struct ProbeInfo {
@@ -100,7 +127,9 @@ pub async fn probe(
     {
         headers.insert(reqwest::header::COOKIE, v);
     }
-    let resp = client.get(url.clone()).headers(headers).send().await?;
+    let resp = tokio::time::timeout(PROBE_TIMEOUT, client.get(url.clone()).headers(headers).send())
+        .await
+        .map_err(|_| Error::Timeout)??;
     if !resp.status().is_success() {
         return Err(Error::Status(resp.status().as_u16()));
     }
@@ -173,12 +202,12 @@ fn percent_decode(s: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(a), Some(b)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
-                out.push(a * 16 + b);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%' && i + 2 < bytes.len()
+            && let (Some(a), Some(b)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2]))
+        {
+            out.push(a * 16 + b);
+            i += 3;
+            continue;
         }
         out.push(bytes[i]);
         i += 1;

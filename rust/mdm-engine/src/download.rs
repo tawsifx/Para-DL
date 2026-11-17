@@ -35,14 +35,33 @@ use crate::verify::{Hash, matches};
 const DEFAULT_MIN_SPLIT: u64 = 64 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// Test-only override for the per-chunk read timeout. Production keeps 30 s; tests
+/// shorten it to prove a stalled close-delimited stream is an error, not a false EOF.
+/// `#[cfg(test)]` keeps this out of the public `StartOptions` API and production builds.
+#[cfg(test)]
+static TEST_READ_TIMEOUT: AtomicU64 = AtomicU64::new(0);
+
+/// Set the test read timeout. Never zero: zero means "use the production 30 s value".
+#[cfg(test)]
+pub(crate) fn set_test_read_timeout(timeout: Duration) {
+    TEST_READ_TIMEOUT.store(timeout.as_millis() as u64, Ordering::Relaxed);
+}
+
+fn read_timeout() -> Duration {
+    #[cfg(test)]
+    {
+        let millis = TEST_READ_TIMEOUT.load(Ordering::Relaxed);
+        if millis > 0 {
+            return Duration::from_millis(millis);
+        }
+    }
+    READ_TIMEOUT
+}
+
 const MAX_RETRIES: u32 = 3;
 const COMMANDS: usize = 16;
 /// Periodic crash-safe sidecar save interval (MDM: "several times per minute").
 const SAVE_INTERVAL: Duration = Duration::from_secs(2);
-/// A close-delimited (no Content-Length, no Range) stream is read in bounded windows.
-/// Reopening the GET for each window (discarding the already-written prefix) lets the
-/// engine pick up a recovered/throttle-free server and keeps each request bounded.
-const UNKNOWN_STREAM_WINDOW: u64 = 64 * 1024;
 /// Sentinel planner size for a single-stream download with no known Content-Length
 /// (the GitHub -> codeload case in docs/diagnostics/watchdog-cycle-aria2-bug.md).
 const UNKNOWN_SIZE: u64 = u64::MAX;
@@ -196,6 +215,10 @@ impl UriPool {
     pub fn len(&self) -> usize {
         self.urls.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.urls.is_empty()
+    }
 }
 
 struct StateInfo {
@@ -239,6 +262,9 @@ struct Shared {
     uris: Arc<UriPool>,
     client: reqwest::Client,
     headers: reqwest::header::HeaderMap,
+    /// Host the caller's sensitive headers were captured for. They are sent only
+    /// to this host — never to a cross-host redirect target or a mirror.
+    header_host: Option<String>,
     /// Cookie header value and the exact hosts it was captured for.
     cookie_header: Option<String>,
     cookie_hosts: Vec<String>,
@@ -365,6 +391,10 @@ async fn wait_until_running(shared: &Shared, rx: &mut watch::Receiver<bool>) -> 
 async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> WorkerEnd {
     let mut pos = assignment.from;
     let mut retries = 0u32;
+    // Read timeouts are retried from the committed offset, but must not be reset by a
+    // successful reconnect (unlike `retries`, which counts failed GETs). Otherwise a
+    // permanently stalled stream would reconnect forever and never become a failure.
+    let mut read_timeouts = 0u32;
     let mut paused_rx = shared.paused.subscribe();
     // Unknown-size downloads use a single plain GET with no Range at all.
     let mut stream_plain = shared.unknown_size;
@@ -389,7 +419,10 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
         let want_end = (pos + room.saturating_sub(1)).min(end.saturating_sub(1));
 
         let uri = shared.uris.next(); // rotate across mirrors / the pool on each request
-        let mut req = shared.client.get(uri.clone()).headers(shared.headers.clone());
+        // These are DIRECT requests (no redirect for reqwest to strip on): scope
+        // the caller's sensitive headers to the original host on every request.
+        let headers = probe::scope_headers(&shared.headers, shared.header_host.as_deref(), uri.host_str());
+        let mut req = shared.client.get(uri.clone()).headers(headers);
         if !stream_plain {
             req = req.header(RANGE, format!("bytes={pos}-{want_end}"));
         }
@@ -463,18 +496,29 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
         // already committed so a reconnect (after a recycle or a bounded window) resumes at
         // the right offset instead of overwriting earlier bytes with the wrong data.
         let mut skip = if stream_plain { pos } else { 0 };
-        let mut window: u64 = 0;
-        while let Some(chunk) = tokio::time::timeout(READ_TIMEOUT, stream.next())
-            .await
-            .ok()
-            .flatten()
-        {
-            let chunk = match chunk {
-                Ok(c) => c,
-                Err(e) => {
+        loop {
+            // A read timeout (Err(Elapsed)) is NOT the same as EOF (Ok(None)). Collapsing
+            // both into `None` used to end a stalled close-delimited stream with
+            // StreamEnded, which the supervisor mistook for a completed unknown-size
+            // download and renamed a truncated file into place.
+            let chunk = match tokio::time::timeout(read_timeout(), stream.next()).await {
+                Ok(Some(Ok(c))) => c,
+                Ok(Some(Err(e))) => {
                     retries += 1;
                     if retries > MAX_RETRIES {
                         return WorkerEnd::Failed(e.to_string());
+                    }
+                    short = true;
+                    break;
+                }
+                Ok(None) => break, // genuine EOF: the only clean end of a stream
+                Err(_) => {
+                    // Bounded retry from the committed offset: a timeout is a short read,
+                    // never a finished stream. Exhausting retries fails the worker so the
+                    // supervisor records the error instead of declaring false success.
+                    read_timeouts += 1;
+                    if read_timeouts > MAX_RETRIES {
+                        return WorkerEnd::Failed(format!("read timeout after {pos} bytes"));
                     }
                     short = true;
                     break;
@@ -509,12 +553,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
                 shared.progress.fetch_add(n as u64, Ordering::Relaxed);
                 *shared.last_progress.lock().unwrap() = Instant::now();
                 pos = end;
-                window += n as u64;
                 shared.maybe_save();
-                if stream_plain && window >= UNKNOWN_STREAM_WINDOW {
-                    short = true;
-                    break; // reconnect with a fresh GET, picking up recovered server speed
-                }
                 if let Some(end) = done {
                     return WorkerEnd::SegmentDone(end);
                 }
@@ -538,12 +577,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
             shared.progress.fetch_add(n as u64, Ordering::Relaxed);
                 *shared.last_progress.lock().unwrap() = Instant::now();
             pos = end;
-            window += n as u64;
             shared.maybe_save(); // crash-safe progress, throttled to SAVE_INTERVAL
-            if stream_plain && window >= UNKNOWN_STREAM_WINDOW {
-                short = true;
-                break; // reconnect with a fresh GET, picking up recovered server speed
-            }
             if n < chunk.len() {
                 // A split cut this chunk short; the remainder is re-requested from `pos`.
                 short = true;
@@ -646,6 +680,15 @@ async fn supervise(
                 if matches!(end, WorkerEnd::StreamEnded(_)) {
                     break; // plain stream at EOF: unknown-size download finished
                 }
+                if let WorkerEnd::Failed(msg) = &end
+                    && shared.unknown_size
+                {
+                    // A single plain stream has no peer to take over. Any terminal worker
+                    // failure (read timeout, exhausted retries, unexpected status) is fatal:
+                    // record it so the final guard fails instead of renaming truncated bytes.
+                    shared.set_error(msg);
+                    break;
+                }
                 if !shared.unknown_size && shared.planner.lock().unwrap().is_complete() {
                     break;
                 }
@@ -731,6 +774,18 @@ async fn supervise(
         shared.set_state(State::Failed);
         return Err(Error::Verification(err));
     }
+    // An unknown-size supervisor can leave the loop for reasons other than genuine EOF:
+    // "all URIs failed", "transfer stalled", or a terminal worker failure. Those paths
+    // already called set_error(); without this guard they were ignored and a truncated
+    // part file was renamed into place and reported as success. Genuine EOF leaves no
+    // recorded error, so the normal unknown-size completion path is unchanged.
+    if shared.unknown_size {
+        let recorded = shared.info.lock().unwrap().error.clone();
+        if let Some(err) = recorded {
+            shared.set_state(State::Failed);
+            return Err(Error::Network(err));
+        }
+    }
 
     shared.set_state(State::Verifying);
     // Persist the final segment table before renaming the part file into place.
@@ -756,7 +811,7 @@ async fn supervise(
             Err(e) => {
                 shared.set_error(e.to_string());
                 shared.set_state(State::Failed);
-                return Err(e.into());
+                return Err(e);
             }
         }
     }
@@ -826,7 +881,11 @@ impl Download {
                     .host_str()
                     .is_some_and(|h| opts.cookie_hosts.iter().any(|c| c.eq_ignore_ascii_case(h)))
             });
-            match probe::probe(&client, candidate.clone(), opts.headers.clone(), cookie).await {
+            // A mirror candidate is a different host: never send the caller's
+            // credentials to it during the probe either (reqwest only strips on
+            // redirects, not on a direct GET to an alternate host).
+            let scoped = probe::scope_headers(&opts.headers, opts.url.host_str(), candidate.host_str());
+            match probe::probe(&client, candidate.clone(), scoped, cookie).await {
                 Ok(i) => {
                     info = Some(i);
                     break;
@@ -948,6 +1007,7 @@ impl Download {
             uris,
             client,
             headers: opts.headers.clone(),
+            header_host: opts.url.host_str().map(str::to_owned),
             cookie_header: opts.cookie_header.clone(),
             cookie_hosts,
             finished: AtomicBool::new(false),
@@ -957,7 +1017,7 @@ impl Download {
             dest: opts.dest.clone(),
             resume_state: Mutex::new(resume_state),
             min_split,
-            connections: if unknown_size { 1 } else { opts.connections.max(1).min(16) },
+            connections: if unknown_size { 1 } else { opts.connections.clamp(1, 16) },
             unknown_size,
             last_save: Mutex::new(Instant::now()),
             paused,
@@ -985,7 +1045,18 @@ impl Download {
     }
 
     /// Recycle all sockets in process. Committed offsets and the URI pool are preserved.
+    /// A no-Range single stream has nothing to resegment: aborting it would force a full
+    /// re-GET of the committed prefix (the O(N^2) L1 defect), so it is a no-op here too.
+    /// Terminal handles are a no-op so a late watchdog tick cannot turn a completed
+    /// transfer into exit 130.
     pub async fn recycle_connections(&self) -> Result<()> {
+        let terminal = matches!(
+            self.shared.info.lock().unwrap().state,
+            State::Done | State::Failed | State::Cancelled
+        );
+        if self.shared.unknown_size || terminal {
+            return Ok(());
+        }
         self.cmds
             .send(Command::Recycle)
             .await

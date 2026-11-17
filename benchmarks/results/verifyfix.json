@@ -1,0 +1,555 @@
+{
+  "benchmarks": {
+    "checksum_large_file": {
+      "algorithm": "sha256",
+      "difference": {
+        "reason": "Both engines call the same paradl.postproc.checksum.ChecksumEngine.verify (Python hashlib); checksum cost is engine-independent, so no per-engine difference exists to measure.",
+        "value": null
+      },
+      "file_size_bytes": 268435456,
+      "median_seconds": 0.1162,
+      "note": "256 MiB crosses the 100 MiB mmap threshold in ChecksumEngine; this measures the real large-file path. Warm OS page-cache may lower the number -- it is not a WAN or engine-specific throughput claim.",
+      "per_engine": {
+        "aria2": {
+          "shared_path": true,
+          "value": 0.1162
+        },
+        "native": {
+          "shared_path": true,
+          "value": 0.1162
+        }
+      },
+      "samples_seconds": [
+        0.1164,
+        0.1162,
+        0.1161
+      ],
+      "shared_by_both_engines": true,
+      "spread_seconds": {
+        "max": 0.1164,
+        "min": 0.1161,
+        "n": 3,
+        "stdev": 0.0001
+      },
+      "throughput_mbps": 2202.96
+    },
+    "cpu_usage": {
+      "aria2": {
+        "cpu_seconds_median": 0.2378,
+        "cpu_seconds_samples": [
+          0.2138,
+          0.2378,
+          0.247
+        ],
+        "cpu_spread_seconds": {
+          "max": 0.247,
+          "min": 0.2138,
+          "n": 3,
+          "stdev": 0.0171
+        },
+        "cpu_utilization_pct": 71.2,
+        "scope": "getrusage(self + reaped children) CPU seconds for one cold 32 MiB transfer; includes the aria2c daemon child for aria2.",
+        "wall_median_seconds": 0.334
+      },
+      "native": {
+        "cpu_seconds_median": 0.1698,
+        "cpu_seconds_samples": [
+          0.1605,
+          0.1698,
+          0.1717
+        ],
+        "cpu_spread_seconds": {
+          "max": 0.1717,
+          "min": 0.1605,
+          "n": 3,
+          "stdev": 0.006
+        },
+        "cpu_utilization_pct": 70.9,
+        "scope": "getrusage(self + reaped children) CPU seconds for one cold 32 MiB transfer; includes the aria2c daemon child for aria2.",
+        "wall_median_seconds": 0.2395
+      }
+    },
+    "peak_rss": {
+      "aria2": {
+        "child_daemon_peak_rss_mb": 29.91,
+        "note": "Worker peak excludes the aria2c daemon child. Child peak (largest single reaped child) is reported separately and is NOT additive to the worker peak, so total aria2 footprint is understated; do not treat this as an apples-to-apples RSS win.",
+        "peak_rss_mb": 46.5,
+        "peak_rss_mb_samples": [
+          46.5,
+          46.5,
+          46.55
+        ],
+        "peak_rss_spread_mb": {
+          "max": 46.5469,
+          "min": 46.5,
+          "n": 3,
+          "stdev": 0.0271
+        },
+        "scope": "ru_maxrss of the isolated worker process after one cold transfer"
+      },
+      "native": {
+        "peak_rss_mb": 39.84,
+        "peak_rss_mb_samples": [
+          39.84,
+          40.44,
+          39.77
+        ],
+        "peak_rss_spread_mb": {
+          "max": 40.4375,
+          "min": 39.7656,
+          "n": 3,
+          "stdev": 0.3674
+        },
+        "scope": "ru_maxrss of the isolated worker process after one cold transfer"
+      }
+    },
+    "socket_recycle_latency": {
+      "aria2": {
+        "reason": "Not measured: a faithful aria2 recycle comparison requires a live aria2c daemon with an active GID on a throttled URI (pause/unpause + changeUri); calling control RPCs on a nonexistent GID returns instantly and would understate real control-plane cost. The diagnosis doc records ~150 ms for this path, but it is not reproduced here, so the value is null by design.",
+        "value": null
+      },
+      "native": {
+        "engine_audit": {
+          "aria2_daemon_spawned": false,
+          "native_fallback_called": false,
+          "observed_engine_at_decision": null,
+          "requested_engine": "native",
+          "use_rust_decision": null
+        },
+        "median_ms": 0.011,
+        "samples_ms": [
+          0.015,
+          0.011,
+          0.007
+        ],
+        "scope": "in-process recycle_connections() wall time after >=64 KiB of throttled progress on a live native handle",
+        "spread_ms": {
+          "max": 0.015,
+          "min": 0.007,
+          "n": 3,
+          "stdev": 0.004
+        }
+      }
+    },
+    "startup_overhead": {
+      "aria2": {
+        "cold_import_ms_samples": [
+          26.756,
+          24.626,
+          24.638
+        ],
+        "median_ms": 24.638,
+        "scope": "engine adapter module import + construction in a fresh interpreter",
+        "spread_ms": {
+          "max": 26.756,
+          "min": 24.626,
+          "n": 3,
+          "stdev": 1.2263
+        }
+      },
+      "native": {
+        "cold_import_ms_samples": [
+          20.295,
+          20.234,
+          20.281
+        ],
+        "median_ms": 20.281,
+        "scope": "engine adapter module import + construction in a fresh interpreter",
+        "spread_ms": {
+          "max": 20.295,
+          "min": 20.234,
+          "n": 3,
+          "stdev": 0.032
+        }
+      }
+    },
+    "throughput_16_stream": {
+      "aria2": {
+        "bytes": 33554432,
+        "cold_median_mbps": 95.82,
+        "cold_median_seconds": 0.334,
+        "cold_samples_seconds": [
+          0.3374,
+          0.334,
+          0.3331
+        ],
+        "cold_spread_seconds": {
+          "max": 0.3374,
+          "min": 0.3331,
+          "n": 3,
+          "stdev": 0.0023
+        },
+        "connections": 16,
+        "warm_median_mbps": 132.86,
+        "warm_median_seconds": 0.2409,
+        "warm_note": "Warm median reflects daemon/socket reuse + OS page-cache hits; NOT a general speedup. Compare cold-vs-cold for an engine diff.",
+        "warm_samples_seconds": [
+          0.2409,
+          0.2433,
+          0.2407
+        ],
+        "warm_spread_seconds": {
+          "max": 0.2433,
+          "min": 0.2407,
+          "n": 3,
+          "stdev": 0.0014
+        }
+      },
+      "native": {
+        "bytes": 33554432,
+        "cold_median_mbps": 133.61,
+        "cold_median_seconds": 0.2395,
+        "cold_samples_seconds": [
+          0.2507,
+          0.2395,
+          0.2383
+        ],
+        "cold_spread_seconds": {
+          "max": 0.2507,
+          "min": 0.2383,
+          "n": 3,
+          "stdev": 0.0068
+        },
+        "connections": 16,
+        "warm_median_mbps": 137.53,
+        "warm_median_seconds": 0.2327,
+        "warm_note": "Warm median reflects daemon/socket reuse + OS page-cache hits; NOT a general speedup. Compare cold-vs-cold for an engine diff.",
+        "warm_samples_seconds": [
+          0.2342,
+          0.2297,
+          0.2327
+        ],
+        "warm_spread_seconds": {
+          "max": 0.2342,
+          "min": 0.2297,
+          "n": 3,
+          "stdev": 0.0023
+        }
+      }
+    }
+  },
+  "engine_pinning": {
+    "aria2": {
+      "aria2_daemon_spawned": true,
+      "native_fallback_called": false,
+      "observed_engine_at_decision": "aria2",
+      "requested_engine": "aria2",
+      "use_rust_decision": false
+    },
+    "assertions_passed": true,
+    "method": "aria2 runs pin get_active_engine()='aria2', spy on Aria2Engine._use_rust_for, and sentinel RustEngine.download to fail on silent fallback (+assert a real aria2c daemon spawned). Native runs pin 'rust' and assert no aria2 daemon. --self-test-pin proves both the positive and the deliberately-broken case.",
+    "native": {
+      "aria2_daemon_spawned": false,
+      "native_fallback_called": false,
+      "observed_engine_at_decision": null,
+      "requested_engine": "native",
+      "use_rust_decision": null
+    }
+  },
+  "environment": {
+    "aria2c": "/opt/homebrew/bin/aria2c",
+    "native_extension_present": true,
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "rust_adapter_present": true
+  },
+  "generated_at": "2026-11-17T21:25:12+0600",
+  "harness_version": 2,
+  "honesty": {
+    "codeload": {
+      "reason": "No codeload/WAN comparison performed: this harness intentionally uses an isolated loopback server for reproducible CPU/socket measurement, so no accelerated URL is involved. If a codeload comparison is added, both engines MUST use the SAME accelerated URL -- otherwise the result is not an engine comparison.",
+      "value": null
+    },
+    "drift": "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md sec.7 is measurement noise, NOT a code-attributable win. See variance.",
+    "unfair_metrics": "Metrics that cannot be measured fairly are written as {'value': null, 'reason': '...'} and never invented.",
+    "warm_cache": "Warm throughput includes daemon/socket reuse + page-cache hits and is NOT presented as a general speedup; cold-vs-cold is the engine comparison."
+  },
+  "methodology": {
+    "checksum": "shared ChecksumEngine.verify SHA-256 on a 256 MiB mmap file",
+    "cpu_usage": "getrusage(self + reaped children) CPU seconds for one cold transfer",
+    "peak_rss": "ru_maxrss of isolated worker; aria2 daemon child reported separately",
+    "recycle": "in-process recycle_connections() wall time after >=64 KiB throttled progress; native only (aria2 null+reason -- see honesty).",
+    "startup": "cold engine-module import + construction, median of 3 fresh subprocesses",
+    "throughput": "32 MiB deterministic loopback, 16 connections; 3 cold transfers in fresh subprocesses + warm median (3 transfers after daemon/engine warmup). Loopback measures local CPU/socket cost, NOT WAN anti-throttle performance. Reports medians + spreads."
+  },
+  "runs": [
+    {
+      "benchmarks": {
+        "checksum_large_file": {
+          "algorithm": "sha256",
+          "difference": {
+            "reason": "Both engines call the same paradl.postproc.checksum.ChecksumEngine.verify (Python hashlib); checksum cost is engine-independent, so no per-engine difference exists to measure.",
+            "value": null
+          },
+          "file_size_bytes": 268435456,
+          "median_seconds": 0.1162,
+          "note": "256 MiB crosses the 100 MiB mmap threshold in ChecksumEngine; this measures the real large-file path. Warm OS page-cache may lower the number -- it is not a WAN or engine-specific throughput claim.",
+          "per_engine": {
+            "aria2": {
+              "shared_path": true,
+              "value": 0.1162
+            },
+            "native": {
+              "shared_path": true,
+              "value": 0.1162
+            }
+          },
+          "samples_seconds": [
+            0.1164,
+            0.1162,
+            0.1161
+          ],
+          "shared_by_both_engines": true,
+          "spread_seconds": {
+            "max": 0.1164,
+            "min": 0.1161,
+            "n": 3,
+            "stdev": 0.0001
+          },
+          "throughput_mbps": 2202.96
+        },
+        "cpu_usage": {
+          "aria2": {
+            "cpu_seconds_median": 0.2378,
+            "cpu_seconds_samples": [
+              0.2138,
+              0.2378,
+              0.247
+            ],
+            "cpu_spread_seconds": {
+              "max": 0.247,
+              "min": 0.2138,
+              "n": 3,
+              "stdev": 0.0171
+            },
+            "cpu_utilization_pct": 71.2,
+            "scope": "getrusage(self + reaped children) CPU seconds for one cold 32 MiB transfer; includes the aria2c daemon child for aria2.",
+            "wall_median_seconds": 0.334
+          },
+          "native": {
+            "cpu_seconds_median": 0.1698,
+            "cpu_seconds_samples": [
+              0.1605,
+              0.1698,
+              0.1717
+            ],
+            "cpu_spread_seconds": {
+              "max": 0.1717,
+              "min": 0.1605,
+              "n": 3,
+              "stdev": 0.006
+            },
+            "cpu_utilization_pct": 70.9,
+            "scope": "getrusage(self + reaped children) CPU seconds for one cold 32 MiB transfer; includes the aria2c daemon child for aria2.",
+            "wall_median_seconds": 0.2395
+          }
+        },
+        "peak_rss": {
+          "aria2": {
+            "child_daemon_peak_rss_mb": 29.91,
+            "note": "Worker peak excludes the aria2c daemon child. Child peak (largest single reaped child) is reported separately and is NOT additive to the worker peak, so total aria2 footprint is understated; do not treat this as an apples-to-apples RSS win.",
+            "peak_rss_mb": 46.5,
+            "peak_rss_mb_samples": [
+              46.5,
+              46.5,
+              46.55
+            ],
+            "peak_rss_spread_mb": {
+              "max": 46.5469,
+              "min": 46.5,
+              "n": 3,
+              "stdev": 0.0271
+            },
+            "scope": "ru_maxrss of the isolated worker process after one cold transfer"
+          },
+          "native": {
+            "peak_rss_mb": 39.84,
+            "peak_rss_mb_samples": [
+              39.84,
+              40.44,
+              39.77
+            ],
+            "peak_rss_spread_mb": {
+              "max": 40.4375,
+              "min": 39.7656,
+              "n": 3,
+              "stdev": 0.3674
+            },
+            "scope": "ru_maxrss of the isolated worker process after one cold transfer"
+          }
+        },
+        "socket_recycle_latency": {
+          "aria2": {
+            "reason": "Not measured: a faithful aria2 recycle comparison requires a live aria2c daemon with an active GID on a throttled URI (pause/unpause + changeUri); calling control RPCs on a nonexistent GID returns instantly and would understate real control-plane cost. The diagnosis doc records ~150 ms for this path, but it is not reproduced here, so the value is null by design.",
+            "value": null
+          },
+          "native": {
+            "engine_audit": {
+              "aria2_daemon_spawned": false,
+              "native_fallback_called": false,
+              "observed_engine_at_decision": null,
+              "requested_engine": "native",
+              "use_rust_decision": null
+            },
+            "median_ms": 0.011,
+            "samples_ms": [
+              0.015,
+              0.011,
+              0.007
+            ],
+            "scope": "in-process recycle_connections() wall time after >=64 KiB of throttled progress on a live native handle",
+            "spread_ms": {
+              "max": 0.015,
+              "min": 0.007,
+              "n": 3,
+              "stdev": 0.004
+            }
+          }
+        },
+        "startup_overhead": {
+          "aria2": {
+            "cold_import_ms_samples": [
+              26.756,
+              24.626,
+              24.638
+            ],
+            "median_ms": 24.638,
+            "scope": "engine adapter module import + construction in a fresh interpreter",
+            "spread_ms": {
+              "max": 26.756,
+              "min": 24.626,
+              "n": 3,
+              "stdev": 1.2263
+            }
+          },
+          "native": {
+            "cold_import_ms_samples": [
+              20.295,
+              20.234,
+              20.281
+            ],
+            "median_ms": 20.281,
+            "scope": "engine adapter module import + construction in a fresh interpreter",
+            "spread_ms": {
+              "max": 20.295,
+              "min": 20.234,
+              "n": 3,
+              "stdev": 0.032
+            }
+          }
+        },
+        "throughput_16_stream": {
+          "aria2": {
+            "bytes": 33554432,
+            "cold_median_mbps": 95.82,
+            "cold_median_seconds": 0.334,
+            "cold_samples_seconds": [
+              0.3374,
+              0.334,
+              0.3331
+            ],
+            "cold_spread_seconds": {
+              "max": 0.3374,
+              "min": 0.3331,
+              "n": 3,
+              "stdev": 0.0023
+            },
+            "connections": 16,
+            "warm_median_mbps": 132.86,
+            "warm_median_seconds": 0.2409,
+            "warm_note": "Warm median reflects daemon/socket reuse + OS page-cache hits; NOT a general speedup. Compare cold-vs-cold for an engine diff.",
+            "warm_samples_seconds": [
+              0.2409,
+              0.2433,
+              0.2407
+            ],
+            "warm_spread_seconds": {
+              "max": 0.2433,
+              "min": 0.2407,
+              "n": 3,
+              "stdev": 0.0014
+            }
+          },
+          "native": {
+            "bytes": 33554432,
+            "cold_median_mbps": 133.61,
+            "cold_median_seconds": 0.2395,
+            "cold_samples_seconds": [
+              0.2507,
+              0.2395,
+              0.2383
+            ],
+            "cold_spread_seconds": {
+              "max": 0.2507,
+              "min": 0.2383,
+              "n": 3,
+              "stdev": 0.0068
+            },
+            "connections": 16,
+            "warm_median_mbps": 137.53,
+            "warm_median_seconds": 0.2327,
+            "warm_note": "Warm median reflects daemon/socket reuse + OS page-cache hits; NOT a general speedup. Compare cold-vs-cold for an engine diff.",
+            "warm_samples_seconds": [
+              0.2342,
+              0.2297,
+              0.2327
+            ],
+            "warm_spread_seconds": {
+              "max": 0.2342,
+              "min": 0.2297,
+              "n": 3,
+              "stdev": 0.0023
+            }
+          }
+        }
+      },
+      "engine_pinning": {
+        "aria2": {
+          "aria2_daemon_spawned": true,
+          "native_fallback_called": false,
+          "observed_engine_at_decision": "aria2",
+          "requested_engine": "aria2",
+          "use_rust_decision": false
+        },
+        "assertions_passed": true,
+        "method": "aria2 runs pin get_active_engine()='aria2', spy on Aria2Engine._use_rust_for, and sentinel RustEngine.download to fail on silent fallback (+assert a real aria2c daemon spawned). Native runs pin 'rust' and assert no aria2 daemon. --self-test-pin proves both the positive and the deliberately-broken case.",
+        "native": {
+          "aria2_daemon_spawned": false,
+          "native_fallback_called": false,
+          "observed_engine_at_decision": null,
+          "requested_engine": "native",
+          "use_rust_decision": null
+        }
+      },
+      "environment": {
+        "aria2c": "/opt/homebrew/bin/aria2c",
+        "native_extension_present": true,
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "python": "3.12.16",
+        "rust_adapter_present": true
+      },
+      "honesty": {
+        "codeload": {
+          "reason": "No codeload/WAN comparison performed: this harness intentionally uses an isolated loopback server for reproducible CPU/socket measurement, so no accelerated URL is involved. If a codeload comparison is added, both engines MUST use the SAME accelerated URL -- otherwise the result is not an engine comparison.",
+          "value": null
+        },
+        "drift": "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md sec.7 is measurement noise, NOT a code-attributable win. See variance.",
+        "unfair_metrics": "Metrics that cannot be measured fairly are written as {'value': null, 'reason': '...'} and never invented.",
+        "warm_cache": "Warm throughput includes daemon/socket reuse + page-cache hits and is NOT presented as a general speedup; cold-vs-cold is the engine comparison."
+      },
+      "methodology": {
+        "checksum": "shared ChecksumEngine.verify SHA-256 on a 256 MiB mmap file",
+        "cpu_usage": "getrusage(self + reaped children) CPU seconds for one cold transfer",
+        "peak_rss": "ru_maxrss of isolated worker; aria2 daemon child reported separately",
+        "recycle": "in-process recycle_connections() wall time after >=64 KiB throttled progress; native only (aria2 null+reason -- see honesty).",
+        "startup": "cold engine-module import + construction, median of 3 fresh subprocesses",
+        "throughput": "32 MiB deterministic loopback, 16 connections; 3 cold transfers in fresh subprocesses + warm median (3 transfers after daemon/engine warmup). Loopback measures local CPU/socket cost, NOT WAN anti-throttle performance. Reports medians + spreads."
+      }
+    }
+  ],
+  "schema_version": 1,
+  "variance": {
+    "reason": "single run; re-run with --runs 3 to quantify variance",
+    "value": null
+  }
+}

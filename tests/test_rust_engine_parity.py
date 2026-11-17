@@ -55,6 +55,7 @@ class SeenRequest:
     host: str | None
     cookie: str | None
     range_header: str | None
+    authorization: str | None = None
 
 
 @dataclass
@@ -62,8 +63,9 @@ class ThrottlingServer:
     """Owns a ``ThreadingHTTPServer`` bound to 127.0.0.1:0.
 
     ``throttle_bps`` is a *knob*: 0 means unlimited, any positive value makes
-    body writes sleep per chunk.  Changing it mid-transfer affects only new
-    requests, which is exactly what the watchdog/recycle tests rely on.
+    body writes sleep per chunk.  It is re-read per chunk, so changing it
+    mid-transfer affects the in-flight response -- which is what the
+    watchdog/recycle tests rely on.
     """
 
     payload: bytes
@@ -109,6 +111,18 @@ class ThrottlingServer:
             def log_message(self, fmt: str, *args: Any) -> None:
                 return  # keep pytest output quiet
 
+            def handle_one_request(self) -> None:
+                # A client that abandons an HTTP/1.1 keep-alive connection (the
+                # native engine closing its socket after reading a response, or
+                # a test client after following a 302) makes rfile.readline()
+                # raise on the next iteration of BaseHTTPRequestHandler.handle.
+                # That is a normal peer disconnect, not a server fault: close
+                # quietly so socketserver does not print a teardown traceback.
+                try:
+                    super().handle_one_request()
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+                    self.close_connection = True
+
             def _record(self) -> None:
                 server.seen.append(
                     SeenRequest(
@@ -116,6 +130,7 @@ class ThrottlingServer:
                         host=self.headers.get("Host"),
                         cookie=self.headers.get("Cookie"),
                         range_header=self.headers.get("Range"),
+                        authorization=self.headers.get("Authorization"),
                     )
                 )
 
@@ -141,10 +156,13 @@ class ThrottlingServer:
                 self._write_throttled(body)
 
             def _write_throttled(self, body: bytes) -> None:
-                throttle = server.throttle_bps
                 chunk = max(1, int(server.chunk_size))
-                pause = chunk / throttle if throttle and throttle > 0 else 0.0
                 for offset in range(0, len(body), chunk):
+                    # Re-read the knob per chunk: a single close-delimited GET may
+                    # stream the whole body, and tests unthrottle mid-transfer to
+                    # let it finish. Capturing the value once would ignore that.
+                    throttle = server.throttle_bps
+                    pause = chunk / throttle if throttle and throttle > 0 else 0.0
                     if pause and offset:
                         time.sleep(pause)
                     try:
@@ -529,6 +547,7 @@ def test_cookie_does_not_leak_to_cross_host_redirect(
         # Record how many bytes the server had actually written at tick time.
         events.append((done, total, server.bytes_sent))
 
+    t0 = time.monotonic()
     try:
         result = adapter_engine().execute(
             info,
@@ -539,6 +558,15 @@ def test_cookie_does_not_leak_to_cross_host_redirect(
         )
     finally:
         server.throttle_bps = 0.0
+    elapsed = time.monotonic() - t0
+
+    # L1 timing guard (audit Task 3c): 1 MiB at 512 KB/s is ~2 s of wall-clock
+    # work. A close-delimited, non-Range stream must be read once to EOF -- if
+    # the engine re-GETs the whole body per bounded window it takes ~30 s.
+    assert elapsed < 8.0, (
+        f"close-delimited cookie-redirect transfer took {elapsed:.1f}s; "
+        "expected ~2s for 1 MiB at 512 KB/s (redundant re-GETs / L1)"
+    )
 
     assert result.success is True, result.error
     assert result.file_path is not None
