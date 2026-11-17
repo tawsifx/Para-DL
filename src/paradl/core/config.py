@@ -22,6 +22,27 @@ CONFIG_SCHEMA_VERSION = 2
 VALID_AUDIO_CODECS = {"lossless", "native", "mp3", "flac", "opus", "wav", "aac"}
 VALID_VIDEO_QUALITIES = {"best", "4k", "1440p", "1080p", "720p", "480p"}
 VALID_WATCHDOG_MODES = {m.value for m in WatchdogMode}
+VALID_ENGINES = {"rust", "aria2"}
+
+# Active HTTP(S) transfer backend.  Rust is the default; ``--engine aria2``
+# selects the legacy JSON-RPC backend.  Set at parse time by the ``--engine``
+# argparse action so every downstream engine (including the delegation shims)
+# observes the same choice without threading config objects through them.
+_active_engine: str = "rust"
+
+
+def set_active_engine(name: str) -> None:
+    """Set the process-wide transfer engine (validated against VALID_ENGINES)."""
+    global _active_engine  # noqa: PLW0603
+    normalized = str(name).strip().lower()
+    if normalized not in VALID_ENGINES:
+        raise ValueError(f"engine must be one of {sorted(VALID_ENGINES)}, got {name!r}")
+    _active_engine = normalized
+
+
+def get_active_engine() -> str:
+    """Return the process-wide transfer engine name."""
+    return _active_engine
 
 
 def default_bin_dir() -> str:
@@ -57,6 +78,7 @@ class PDLConfig:
     pause_on_low_power: bool = False
     isp: str = "auto"
     doh_endpoint: str | None = None
+    engine: str = "rust"
 
     def get_effective_isp(self) -> str:
         """Return configured ISP if explicitly set, or auto-detect from active network."""
@@ -190,6 +212,10 @@ class PDLConfig:
                     f"doh_endpoint must be an http/https URL, got {self.doh_endpoint!r}"
                 )
 
+        if not isinstance(self.engine, str) or self.engine.strip().lower() not in VALID_ENGINES:
+            raise ValueError(f"engine must be one of {sorted(VALID_ENGINES)}, got {self.engine!r}")
+        self.engine = self.engine.strip().lower()
+
     @classmethod
     def _backup_corrupt_file(cls, cfg_file: Path, exc: Exception) -> None:
         bad_file = cfg_file.with_suffix(cfg_file.suffix + ".bad")
@@ -224,6 +250,7 @@ class PDLConfig:
         try:
             cfg = cls(**known_kwargs)
             cfg.validate()
+            set_active_engine(cfg.engine)
             return cfg
         except (TypeError, ValueError) as exc:
             cls._backup_corrupt_file(cfg_file, exc)
@@ -294,6 +321,9 @@ class PDLConfig:
                     return False, f"Invalid numeric value for {key}: {value!r}"
             elif key in ("max_download_limit", "anti_throttle", "ytdlp_player_client"):
                 coerced = None if value is None else str(value).strip()
+            elif key == "engine":
+                coerced = str(value).strip().lower()
+                set_active_engine(str(coerced))
             else:
                 coerced = str(value).strip()
 

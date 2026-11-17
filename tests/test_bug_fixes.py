@@ -28,6 +28,13 @@ from paradl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
 from paradl.ui import UI
 
 
+@pytest.fixture
+def force_legacy_aria2(monkeypatch):
+    """These tests patch aria2 internals; force the legacy backend so the
+    delegation shim does not route them to the native Rust engine."""
+    monkeypatch.setattr("paradl.core.config.get_active_engine", lambda: "aria2")
+
+
 # ---------------------------------------------------------------------------
 # H1: cURL parser consumes option values and identifies real target URL
 # ---------------------------------------------------------------------------
@@ -103,6 +110,7 @@ def test_h3_media_codec_args():
 # ---------------------------------------------------------------------------
 # H4: aria2 final file resolution does not pick unrelated pre-existing files
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("force_legacy_aria2")
 def test_h4_aria2_final_file_resolution(tmp_path):
     UI.quiet = True
     actual = tmp_path / "payload.bin"
@@ -278,6 +286,7 @@ def test_m6_compute_hour_bucket():
 # ---------------------------------------------------------------------------
 # M7: Batch downloads checksum status
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("force_legacy_aria2")
 def test_m7_batch_checksum_aggregation(tmp_path):
     UI.quiet = True
     f1 = tmp_path / "f1.bin"

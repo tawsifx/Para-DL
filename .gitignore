@@ -28,6 +28,14 @@ Icon
 *.aria2
 *.part
 
+# Rust / Python build artifacts
+rust/target/
+__pycache__/
+*.pyc
+
+# Agent scratch (ledgers, review packages) — local only
+.superpowers/
+
 # Internal context, notes & reports
 *CONTEXT*.md
 *REPORT*.md

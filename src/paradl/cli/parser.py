@@ -8,10 +8,27 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Sequence
+from typing import Any
 
 from paradl import VERSION
-from paradl.core.config import PDLConfig
+from paradl.core.config import VALID_ENGINES, PDLConfig, set_active_engine
 from paradl.ui import SecretRedactingFilter
+
+
+class _EngineAction(argparse.Action):
+    """Record the chosen backend at parse time for downstream engine shims."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        name = str(values)
+        set_active_engine(name)
+        setattr(namespace, self.dest, name)
 
 SUBCOMMANDS = {
     "auth",
@@ -175,6 +192,14 @@ Recipes:
         type=int,
         default=config.connections,
         help=f"Parallel connection streams for aria2c (1-16, maximum allowed: 16, default: {min(config.connections, 16)}).",
+    )
+    parser.add_argument(
+        "--engine",
+        dest="engine",
+        choices=sorted(VALID_ENGINES),
+        default=config.engine,
+        action=_EngineAction,
+        help="HTTP(S) transfer backend: 'rust' (default, in-process mdm-engine) or 'aria2' (legacy JSON-RPC fallback).",
     )
     parser.add_argument(
         "-o",

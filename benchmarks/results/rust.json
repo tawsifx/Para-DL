@@ -1,0 +1,83 @@
+{
+  "benchmarks": {
+    "peak_rss": {
+      "aria2": {
+        "peak_rss_mb": 44.2
+      },
+      "native": {
+        "peak_rss_mb": 36.38
+      }
+    },
+    "socket_recycle_latency": {
+      "aria2": {
+        "latency_ms": null,
+        "note": "Not measured: a faithful comparison requires a live aria2c daemon with an active GID on a throttled URI; pause/unpause on a nonexistent GID would return instantly and understate real control-plane cost. The diagnosis doc records ~150 ms for this path."
+      },
+      "native": {
+        "latency_ms": 0.014
+      }
+    },
+    "startup_overhead": {
+      "aria2": {
+        "cold_import_ms_samples": [
+          28.164,
+          25.384,
+          25.631
+        ],
+        "median_ms": 25.631
+      },
+      "native": {
+        "cold_import_ms_samples": [
+          1.076,
+          1.237,
+          1.069
+        ],
+        "median_ms": 1.076
+      }
+    },
+    "throughput_16_stream": {
+      "aria2": {
+        "bytes": 33554432,
+        "cold_mbps": 91.76,
+        "cold_seconds": 0.3487,
+        "connections": 16,
+        "warm_median_mbps": 129.02,
+        "warm_median_seconds": 0.248,
+        "warm_samples_seconds": [
+          0.248,
+          0.2415,
+          0.2495
+        ]
+      },
+      "native": {
+        "bytes": 33554432,
+        "cold_mbps": 131.89,
+        "cold_seconds": 0.2426,
+        "connections": 16,
+        "warm_median_mbps": 140.31,
+        "warm_median_seconds": 0.2281,
+        "warm_samples_seconds": [
+          0.2281,
+          0.2268,
+          0.4336
+        ]
+      }
+    }
+  },
+  "environment": {
+    "aria2c": "/opt/homebrew/bin/aria2c",
+    "native_extension_present": true,
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "python": "3.12.16",
+    "rust_adapter_present": true
+  },
+  "generated_at": "2026-11-17T19:27:57+0600",
+  "methodology": {
+    "honesty": "No warm-cache hit is presented as a general speedup. Native values are null until the PyO3 extension is built and this script is re-run.",
+    "peak_rss": "ru_maxrss of an isolated worker subprocess after one transfer",
+    "recycle": "in-process recycle_connections() wall time after >=64 KiB of throttled progress; native only (see aria2 note in results).",
+    "startup": "cold import in a fresh subprocess (median of 3)",
+    "throughput": "32 MiB deterministic loopback payload, 16 connections; cold run (first invocation) and warm median (3 runs) reported separately. Loopback measures local CPU/socket cost, NOT WAN anti-throttle performance."
+  },
+  "schema_version": 1
+}

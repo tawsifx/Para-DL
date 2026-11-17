@@ -1,0 +1,18 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "paradl-rust-engine"
+version = "0.1.0"
+description = "Native Rust download engine for paradl (vendored MDM engine)"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+
+[tool.maturin]
+module-name = "paradl._rust_engine"
+# Mixed layout: the extension is installed as paradl/_rust_engine*.so, while the
+# namespace shim in python/paradl keeps the existing Python sources importable.
+python-source = "python"
+features = ["pyo3/extension-module"]
+strip = true

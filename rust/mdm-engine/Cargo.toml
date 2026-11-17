@@ -1,0 +1,30 @@
+[package]
+name = "mdm-engine"
+description = "Trimmed MDM download engine: planner, resume state, limiter, verifier, Tokio workers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+md-5.workspace = true
+sha1.workspace = true
+crc32fast.workspace = true
+base64.workspace = true
+hex.workspace = true
+httpdate.workspace = true
+url.workspace = true
+bytes.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
