@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Entrega as transferências do browser ao Mister Download Manager."
+  },
+  "menu": {
+    "message": "Transferir com o Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Transferir vídeo"
+  },
+  "video_more": {
+    "message": "Mais opções"
+  },
+  "video_hide_here": {
+    "message": "Ocultar neste vídeo"
+  },
+  "video_never_site": {
+    "message": "Nunca em $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Definições do botão..."
+  },
+  "video_sent": {
+    "message": "Enviado para Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager não está instalado ou não iniciou"
+  },
+  "video_drag": {
+    "message": "Arraste para o mover ao longo do limite do vídeo"
+  },
+  "menu_selected": {
+    "message": "Descarregar links selecionados com Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Descarregar todos os links com Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Ligado a Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Ligado a Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Em pausa: os downloads permanecem no navegador"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager não está instalado ou a sua integração com o navegador não está configurada"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager não aceita esta cópia da extensão"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager não iniciou a tempo"
+  },
+  "status_host_failed": {
+    "message": "A ligação ao Mister Download Manager falhou"
+  },
+  "status_too_large": {
+    "message": "Os detalhes deste download eram demasiado grandes para serem entregues"
+  },
+  "status_update_app": {
+    "message": "Atualize o Mister Download Manager para usar tudo o que esta extensão oferece"
+  },
+  "popup_take": {
+    "message": "Obter downloads deste navegador"
+  },
+  "popup_proxy": {
+    "message": "Enviar transferências através do proxy ou extensão VPN deste browser"
+  },
+  "popup_proxy_title": {
+    "message": "O Mister Download Manager transfere através do mesmo proxy que este browser. O browser pede-lhe uma vez para permitir; desativar isto anula essa permissão."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "O Mister Download Manager transfere, então, através do mesmo proxy que este navegador. Enquanto esta opção estiver desativada, a extensão não lê o proxy do navegador."
+  },
+  "popup_exclude_site": {
+    "message": "Nunca descarregar de $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Os downloads de $site$ ficam com o navegador",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Abrir Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Opções..."
+  },
+  "popup_help": {
+    "message": "Ajuda"
+  },
+  "popup_support": {
+    "message": "Apoiar o MDM"
+  },
+  "popup_fix": {
+    "message": "Como corrigir"
+  },
+  "popup_declined": {
+    "message": "Deixado para o navegador: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "A última transferência foi deixada para o navegador."
+  },
+  "declined_file_type": {
+    "message": "O tipo não está em Opções → Tipos de ficheiro."
+  },
+  "declined_site": {
+    "message": "O site está em Opções → Tipos de ficheiro, sites deixados para o navegador."
+  },
+  "declined_address": {
+    "message": "O endereço está em Opções → Tipos de ficheiro, endereços deixados para o navegador."
+  },
+  "declined_small": {
+    "message": "É menor do que o tamanho mínimo em Opções → Tipos de ficheiro."
+  },
+  "declined_browser": {
+    "message": "Este navegador não está selecionado em Opções → Geral."
+  },
+  "declined_integration_off": {
+    "message": "A opção \"Utilizar integração avançada do navegador\" está desativada em Opções → Geral."
+  },
+  "declined_site_access": {
+    "message": "A extensão não tem permissão para ler este site (acesso ao site do navegador)."
+  },
+  "popup_alt": {
+    "message": "Mantenha Alt premido enquanto clica num link para deixar o navegador descarregá-lo."
+  },
+  "popup_media": {
+    "message": "Multimédia nesta página"
+  },
+  "popup_media_none": {
+    "message": "Ainda não foi encontrado nenhum vídeo ou som nesta página. Reproduza-o e, em seguida, abra isto novamente."
+  },
+  "popup_media_streamed": {
+    "message": "O leitor desta página transmite o vídeo em partes, por isso não há nenhum ficheiro para listar. Aponte para o vídeo e utilize o botão «Transferir vídeo»."
+  },
+  "popup_media_store": {
+    "message": "As regras da Chrome Web Store mantêm esta cópia do suplemento afastada dos vídeos deste site. A Ajuda indica o que pode fazer."
+  },
+  "popup_media_download": {
+    "message": "Transferir"
+  },
+  "popup_media_protected": {
+    "message": "Protegido"
+  },
+  "popup_media_live": {
+    "message": "Em direto"
+  },
+  "video_off": {
+    "message": "O botão de download está desativado neste site"
+  },
+  "video_drm": {
+    "message": "Vídeo protegido: não pode ser guardado"
+  },
+  "video_unnamed": {
+    "message": "Não é possível saber que vídeo é este: abra a página do próprio vídeo e tente lá"
+  },
+  "video_looking": {
+    "message": "A procurar as qualidades…"
+  },
+  "video_open_mdm": {
+    "message": "Abrir no Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Não há nenhum vídeo para transferir aqui"
+  },
+  "video_playlist": {
+    "message": "Uma lista de vídeos: escolha-os no Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "O Mister Download Manager precisa do yt-dlp para este vídeo"
+  },
+  "video_too_long": {
+    "message": "A pesquisa demorou demasiado"
+  },
+  "video_busy": {
+    "message": "O Mister Download Manager está ocupado com outros vídeos"
+  },
+  "video_queued": {
+    "message": "Adicionado à fila"
+  },
+  "video_failed_lookup": {
+    "message": "Não foi possível pesquisar"
+  },
+  "video_tab_video": {
+    "message": "Vídeo"
+  },
+  "video_tab_audio": {
+    "message": "Áudio"
+  },
+  "video_open_post": {
+    "message": "Abra a publicação e use o botão lá"
+  },
+  "popup_send_to": {
+    "message": "Enviar downloads para"
+  },
+  "popup_send_here": {
+    "message": "Este computador"
+  },
+  "popup_send_remote": {
+    "message": "Outro Mister Download Manager (um servidor)"
+  },
+  "popup_remote_code": {
+    "message": "Código de emparelhamento"
+  },
+  "popup_remote_open": {
+    "message": "Abrir"
+  },
+  "popup_remote_pair": {
+    "message": "Emparelhar"
+  },
+  "popup_remote_help": {
+    "message": "Abra o endereço uma vez e aceite o certificado, depois introduza um código das Opções, Remoto, Emparelhar um dispositivo (ou misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Os downloads vão para $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Introduza o endereço https://."
+  },
+  "remote_unreachable": {
+    "message": "Não alcançado. Abra o endereço uma vez neste navegador e aceite o certificado, depois tente novamente."
+  },
+  "remote_wrong_code": {
+    "message": "Código errado."
+  },
+  "remote_no_code": {
+    "message": "Não mostra nenhum código agora: clique primeiro em Emparelhar um dispositivo."
+  },
+  "remote_too_soon": {
+    "message": "Aguarde um momento e tente novamente."
+  },
+  "remote_failed": {
+    "message": "Não funcionou. Tente novamente."
+  },
+  "remote_device_name": {
+    "message": "Extensão do navegador"
+  },
+  "popup_media_title_name": {
+    "message": "Adicionar o título da página antes dos nomes dos ficheiros multimédia"
+  }
+}

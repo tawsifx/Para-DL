@@ -15,7 +15,7 @@
 - Worktree `feat/rust-mdm-engine` only; do not touch `main` or `perf/max-efficiency`.
 - Preserve all CLI flags, `ExitCode` values, `TransferResult` fields, JSONL event names/shapes, mirror/metalink/cookie/header/proxy/ip_family behavior, and the shim modules.
 - Max 16 connections per transfer; all new concurrency bounded and timeouts present.
-- **License:** MDM is `GPL-3.0-or-later`; `paradl` declares `MIT` in `pyproject.toml`. Preserve MDM copyright/GPL headers on every ported file, create `THIRD_PARTY_NOTICES.md`, and FLAG the license conflict for user review. Do not silently change the root license.
+- **License:** MDM is `GPL-3.0-or-later`; `paradl` declares `MIT` in `pyproject.toml`. Preserve MDM copyright/GPL headers on every ported file and FLAG the license conflict for user review. Do not silently change the root license.
 - No WebAssembly/GPU claims. Honest benchmarks only; separate real wins from noise.
 - TDD: every new behavior gets a failing test first (Rust `#[test]` and Python `pytest`).
 - Verification gate: `cargo test`, `pytest -q`, `ruff check src tests`, `mypy src`, throughput benchmark — all with fresh raw output.
@@ -87,5 +87,5 @@
 
 ### Task 4 (Lead): Integration, license, final gate
 
-- [ ] `THIRD_PARTY_NOTICES.md`: source URL, version/commit, ported files, modifications, GPL-3.0-or-later terms, MIT conflict flagged.
+- [ ] Flag the GPL-3.0-or-later vs MIT conflict for maintainer decision (per-file SPDX headers retained).
 - [ ] Final `cargo test`, `pytest -q`, `ruff`, `mypy src`, benchmark; plain-English summary.

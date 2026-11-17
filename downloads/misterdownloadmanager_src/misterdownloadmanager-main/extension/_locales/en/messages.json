@@ -1,0 +1,362 @@
+{
+  "name": {
+    "message": "Mister Download Manager",
+    "description": "the extension's name in the browser's list of extensions and on its toolbar button; keep the name Mister Download Manager as it is"
+  },
+  "description": {
+    "message": "Hands downloads from the browser to Mister Download Manager.",
+    "description": "the extension's description in the browser's list of extensions; keep the name Mister Download Manager as it is"
+  },
+  "menu": {
+    "message": "Download with Mister Download Manager",
+    "description": "command in the browser's right-click menu on a link, picture, video or sound; keep the name Mister Download Manager as it is"
+  },
+  "video_download": {
+    "message": "Download video",
+    "description": "the button over a video on a web page that downloads it; verb; short (it sits on the video)"
+  },
+  "video_more": {
+    "message": "More options",
+    "description": "the small arrow next to the Download video button that opens its menu (read aloud by screen readers)"
+  },
+  "video_hide_here": {
+    "message": "Hide on this video",
+    "description": "menu command of the download button over a video: hide the button on this video only"
+  },
+  "video_never_site": {
+    "message": "Never on $site$",
+    "description": "menu command of the download button over a video: never show the button on this web site again",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Button settings...",
+    "description": "menu command of the download button over a video: opens its settings in Mister Download Manager"
+  },
+  "video_sent": {
+    "message": "Sent to Mister Download Manager",
+    "description": "shown briefly on the download button after it was clicked; keep the name Mister Download Manager as it is"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager isn't installed or didn't start",
+    "description": "shown briefly on the download button when the app could not be reached; keep the name Mister Download Manager as it is"
+  },
+  "video_drag": {
+    "message": "Drag to move it along the video's edge",
+    "description": "tooltip of the download button over a video: it can be dragged to another place on the video's edge"
+  },
+  "menu_selected": {
+    "message": "Download selected links with Mister Download Manager",
+    "description": "command in the browser's right-click menu on selected text: download the links in the selection; keep the name Mister Download Manager as it is"
+  },
+  "menu_all": {
+    "message": "Download all links with Mister Download Manager",
+    "description": "command in the browser's right-click menu on a page: download the links of the whole page; keep the name Mister Download Manager as it is"
+  },
+  "status_connected": {
+    "message": "Connected to Mister Download Manager",
+    "description": "the toolbar button's status when the browser reaches the app; keep the name Mister Download Manager as it is"
+  },
+  "status_connected_version": {
+    "message": "Connected to Mister Download Manager $version$",
+    "description": "the toolbar button's status when the browser reaches the app, with the app's version number; keep the name Mister Download Manager as it is",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Paused: downloads stay with the browser",
+    "description": "status when the user switched off taking downloads in the toolbar button's popup"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager isn't installed, or its browser integration isn't set up",
+    "description": "status when the browser can't find the app's connection; keep the name Mister Download Manager as it is"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager doesn't accept this copy of the extension",
+    "description": "status when the app refuses this copy of the extension (another copy is installed, or it came from another store); keep the name Mister Download Manager as it is"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager didn't start in time",
+    "description": "status when the app was started for a download but didn't answer in time; keep the name Mister Download Manager as it is"
+  },
+  "status_host_failed": {
+    "message": "The connection to Mister Download Manager failed",
+    "description": "status when the connection to the app broke off (often security software blocking it); keep the name Mister Download Manager as it is"
+  },
+  "status_too_large": {
+    "message": "This download's details were too large to hand over",
+    "description": "status when a download carried too much data (very large cookies) to give to the app"
+  },
+  "status_update_app": {
+    "message": "Update Mister Download Manager to use everything this extension offers",
+    "description": "status when the app is older than the extension; keep the name Mister Download Manager as it is"
+  },
+  "popup_take": {
+    "message": "Take downloads from this browser",
+    "description": "check box in the toolbar button's popup: on, downloads go to the app; off, the browser keeps them"
+  },
+  "popup_proxy": {
+    "message": "Send downloads through this browser's proxy or VPN extension",
+    "description": "switch in the toolbar button's popup: on, the app downloads through the same proxy the browser uses (one a VPN or proxy extension sets); the browser then asks once to allow reading it"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager then downloads through the same proxy as this browser. The browser asks you once to allow it; turning this off takes that back.",
+    "description": "tooltip of the switch Send downloads through this browser's proxy or VPN extension; keep the name Mister Download Manager as it is"
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager then downloads through the same proxy as this browser. While this is off, the extension doesn't read the browser's proxy.",
+    "description": "tooltip of the switch Send downloads through this browser's proxy or VPN extension in Chrome, Edge and the other Chromium browsers (they ask for no permission at the switch); keep the name Mister Download Manager as it is"
+  },
+  "popup_exclude_site": {
+    "message": "Never take downloads from $site$",
+    "description": "button in the toolbar button's popup: leave this web site's downloads to the browser from now on",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Downloads from $site$ stay with the browser",
+    "description": "shown in the toolbar button's popup after the site was excluded",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Open Mister Download Manager",
+    "description": "button in the toolbar button's popup; keep the name Mister Download Manager as it is"
+  },
+  "popup_options": {
+    "message": "Options...",
+    "description": "button in the toolbar button's popup: open the app's Options"
+  },
+  "popup_help": {
+    "message": "Help",
+    "description": "link in the toolbar button's popup to the help page"
+  },
+  "popup_support": {
+    "message": "Support MDM",
+    "description": "link at the foot of the toolbar button's popup to the creator's GitHub Sponsors page (MDM is free; this is an optional donation)"
+  },
+  "popup_fix": {
+    "message": "How to fix it",
+    "description": "link under a connection problem in the toolbar button's popup, to the help page's section for it"
+  },
+  "popup_declined": {
+    "message": "Left to the browser: $name$",
+    "description": "in the toolbar button's popup: the last download the extension let the browser keep instead of handing it to the app; followed by why (one of the declined_* texts)",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "The last download was left to the browser.",
+    "description": "in the toolbar button's popup when the last download the browser kept came from a private window (its name isn't kept); followed by why (one of the declined_* texts)"
+  },
+  "declined_file_type": {
+    "message": "Its type isn't in Options → File types.",
+    "description": "why a download stayed with the browser: its file type isn't on the app's list; Options and File types are the app's window and its page, as the app names them"
+  },
+  "declined_site": {
+    "message": "Its site is in Options → File types, sites left to the browser.",
+    "description": "why a download stayed with the browser: its web site is on the app's list of sites not to take downloads from"
+  },
+  "declined_address": {
+    "message": "Its address is in Options → File types, addresses left to the browser.",
+    "description": "why a download stayed with the browser: its address matches the app's list of addresses not to take"
+  },
+  "declined_small": {
+    "message": "It's smaller than the minimum size in Options → File types.",
+    "description": "why a download stayed with the browser: the file is smaller than the app's minimum size setting"
+  },
+  "declined_browser": {
+    "message": "This browser isn't ticked in Options → General.",
+    "description": "why a download stayed with the browser: the app's Options don't capture downloads from this browser (its box is unticked in the list of browsers)"
+  },
+  "declined_integration_off": {
+    "message": "Use advanced browser integration is off in Options → General.",
+    "description": "why a download stayed with the browser: the app's setting 'Use advanced browser integration' is off; keep the setting's name as the app shows it"
+  },
+  "declined_site_access": {
+    "message": "The extension isn't allowed to read this site (the browser's site access).",
+    "description": "why a download stayed with the browser: the user limited the extension's access to web sites in the browser, so it can't pass the sign-in on"
+  },
+  "popup_alt": {
+    "message": "Hold Alt while clicking a link to let the browser download it.",
+    "description": "hint in the toolbar button's popup; Alt is the keyboard key"
+  },
+  "popup_media": {
+    "message": "Media on this page",
+    "description": "heading in the toolbar button's popup over the list of the videos, sounds and streams the current web page has loaded"
+  },
+  "popup_media_none": {
+    "message": "No video or sound found on this page yet. Play it, then open this again.",
+    "description": "shown in the toolbar button's popup when the current web page hasn't loaded any video, sound or stream yet"
+  },
+  "popup_media_streamed": {
+    "message": "This page's player streams its video in pieces, so there's no file to list. Point at the video and use its Download video button.",
+    "description": "in the toolbar button's popup, when the page's player plays from a stream built in the page (a blob:): the list of the page's media has nothing to show; Download video is the name of the button over videos"
+  },
+  "popup_media_store": {
+    "message": "The Chrome Web Store's rules keep this copy of the add-on away from this site's videos. Help says what you can do.",
+    "description": "in the toolbar button's popup, on a site where the Chrome Web Store's copy of the extension shows no download button; Help is the link at the bottom of the popup"
+  },
+  "popup_media_download": {
+    "message": "Download",
+    "description": "button beside a video, sound or stream in the toolbar button's popup: download it with the app; verb; short"
+  },
+  "popup_media_protected": {
+    "message": "Protected",
+    "description": "shown instead of the Download button beside a copy-protected (DRM) stream in the toolbar button's popup: it can't be downloaded; short"
+  },
+  "popup_media_live": {
+    "message": "Live",
+    "description": "beside a stream in the toolbar button's popup: it is a live broadcast (no fixed length); short"
+  },
+  "video_off": {
+    "message": "The download button is off on this site",
+    "description": "shown briefly on the download button over a video when the app's settings keep the button off on this web site"
+  },
+  "video_drm": {
+    "message": "Protected video: it can't be saved",
+    "description": "shown briefly on the download button when the video is copy-protected (DRM) and no tool can download it"
+  },
+  "video_unnamed": {
+    "message": "Can't tell which video this is: open its own page and try there",
+    "description": "shown briefly on the download button when nothing on the page says which video the player is playing, so nothing was sent"
+  },
+  "video_looking": {
+    "message": "Looking up the qualities…",
+    "description": "in the menu that opens from the download button over a video, while the app finds which qualities (resolutions, formats) the video can be downloaded in"
+  },
+  "video_open_mdm": {
+    "message": "Open in Mister Download Manager…",
+    "description": "last command of the menu of qualities under the download button over a video: opens the app's Download video window for this video instead; keep the name Mister Download Manager as it is"
+  },
+  "video_no_choices": {
+    "message": "No video to download here",
+    "description": "in the menu under the download button over a video: the app found no quality of the video it could download"
+  },
+  "video_playlist": {
+    "message": "A list of videos: choose them in Mister Download Manager",
+    "description": "in the menu under the download button over a video: the page is a list of videos (a playlist), whose videos are chosen in the app's window; keep the name Mister Download Manager as it is"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager needs yt-dlp for this video",
+    "description": "in the menu under the download button over a video: the app needs the yt-dlp tool (a program's name, keep it as it is) to find this video's qualities, and it isn't installed; keep the name Mister Download Manager as it is"
+  },
+  "video_too_long": {
+    "message": "Looking up took too long",
+    "description": "in the menu under the download button over a video: the app took more than a minute to find the video's qualities, so the menu stopped waiting"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager is busy with other videos",
+    "description": "in the menu under the download button over a video: the app is already looking up other videos and can't look this one up now; keep the name Mister Download Manager as it is"
+  },
+  "video_queued": {
+    "message": "Added to the queue",
+    "description": "shown briefly on the download button over a video after a quality was picked: the download was added to the app's download queue, to start later"
+  },
+  "video_failed_lookup": {
+    "message": "Could not look it up",
+    "description": "in the menu under the download button over a video: finding the video's qualities failed; the app's own explanation follows on the next line"
+  },
+  "video_tab_video": {
+    "message": "Video",
+    "description": "tab above the list of qualities in the menu under the download button over a video: the choices that include picture (video with sound); short, one word"
+  },
+  "video_tab_audio": {
+    "message": "Audio",
+    "description": "tab above the list of qualities in the menu under the download button over a video: the choices that are sound only (MP3, Opus and the like); short, one word"
+  },
+  "video_open_post": {
+    "message": "Open the post, then use the button there",
+    "description": "shown briefly on the download button over a video in a feed (a social site's home page, a timeline) when nothing in the feed gives that video's own address, so nothing was sent: the user should open the post the video belongs to and click the button on that page; short"
+  },
+  "popup_send_to": {
+    "message": "Send downloads to",
+    "description": "heading in the toolbar button's popup, above the choice of where downloads go"
+  },
+  "popup_send_here": {
+    "message": "This computer",
+    "description": "choice under Send downloads to: the Mister Download Manager on this computer"
+  },
+  "popup_send_remote": {
+    "message": "Another Mister Download Manager (a server)",
+    "description": "choice under Send downloads to: an MDM running on another computer of the network, such as a home server; keep the name Mister Download Manager as it is"
+  },
+  "popup_remote_code": {
+    "message": "Pairing code",
+    "description": "placeholder of the box for the 8-digit code the other MDM shows"
+  },
+  "popup_remote_open": {
+    "message": "Open it",
+    "description": "button: open the other MDM's address in a tab (to accept its certificate once)"
+  },
+  "popup_remote_pair": {
+    "message": "Pair",
+    "description": "button: pair this browser with the other MDM using the code"
+  },
+  "popup_remote_help": {
+    "message": "Open its address once and accept its certificate, then enter a code from its Options, Remote, Pair a device (or misterdownloadmanager-cli pair).",
+    "description": "help under the pairing boxes; Options, Remote and Pair a device are the app's window, tab and button; keep misterdownloadmanager-cli pair as it is"
+  },
+  "status_remote": {
+    "message": "Downloads go to $address$",
+    "description": "the toolbar button's status while downloads go to another MDM",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Enter its https:// address.",
+    "description": "the address typed isn't an https:// address"
+  },
+  "remote_unreachable": {
+    "message": "Not reached. Open its address once in this browser and accept its certificate, then try again.",
+    "description": "pairing failed: the other MDM didn't answer"
+  },
+  "remote_wrong_code": {
+    "message": "Wrong code.",
+    "description": "pairing failed: the code was wrong"
+  },
+  "remote_no_code": {
+    "message": "It shows no code now: click Pair a device there first.",
+    "description": "pairing failed: the other MDM shows no pairing code; Pair a device is its button"
+  },
+  "remote_too_soon": {
+    "message": "Wait a moment, then try again.",
+    "description": "pairing failed: codes tried too fast"
+  },
+  "remote_failed": {
+    "message": "It didn't work. Try again.",
+    "description": "pairing failed for another reason"
+  },
+  "remote_device_name": {
+    "message": "Browser extension",
+    "description": "the name this browser gets in the other MDM's list of paired devices"
+  },
+  "popup_media_title_name": {
+    "message": "Prefix media file names with the page title",
+    "description": "Option in the browser extension media list: put the page title before the original file name when downloading a detected media file"
+  }
+}

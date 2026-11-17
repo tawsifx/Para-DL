@@ -1,0 +1,1358 @@
+# gosh-dl Technical Specification
+
+A native Rust download engine supporting HTTP/HTTPS and BitTorrent protocols.
+
+Current implementation reference: **0.6.2**, requiring Rust **1.85+**.
+See [ROLLOUT.md](ROLLOUT.md) for validation scope and remaining feature limits.
+
+---
+
+## Table of Contents
+
+1. [Architecture](#architecture)
+2. [Core API](#core-api)
+3. [HTTP Implementation](#http-implementation)
+4. [BitTorrent Implementation](#bittorrent-implementation)
+5. [Storage Layer](#storage-layer)
+6. [Scheduling and Priority](#scheduling-and-priority)
+7. [Configuration](#configuration)
+
+---
+
+## Architecture
+
+### Design Principles
+
+- **Library-first**: Reusable crate, not tied to any specific application
+- **Async-native**: Built on Tokio for efficient concurrent operations
+- **Type-safe**: Strong typing throughout, minimal runtime errors
+- **Observable**: Event-driven architecture for progress tracking
+
+### Module Structure
+
+```
+src/
+├── lib.rs                 # Public API, re-exports
+├── engine.rs              # DownloadEngine - main coordinator
+├── types.rs               # Re-exports protocol types (backward compat)
+├── error.rs               # Internal EngineError + ProtocolError conversion
+├── config.rs              # EngineConfig and sub-configs
+├── priority_queue.rs      # Priority-based download scheduling
+├── scheduler.rs           # Time-based bandwidth scheduling
+├── limiter.rs             # Debt-based byte-rate limiter (all transfer paths)
+├── metalink.rs            # Metalink RFC 5854 parsing + engine API (feature-gated)
+│
+├── protocol/              # Boundary types (engine ↔ consumer)
+│   ├── mod.rs             # Re-exports all protocol types
+│   ├── types.rs           # DownloadId, DownloadKind, State, Progress
+│   ├── options.rs         # DownloadOptions, DownloadPriority
+│   ├── recursive.rs       # Recursive HTTP discovery/job types (feature-gated)
+│   ├── status.rs          # DownloadStatus, DownloadMetadata, GlobalStats
+│   ├── events.rs          # DownloadEvent enum
+│   ├── torrent.rs         # TorrentInfo, TorrentFile, PeerInfo
+│   ├── checksum.rs        # ChecksumAlgorithm, ExpectedChecksum
+│   ├── scheduler.rs       # ScheduleRule, BandwidthLimits
+│   └── error.rs           # ProtocolError (simplified boundary error)
+│
+├── http/                  # HTTP download engine
+│   ├── mod.rs             # HttpDownloader
+│   ├── crawl.rs           # Recursive HTTP discovery + manifest building (feature-gated)
+│   ├── segment.rs         # Segmented download logic
+│   ├── connection.rs      # Connection pooling, rate limiting
+│   ├── resume.rs          # Resume detection and validation
+│   ├── mirror.rs          # Mirror failover management
+│   └── checksum.rs        # MD5/SHA256 verification (re-exports types)
+│
+├── torrent/               # BitTorrent engine
+│   ├── mod.rs             # TorrentDownloader
+│   ├── bencode.rs         # Bencode parser
+│   ├── metainfo.rs        # Torrent file parser
+│   ├── magnet.rs          # Magnet URI parser
+│   ├── metadata.rs        # BEP 9 metadata fetching
+│   ├── tracker.rs         # HTTP/UDP tracker clients
+│   ├── peer.rs            # Peer wire protocol
+│   ├── piece.rs           # Piece management
+│   ├── dht.rs             # DHT client (BEP 5)
+│   ├── pex.rs             # Peer Exchange (BEP 11)
+│   ├── lpd.rs             # Local Peer Discovery (BEP 14)
+│   ├── choking.rs         # Choking algorithm
+│   ├── mse.rs             # Message Stream Encryption
+│   ├── webseed.rs         # WebSeed support (BEP 17/19)
+│   ├── transport.rs       # Transport abstraction
+│   └── utp/               # uTP protocol (BEP 29)
+│       ├── mod.rs
+│       ├── socket.rs      # Connection management
+│       ├── packet.rs      # Packet encoding/decoding
+│       ├── congestion.rs  # LEDBAT algorithm
+│       ├── state.rs       # Connection state machine
+│       └── multiplexer.rs # UDP socket sharing
+│
+└── storage/               # Persistence layer
+    ├── mod.rs             # Storage trait + MemoryStorage
+    ├── file.rs            # FileStorage (JSON sidecar files)
+    └── sqlite.rs          # SQLite backend
+```
+
+### Data Flow
+
+```
+User Request
+     │
+     ▼
+┌────────────────┐
+│ DownloadEngine │ ◄─── Configuration
+└───────┬────────┘
+        │
+        ▼
+┌───────────────────┐
+│  Priority Queue   │ ◄─── Concurrent limit enforcement
+└───────┬───────────┘
+        │
+   ┌────┴────┐
+   ▼         ▼
+┌──────┐  ┌─────────┐
+│ HTTP │  │ Torrent │
+└──┬───┘  └────┬────┘
+   │           │
+   │    ┌──────┼──────┬──────────┐
+   │    ▼      ▼      ▼          ▼
+   │ Tracker  DHT    PEX       LPD
+   │    └──────┴──────┴──────────┘
+   │                  │
+   │           ┌──────┴──────┐
+   │           ▼             ▼
+   │        Peers        WebSeeds
+   │           │             │
+   └───────────┴─────────────┘
+               │
+               ▼
+        ┌─────────────┐
+        │   Storage   │
+        │  (SQLite)   │
+        └─────────────┘
+               │
+               ▼
+          Event Stream
+```
+
+---
+
+## Core API
+
+### DownloadEngine
+
+```rust
+impl DownloadEngine {
+    // Lifecycle
+    pub async fn new(config: EngineConfig) -> Result<Arc<Self>>;
+    pub async fn shutdown(&self) -> Result<()>;
+
+    // Downloads
+    pub async fn add_http(&self, url: &str, opts: DownloadOptions) -> Result<DownloadId>;
+    pub async fn add_torrent(&self, data: &[u8], opts: DownloadOptions) -> Result<DownloadId>;
+    pub async fn add_magnet(&self, uri: &str, opts: DownloadOptions) -> Result<DownloadId>;
+    #[cfg(feature = "recursive-http")]
+    pub async fn discover_http_recursive(
+        &self,
+        root_url: &str,
+        opts: &DownloadOptions,
+        recursive: &RecursiveOptions,
+    ) -> Result<RecursiveManifest>;
+    #[cfg(feature = "recursive-http")]
+    pub async fn add_http_recursive(
+        &self,
+        root_url: &str,
+        opts: DownloadOptions,
+        recursive: RecursiveOptions,
+    ) -> Result<RecursiveJob>;
+    #[cfg(feature = "recursive-http")]
+    pub fn recursive_job_status(&self, job: &RecursiveJob) -> RecursiveJobStatus;
+    #[cfg(feature = "recursive-http")]
+    pub fn list_recursive_jobs(&self) -> Vec<TrackedRecursiveJob>;
+    #[cfg(feature = "recursive-http")]
+    pub fn recursive_job(&self, id: Uuid) -> Option<TrackedRecursiveJob>;
+    #[cfg(feature = "recursive-http")]
+    pub fn subscribe_recursive_jobs(&self) -> broadcast::Receiver<RecursiveJobEvent>;
+    #[cfg(feature = "recursive-http")]
+    pub async fn cancel_recursive_job(&self, id: Uuid, delete_files: bool) -> Result<()>;
+    #[cfg(feature = "recursive-http")]
+    pub async fn remove_recursive_job(&self, id: Uuid, delete_files: bool) -> Result<()>;
+
+    #[cfg(feature = "metalink")]
+    pub async fn add_metalink(&self, xml: &[u8], opts: DownloadOptions) -> Result<Vec<DownloadId>>;
+    #[cfg(feature = "metalink")]
+    pub async fn add_metalink_file(&self, path: &Path, opts: DownloadOptions) -> Result<Vec<DownloadId>>;
+
+    // Control
+    pub async fn pause(&self, id: DownloadId) -> Result<()>;
+    pub async fn resume(&self, id: DownloadId) -> Result<()>;
+    pub async fn cancel(&self, id: DownloadId, delete_files: bool) -> Result<()>;
+    pub async fn pause_all(&self) -> BatchResult;
+    pub async fn resume_all(&self) -> BatchResult;
+    pub async fn cancel_all(&self, delete_files: bool) -> BatchResult;
+
+    // Streaming: AsyncRead over an in-progress download. For torrents the
+    // read position feeds piece selection so the reader is served first.
+    pub fn open_reader(&self, id: DownloadId, offset: u64) -> Result<DownloadReader>;
+
+    // Data integrity: re-check on-disk data (checksum for HTTP, per-piece
+    // re-hash for torrents) and re-download whatever fails.
+    pub async fn verify(&self, id: DownloadId) -> Result<VerifyReport>;
+    pub async fn repair(&self, id: DownloadId) -> Result<VerifyReport>;
+
+    // Priority
+    pub fn set_priority(&self, id: DownloadId, priority: DownloadPriority) -> Result<()>;
+    pub fn get_priority(&self, id: DownloadId) -> Option<DownloadPriority>;
+
+    // Status
+    pub fn status(&self, id: DownloadId) -> Option<DownloadStatus>;
+    pub fn list(&self) -> Vec<DownloadStatus>;
+    pub fn active(&self) -> Vec<DownloadStatus>;
+    pub fn waiting(&self) -> Vec<DownloadStatus>;
+    pub fn stopped(&self) -> Vec<DownloadStatus>;
+    pub fn global_stats(&self) -> GlobalStats;
+
+    // Bandwidth scheduling
+    pub fn get_bandwidth_limits(&self) -> BandwidthLimits;
+    pub fn set_schedule_rules(&self, rules: Vec<ScheduleRule>);
+    pub fn get_schedule_rules(&self) -> Vec<ScheduleRule>;
+
+    // Events
+    pub fn subscribe(&self) -> broadcast::Receiver<DownloadEvent>;
+
+    // Configuration
+    pub fn set_config(&self, config: EngineConfig) -> Result<()>;
+    pub fn get_config(&self) -> EngineConfig;
+}
+```
+
+### Lifecycle and Integrity Semantics
+
+| Operation | 0.6.2 behaviour |
+| --- | --- |
+| Torrent pause | Stops the worker and releases its queue slot. A queued task cannot start after pause. |
+| Torrent resume | Reconstructs the worker from metainfo or the original magnet URI, preserves options and lifetime totals, and reacquires a priority-queue permit. Startup checks existing pieces. |
+| `verify` | Rejects queued, connecting, and downloading states. HTTP uses a checksum, or regular-file presence/size only. Torrents rebuild their piece bitmap; persisted metainfo allows verification without a live handle. |
+| `repair` | Returns the pre-repair report. Invalid HTTP data is restarted from zero; invalid torrent data causes worker reconstruction and re-checking/refetching. Callers observe events/status for completion. |
+| `open_reader` | HTTP serves only a gap-free prefix, using saved segment state when paused/restored. Torrents serve verified pieces and can reconstruct a bitmap from persisted metainfo without starting peers. |
+| Reader termination | Dropping the reader aborts its pump. EOF can also signal a failed/removed download or an unreadable completed file; compare bytes read with the known size minus the opening offset. |
+| HTTP pause / cancel (0.6.4) | Every wait on the HTTP path (probes, sends, body chunks, limiter debt, back-off) is cancellable. `pause` and `cancel` drain the worker (10 s bound; a straggler is re-awaited before the next lifecycle action) before returning or deleting files. |
+| Torrent stop (0.6.4) | `TorrentDownloader::stop()` aborts outbound and inbound peer tasks in addition to discovery tasks, so no peer can write a piece after cancel-with-delete. |
+| `resume` from `Error` (0.6.4) | Accepted for HTTP (uses the segments saved on failure) and torrents (reconstructs the worker). `resume_all` only resumes `Paused`. |
+| `cancel(id, true)` (0.6.4) | Re-validates the output name. HTTP: removes the `.part`, and the final file only if the download completed; never recurses into a directory. Torrent: removes the torrent's file/directory; a metadata-less magnet deletes nothing. |
+| After `shutdown()` (0.6.4) | `add_*` and `resume` return `EngineError::Shutdown`. |
+
+`DownloadReader::total_size()` is a snapshot at open time and can be `None`.
+Size-only verification cannot detect corruption that leaves the file length
+unchanged. Persisted torrent verification requires saved metainfo; an unresolved
+magnet does not yet have the piece hashes needed to verify data.
+
+### Download States
+
+```rust
+pub enum DownloadState {
+    Queued,                    // Waiting in priority queue
+    Connecting,                // Establishing connection
+    Downloading,               // Active transfer
+    Seeding,                   // Torrent only: uploading to peers
+    Paused,                    // Paused by user
+    Completed,                 // Successfully finished
+    Error {                    // Failed
+        kind: String,
+        message: String,
+        retryable: bool,
+    },
+}
+```
+
+### Events
+
+```rust
+pub enum DownloadEvent {
+    Added { id: DownloadId },
+    Started { id: DownloadId },
+    Progress { id: DownloadId, progress: DownloadProgress },
+    StateChanged { id: DownloadId, old_state: DownloadState, new_state: DownloadState },
+    Completed { id: DownloadId },
+    Failed { id: DownloadId, error: String, retryable: bool },
+    Removed { id: DownloadId },
+    Paused { id: DownloadId },
+    Resumed { id: DownloadId },
+}
+```
+
+### Recursive Types
+
+When `recursive-http` is enabled, the boundary also exposes:
+
+```rust
+pub struct RecursiveOptions {
+    pub max_depth: usize,
+    pub same_host_only: bool,
+    pub allowed_prefix: Option<String>,
+    pub include_patterns: Vec<String>,
+    pub exclude_patterns: Vec<String>,
+    pub preserve_paths: bool,
+    pub overwrite_existing: bool,
+    pub fail_fast: bool,
+    pub max_discovery_concurrency: usize,
+}
+
+pub struct RecursiveManifest {
+    pub root_url: String,
+    pub entries: Vec<RecursiveEntry>,
+}
+
+pub struct RecursiveEntry {
+    pub url: String,
+    pub relative_path: PathBuf,
+    pub size_hint: Option<u64>,
+}
+
+pub struct RecursiveJob {
+    pub root_url: String,
+    pub child_ids: Vec<DownloadId>,
+}
+
+pub struct TrackedRecursiveJob {
+    pub id: Uuid,
+    pub root_url: String,
+    pub child_ids: Vec<DownloadId>,
+    pub created_at: DateTime<Utc>,
+}
+
+// Running/Queued/Paused are reported while any child can still change state;
+// Completed/Failed/Partial are terminal (0.6.4).
+pub enum RecursiveJobState {
+    Empty,
+    Queued,
+    Running,
+    Paused,
+    Completed,
+    Failed,
+    Partial,
+}
+
+pub struct RecursiveJobProgress {
+    pub total_children: usize,
+    pub queued_children: usize,
+    pub active_children: usize,
+    pub paused_children: usize,
+    pub completed_children: usize,
+    pub failed_children: usize,
+    pub missing_children: usize,
+    pub completed_size: u64,
+    pub total_size: Option<u64>,
+}
+
+pub struct RecursiveJobStatus {
+    pub root_url: String,
+    pub child_ids: Vec<DownloadId>,
+    pub state: RecursiveJobState,
+    pub progress: RecursiveJobProgress,
+}
+
+pub enum RecursiveJobEvent {
+    Added { job: TrackedRecursiveJob, status: RecursiveJobStatus },
+    Updated { job: TrackedRecursiveJob, status: RecursiveJobStatus },
+    Removed { id: Uuid },
+}
+```
+
+### Error Hierarchy
+
+```rust
+pub enum EngineError {
+    Network { kind: NetworkErrorKind, message: String, retryable: bool },
+    Storage { kind: StorageErrorKind, path: PathBuf, message: String },
+    Protocol { kind: ProtocolErrorKind, message: String },
+    InvalidInput { field: &'static str, message: String },
+    ResourceLimit { resource: &'static str, limit: usize },
+    NotFound(String),
+    AlreadyExists(String),
+    InvalidState { action: &'static str, current_state: String },
+    Shutdown,
+    Database(String),
+    Internal(String),
+}
+
+pub enum NetworkErrorKind {
+    DnsResolution, ConnectionRefused, ConnectionReset, Timeout,
+    Tls, HttpStatus(u16), Unreachable, TooManyRedirects, Other,
+}
+
+pub enum StorageErrorKind {
+    NotFound, PermissionDenied, DiskFull, PathTraversal,
+    AlreadyExists, InvalidPath, Io,
+}
+
+pub enum ProtocolErrorKind {
+    InvalidUrl, RangeNotSupported, InvalidResponse, InvalidTorrent,
+    InvalidMagnet, HashMismatch, TrackerError, PeerProtocol, BencodeParse,
+    DhtError, PexError, LpdError, MetadataError,
+}
+```
+
+### Protocol Error (Boundary)
+
+`ProtocolError` is a simplified error type for consumers, hiding internal implementation details:
+
+```rust
+pub enum ProtocolError {
+    NotFound { id: String },
+    InvalidState { action: String, current_state: String },
+    InvalidInput { field: String, message: String },
+    Network { message: String, retryable: bool },
+    Storage { message: String },
+    Shutdown,
+    Internal { message: String },
+}
+
+pub type ProtocolResult<T> = Result<T, ProtocolError>;
+```
+
+`EngineError` converts to `ProtocolError` at the public API boundary via `From` impl.
+
+---
+
+## Protocol Module
+
+The `protocol/` module contains all types that cross the engine boundary. These are the messages exchanged between the engine and its consumers (GUI, CLI, etc.).
+
+### Design Principles
+
+- **Types only**: No logic, just data structures
+- **Boundary types**: Everything that enters or exits the engine
+- **Serializable**: All types derive `serde::Serialize` and `serde::Deserialize`
+- **Backward compatible**: Original modules re-export from protocol
+
+### Protocol Types
+
+| File | Types | Purpose |
+|------|-------|---------|
+| `types.rs` | `DownloadId`, `DownloadKind`, `DownloadState`, `DownloadProgress` | Core identifiers and state |
+| `options.rs` | `DownloadOptions`, `DownloadPriority` | Input to add_* methods |
+| `recursive.rs` | `RecursiveOptions`, `RecursiveManifest`, `RecursiveJob`, `TrackedRecursiveJob`, `RecursiveJobStatus`, `RecursiveJobEvent` | Recursive HTTP discovery, orchestration, aggregate state |
+| `status.rs` | `DownloadStatus`, `DownloadMetadata`, `GlobalStats` | Status queries |
+| `events.rs` | `DownloadEvent` | Event stream |
+| `torrent.rs` | `TorrentInfo`, `TorrentFile`, `TorrentStatusInfo`, `PeerInfo` | Torrent metadata |
+| `checksum.rs` | `ChecksumAlgorithm`, `ExpectedChecksum` | Verification |
+| `scheduler.rs` | `ScheduleRule`, `BandwidthLimits` | Bandwidth scheduling |
+| `error.rs` | `ProtocolError`, `ProtocolResult` | Simplified errors |
+
+### Usage
+
+```rust
+// New style: import directly from protocol
+use gosh_dl::protocol::{DownloadEvent, DownloadStatus, ProtocolError};
+
+// Old style: still works via re-exports
+use gosh_dl::{DownloadEvent, DownloadStatus};
+```
+
+---
+
+## HTTP Implementation
+
+### Recursive HTTP Discovery
+
+The recursive HTTP feature is intentionally layered on top of the existing HTTP downloader instead of changing the semantics of `add_http()`.
+
+Current behavior:
+
+- feature-gated behind `recursive-http`
+- fetches HTML directory/index pages and extracts `<a href>` links
+- normalizes URLs, strips fragments, and enforces same-host/root-prefix scope by default
+- applies include/exclude filters to discovered file paths
+- builds a deterministic manifest of `RecursiveEntry` values
+- expands each manifest entry into an ordinary `add_http()` child download
+- rolls back already-added child downloads if recursive enqueue fails before the parent job is tracked
+- persists recursive child runtime metadata so redirect-scope and fail-fast semantics survive restart
+- persists and reloads tracked recursive job records independently from the child downloads
+- derives aggregate recursive job state and counters from the child download set
+- supports parent-level cancellation/removal operations over the child download set
+- emits recursive parent events on a dedicated event stream without changing `DownloadEvent`
+- optionally aborts queued/active sibling child downloads after the first child failure when `fail_fast` is enabled
+- enforces recursive redirect scope during discovery, child file downloads, and resumed child downloads restored from storage
+
+Current non-goals:
+
+- no new `DownloadKind` variant for recursive jobs
+- no parent recursive job in the main download queue/state machine
+- no recursive parent jobs in the main `DownloadEvent` stream
+- no persisted parent-level recursive event/progress history yet
+- no JavaScript execution or general-purpose site mirroring
+
+This keeps queueing, retries, segmented downloads, progress reporting, and persistence on the already-tested per-file HTTP path.
+
+### Segmented Downloads
+
+Supports up to 16 parallel connections per download with automatic fallback for servers that don't support range requests.
+
+**Segment calculation:**
+
+```rust
+pub fn calculate_segment_count(total_size: u64, max_connections: usize, min_segment_size: u64) -> usize {
+    if total_size == 0 { return 1; }
+    let max_by_size = (total_size / min_segment_size) as usize;
+    max_connections.min(max_by_size).max(1)
+}
+```
+
+### Download Flow
+
+1. Validate the selected output filename before adding it to engine state.
+2. Probe with HEAD, including the download's custom headers, Referer, and
+   cookies. Use metadata only from successful responses; a failed probe falls
+   back to a single GET stream.
+3. Compare saved ETag/Last-Modified validators with the successful probe.
+   Use segmented ranges when supported and appropriate for the file size;
+   otherwise use a single stream.
+4. Create output parent directories and write to the `.part` file. Segmented
+   tasks seek to their own ranges and may use configured mirrors. Charge each
+   chunk to global and per-download limits and aggregate progress.
+5. Verify any configured checksum, rename the completed file, and retain its
+   path relative to `save_dir` in metadata for lifecycle operations.
+
+The engine selects an explicit filename first, then the final URL path segment
+when present. Content-Disposition is used only if neither has selected a name.
+Server filename detection therefore does not override an existing URL-derived
+engine filename. Relative subpaths are supported; parent traversal and absolute
+paths are rejected.
+
+The probe's validators are published back to the engine and persisted, so the
+next session can validate its resume against them.
+
+### Resume Detection
+
+Resume is validated using ETag/Last-Modified headers:
+
+```rust
+pub struct ResumeInfo {
+    pub can_resume: bool,
+    pub existing_size: u64,
+    pub total_size: Option<u64>,
+    pub supports_range: bool,
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+}
+
+pub async fn check_resume(client: &Client, url: &str, part_path: &Path,
+    saved_etag: Option<&str>, saved_last_modified: Option<&str>) -> Result<ResumeInfo>;
+```
+
+Validation runs on every resume — in-session and across restarts. The engine
+persists the probe's ETag/Last-Modified in download metadata; on resume (or
+segment restore) the saved validators are compared against a fresh probe, and
+a mismatch discards the partial data and restarts from byte zero. `If-Range`
+alone cannot catch cross-restart changes, because a freshly probed validator
+always matches the current remote file.
+
+### Speed Limiting
+
+A debt-based token bucket (`gosh_dl::RateLimiter`, `src/limiter.rs`) shared
+by every transfer path: segmented HTTP, single-stream HTTP, torrent peer
+traffic (down and up), and webseeds. The engine owns one global pair
+(download/upload); per-download limits from `DownloadOptions` are layered on
+top.
+
+```rust
+impl RateLimiter {
+    pub fn new(limit: Option<u64>) -> Self;        // bytes/sec; None/0 = unlimited
+    pub fn set_limit(&self, limit: Option<u64>);   // live updates (scheduler)
+    pub async fn acquire(&self, bytes: u64);       // books bytes, sleeps out the debt
+}
+```
+
+`acquire` books the bytes immediately (the bucket may go negative) and then
+sleeps until the debt is repaid, so chunks of any size are throttled correctly
+— including chunks larger than one second's budget, which the previous
+`governor`-based approach silently waved through (limits under 16 KiB/s did
+nothing).
+
+### Retry Policy
+
+Exponential backoff with jitter:
+
+```rust
+pub struct RetryPolicy {
+    pub max_attempts: u32,          // Default: 3
+    pub initial_delay_ms: u64,      // Default: 1000
+    pub max_delay_ms: u64,          // Default: 30000
+    pub jitter_factor: f64,         // Default: 0.25 (±25%)
+}
+
+impl RetryPolicy {
+    pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
+        let base = self.initial_delay_ms * 2u64.pow(attempt.min(10));
+        let capped = base.min(self.max_delay_ms);
+        let jitter = 1.0 + (rand() - 0.5) * 2.0 * self.jitter_factor;
+        Duration::from_millis((capped as f64 * jitter) as u64)
+    }
+}
+```
+
+### Mirror Failover
+
+```rust
+pub struct MirrorManager {
+    urls: Vec<String>,              // Primary + mirrors
+    current_index: AtomicUsize,
+    failed: RwLock<HashSet<usize>>,
+    failure_counts: Vec<AtomicUsize>,
+    max_failures: usize,            // Default: 3
+}
+
+impl MirrorManager {
+    pub fn url_for_segment(&self, segment_idx: usize) -> &str;    // Round-robin
+    pub fn report_url_failure(&self, url: &str) -> Option<&str>;  // Track failures
+    pub fn report_success(&self);                                 // Reset counter
+}
+```
+
+Two cooperating layers:
+
+- **Segment striping**: with more than one available URL, each segment is
+  assigned a mirror round-robin and rotates to another URL on retry. Only the
+  primary URL's requests carry `If-Range` validators (mirrors have their own
+  ETags); every mirror's `Content-Range` total is cross-checked against the
+  expected file size, and a mismatching or failing mirror is penalized and
+  retried elsewhere.
+- **Whole-download failover**: if an attempt fails outright, the engine
+  switches to the next healthy URL and restarts the attempt.
+
+### Checksum Verification
+
+```rust
+pub enum ChecksumAlgorithm {
+    Md5,
+    Sha256,
+}
+
+pub struct ExpectedChecksum {
+    pub algorithm: ChecksumAlgorithm,
+    pub value: String,  // Hex-encoded
+}
+
+impl ExpectedChecksum {
+    pub fn parse(s: &str) -> Option<Self>;  // "md5:abc123" or "sha256:def456"
+}
+
+pub async fn verify_checksum(path: &Path, expected: &ExpectedChecksum) -> Result<bool>;
+pub async fn compute_checksum(path: &Path, algorithm: ChecksumAlgorithm) -> Result<String>;
+```
+
+---
+
+## BitTorrent Implementation
+
+### Bencode Format
+
+```
+Integers:   i<number>e        Example: i42e
+Strings:    <length>:<data>   Example: 4:spam
+Lists:      l<items>e         Example: l4:spami42ee
+Dicts:      d<pairs>e         Example: d3:cow3:moo4:spam4:eggse
+```
+
+```rust
+pub enum BencodeValue {
+    Integer(i64),
+    Bytes(Vec<u8>),
+    List(Vec<BencodeValue>),
+    Dict(BTreeMap<Vec<u8>, BencodeValue>),
+}
+
+impl BencodeValue {
+    pub fn parse(data: &[u8]) -> Result<(Self, &[u8])>;
+    pub fn parse_exact(data: &[u8]) -> Result<Self>;  // Consumes all input
+}
+```
+
+### Metainfo (Torrent Files)
+
+```rust
+pub struct Metainfo {
+    pub info_hash: [u8; 20],
+    pub info: Info,
+    pub announce: Option<String>,
+    pub announce_list: Vec<Vec<String>>,  // Tiered trackers
+    pub creation_date: Option<i64>,
+    pub comment: Option<String>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
+    pub url_list: Vec<String>,            // BEP 19 web seeds
+    pub httpseeds: Vec<String>,           // BEP 17 web seeds
+}
+
+pub struct Info {
+    pub name: String,
+    pub piece_length: u64,
+    pub pieces: Vec<u8>,        // Concatenated SHA-1 hashes (20 bytes each)
+    pub files: Vec<FileInfo>,
+    pub total_size: u64,
+    pub private: bool,          // BEP 27
+}
+
+pub struct FileInfo {
+    pub path: PathBuf,
+    pub length: u64,
+    pub offset: u64,            // Byte offset in piece stream
+}
+```
+
+### Magnet URIs
+
+Format: `magnet:?xt=urn:btih:<hash>&dn=<name>&tr=<tracker>&ws=<webseed>`
+
+```rust
+pub struct MagnetUri {
+    pub info_hash: [u8; 20],
+    pub display_name: Option<String>,
+    pub trackers: Vec<String>,
+    pub web_seeds: Vec<String>,
+    pub exact_length: Option<u64>,
+    pub exact_source: Option<String>,
+    pub keyword_topic: Option<String>,
+}
+
+impl MagnetUri {
+    pub fn parse(uri: &str) -> Result<Self>;
+    pub fn name(&self) -> String;                 // display_name or hex hash
+    pub fn info_hash_hex(&self) -> String;
+    pub fn to_uri(&self) -> String;               // Regenerate URI
+}
+```
+
+Supports both hex (40 chars) and base32 (32 chars) encoded info hashes.
+
+### Tracker Protocol
+
+**HTTP Tracker (BEP 3):**
+
+```rust
+pub struct AnnounceRequest {
+    pub info_hash: [u8; 20],
+    pub peer_id: [u8; 20],
+    pub port: u16,
+    pub uploaded: u64,
+    pub downloaded: u64,
+    pub left: u64,
+    pub event: AnnounceEvent,     // None, Started, Stopped, Completed
+    pub compact: bool,            // Request compact peer format
+    pub numwant: Option<u32>,
+}
+
+pub struct AnnounceResponse {
+    pub interval: u32,            // Seconds until next announce (clamped 60-3600)
+    pub min_interval: Option<u32>,
+    pub peers: Vec<SocketAddr>,
+    pub complete: Option<u32>,    // Seeders
+    pub incomplete: Option<u32>,  // Leechers
+    pub tracker_id: Option<String>,
+}
+```
+
+**UDP Tracker (BEP 15):** Uses connection ID handshake with magic `0x41727101980`.
+
+**WebSocket Tracker (WebTorrent Protocol):**
+
+WebSocket trackers use JSON messages over WebSocket connections, compatible with the WebTorrent ecosystem:
+
+```rust
+// Request format
+{
+    "action": "announce",
+    "info_hash": "<40-char hex>",
+    "peer_id": "<40-char hex>",
+    "uploaded": 0,
+    "downloaded": 0,
+    "left": 12345,
+    "event": "started",  // or "completed", "stopped", null
+    "numwant": 50,
+    "port": 6881
+}
+
+// Response format
+{
+    "action": "announce",
+    "interval": 120,
+    "complete": 5,      // seeders
+    "incomplete": 10,   // leechers
+    "peers": [
+        {"ip": "1.2.3.4", "port": 6881, "peer id": "<hex>"},
+        ...
+    ]
+    // OR compact format:
+    "peers": "<base64-encoded 6-byte-per-peer>"
+}
+```
+
+Supports both `wss://` (TLS) and `ws://` URLs. Connection timeout and response timeout match the configured tracker timeout (default 15 seconds).
+
+### Peer Wire Protocol
+
+**Handshake (68 bytes):**
+```
+<pstrlen=19><pstr="BitTorrent protocol"><reserved=8><info_hash=20><peer_id=20>
+```
+
+Reserved bytes encode extensions: bit 20 = DHT (BEP 5), bit 44 = Fast Extension (BEP 6), bit 43 = Extension Protocol (BEP 10).
+
+**Messages:**
+
+```rust
+pub enum PeerMessage {
+    KeepAlive,                                          // Length: 0
+    Choke,                                              // ID: 0
+    Unchoke,                                            // ID: 1
+    Interested,                                         // ID: 2
+    NotInterested,                                      // ID: 3
+    Have { piece_index: u32 },                          // ID: 4
+    Bitfield { bitfield: BitVec },                      // ID: 5
+    Request { index: u32, begin: u32, length: u32 },    // ID: 6
+    Piece { index: u32, begin: u32, block: Vec<u8> },   // ID: 7
+    Cancel { index: u32, begin: u32, length: u32 },     // ID: 8
+    Port { port: u16 },                                 // ID: 9 (DHT port)
+    Extended { id: u8, payload: Vec<u8> },              // ID: 20 (BEP 10)
+}
+```
+
+Block size is fixed at 16KB (`BLOCK_SIZE = 16384`).
+
+**Connection management:**
+
+- Each torrent binds a TCP listener on `listen_port_range` (walking the range
+  on conflicts; port 0 lets the OS pick) and serves inbound peers through the
+  same connection loop as outbound ones. The actually-bound port is what gets
+  advertised to trackers, DHT, and LPD.
+- Keep-alives are sent on idle receive timeouts; a peer is disconnected only
+  after 150s of true silence. Choking decisions are applied on idle ticks as
+  well as on message receipt.
+- A periodic tracker re-announce task honors the announce interval, and
+  failed peer addresses back off exponentially (60s doubling, 15-minute cap).
+- Requested blocks are marked per piece so peers are not handed duplicate
+  work outside endgame; in endgame, satisfied duplicate requests are
+  `Cancel`led as soon as another peer delivers the block.
+
+### Piece Manager
+
+```rust
+pub struct PieceManager {
+    metainfo: Arc<Metainfo>,
+    have: BitVec,                              // Verified pieces
+    pending: HashMap<u32, PendingPiece>,       // In-progress downloads
+    pending_webseed: HashMap<u32, ()>,         // Pieces requested from webseeds
+    piece_rarity: Vec<u32>,                    // Per-piece peer count
+    selected_pieces: Option<BitVec>,           // For partial downloads
+    sequential_mode: bool,                     // Download in order
+}
+
+impl PieceManager {
+    pub fn need_piece(&self, index: u32) -> bool;
+    pub fn select_piece(&self, peer_has: &BitVec) -> Option<u32>;  // Rarest-first
+    pub fn add_block(&mut self, index: u32, offset: u32, data: Vec<u8>) -> Result<bool>;
+    pub fn verify_piece(&mut self, index: u32) -> Result<bool>;    // SHA-1
+    pub fn set_selected_files(&mut self, indices: Option<&[usize]>);
+    pub fn set_sequential(&mut self, enabled: bool);
+}
+```
+
+**Selection algorithm:**
+1. In sequential mode: returns lowest incomplete piece index
+2. Otherwise: rarest-first (lowest `piece_rarity` count among needed pieces)
+
+**Endgame Mode:** Activates when ≤10 pieces remain; allows duplicate requests from multiple peers.
+
+### DHT (BEP 5)
+
+Uses `mainline` crate for Mainline DHT:
+
+```rust
+pub struct DhtClient {
+    dht: Dht,
+    peer_cache: RwLock<HashMap<Sha1Hash, Vec<SocketAddr>>>,
+}
+
+impl DhtClient {
+    pub async fn new(bootstrap_nodes: &[String]) -> Result<Self>;
+    pub async fn find_peers(&self, info_hash: [u8; 20]) -> Vec<SocketAddr>;
+    pub async fn find_peers_timeout(&self, info_hash: [u8; 20], timeout: Duration) -> Vec<SocketAddr>;
+    pub async fn announce(&self, info_hash: [u8; 20], port: u16) -> Result<()>;
+}
+```
+
+Default bootstrap nodes: `router.bittorrent.com:6881`, `router.utorrent.com:6881`, `dht.transmissionbt.com:6881`.
+
+### PEX (BEP 11)
+
+Peer Exchange via BEP 10 extension protocol:
+
+```rust
+pub struct PexState {
+    known_peers: HashSet<SocketAddr>,
+    last_send: Instant,
+    min_interval: Duration,         // 60 seconds
+}
+
+pub struct PexMessage {
+    pub added: Vec<SocketAddr>,     // IPv4 peers added
+    pub added_flags: Vec<u8>,       // Flags per added peer
+    pub dropped: Vec<SocketAddr>,   // Peers removed
+    pub added6: Vec<SocketAddr>,    // IPv6 peers
+    pub added6_flags: Vec<u8>,
+    pub dropped6: Vec<SocketAddr>,
+}
+
+impl PexState {
+    pub fn should_send(&self) -> bool;
+    pub fn build_message(&mut self, current_peers: &HashSet<SocketAddr>) -> PexMessage;
+}
+```
+
+Flags: `0x01` = prefers encryption, `0x02` = is seeder, `0x04` = supports uTP.
+
+### LPD (BEP 14)
+
+Local Peer Discovery via UDP multicast to `239.192.152.143:6771`:
+
+```rust
+pub struct LpdService {
+    socket: UdpSocket,
+    listen_port: u16,
+    announce_interval: Duration,    // 5 minutes
+}
+
+impl LpdService {
+    pub async fn new(listen_port: u16) -> Result<Self>;
+    pub async fn announce(&self, info_hash: [u8; 20]) -> Result<()>;
+    pub fn subscribe(&self) -> broadcast::Receiver<LocalPeer>;
+}
+```
+
+Message format:
+```
+BT-SEARCH * HTTP/1.1\r\n
+Host: 239.192.152.143:6771\r\n
+Port: <port>\r\n
+Infohash: <hex info_hash>\r\n
+\r\n
+```
+
+### Metadata Fetching (BEP 9)
+
+For magnet links, metadata is fetched from peers via ut_metadata extension:
+
+```rust
+pub struct MetadataFetcher {
+    info_hash: [u8; 20],
+    metadata_size: Option<usize>,
+    pieces: Vec<Option<Vec<u8>>>,
+    requested: HashSet<usize>,
+}
+
+impl MetadataFetcher {
+    pub fn need_metadata(&self) -> bool;
+    pub fn request_piece(&mut self, peer_id: &[u8]) -> Option<usize>;
+    pub fn receive_piece(&mut self, index: usize, data: Vec<u8>) -> bool;
+    pub fn is_complete(&self) -> bool;
+    pub fn assemble(&self) -> Option<Vec<u8>>;  // Returns info dict
+}
+```
+
+Validates assembled metadata by computing SHA-1 and comparing to info_hash.
+
+### Choking Algorithm
+
+Recalculates every 10 seconds, rotates optimistic unchoke every 30 seconds:
+
+```rust
+pub struct ChokingManager {
+    unchoke_slots: usize,           // Default: 4
+    optimistic_peer: Option<SocketAddr>,
+    last_optimistic_rotation: Instant,
+}
+
+impl ChokingManager {
+    pub fn recalculate(&mut self, peers: &mut [PeerStats], am_seeding: bool) -> Vec<ChokingDecision>;
+}
+```
+
+**Algorithm:**
+1. Sort peers by download rate (when downloading) or upload rate (when seeding)
+2. Unchoke top N interested peers
+3. Reserve one slot for optimistic unchoke (rotated every 30s)
+
+### Message Stream Encryption (MSE/PE)
+
+```rust
+pub enum EncryptionPolicy {
+    Disabled,   // Plaintext only
+    Allowed,    // Accept both
+    Preferred,  // Try encrypted, fall back to plain
+    Required,   // Reject non-MSE peers
+}
+
+pub struct EncryptionConfig {
+    pub policy: EncryptionPolicy,
+    pub allow_plaintext: bool,
+    pub allow_rc4: bool,
+    pub min_padding: usize,         // Default: 0
+    pub max_padding: usize,         // Default: 512
+}
+```
+
+**Handshake process:**
+1. Diffie-Hellman key exchange (768-bit prime); a peer public value of 0, 1,
+   or p-1 is rejected
+2. Derive RC4 keys from shared secret + info_hash
+3. Discard first 1024 bytes of RC4 keystream (RC4-drop1024)
+4. Optional random padding for obfuscation
+
+**Fallback (0.6.4):** any failure before crypto negotiation completes is
+reported as `MseHandshakeResult::Failed`. The socket already carries our DH
+public key, so it cannot be reused for plaintext; under `Allowed`/`Preferred`
+with `allow_plaintext`, `PeerConnection::connect_with_encryption` opens a
+fresh TCP connection and performs a plaintext handshake. Inbound connections
+are plaintext-only (no MSE responder).
+
+### WebSeeds (BEP 17/19)
+
+```rust
+pub enum WebSeedType {
+    GetRight,   // BEP 19: URL is base path, append file path
+    Hoffman,    // BEP 17: URL is base, use specific request format
+}
+
+pub struct WebSeedManager {
+    seeds: Vec<WebSeed>,
+    semaphore: Semaphore,           // Limits concurrent connections
+    config: WebSeedConfig,
+}
+
+pub struct WebSeedConfig {
+    pub enabled: bool,              // Default: true
+    pub max_connections: usize,     // Default: 4
+    pub timeout_seconds: u64,       // Default: 30
+    pub max_failures: u32,          // Default: 5
+}
+```
+
+WebSeeds download pieces via HTTP Range requests, with exponential backoff (2x, max 5min) on failures.
+
+### uTP Protocol (BEP 29)
+
+```rust
+pub enum TransportPolicy {
+    TcpOnly,
+    UtpOnly,
+    PreferUtp,
+    PreferTcp,      // Default
+}
+
+pub struct UtpConfigSettings {
+    pub enabled: bool,              // Default: false (opt-in)
+    pub policy: TransportPolicy,
+    pub tcp_fallback: bool,         // Default: true
+    pub target_delay_us: u32,       // Default: 100000 (100ms)
+    pub max_window_size: u32,       // Default: 1MB
+    pub recv_window: u32,           // Default: 1MB
+    pub enable_sack: bool,          // Default: true
+}
+```
+
+**Architecture:** one `UtpMux` per torrent shares a UDP socket among
+connections, routing packets by `(remote_addr, receive connection ID)` and
+accepting inbound SYNs (bounded backlog, retransmit dedupe). Each `UtpSocket`
+owns a background *driver task* that processes incoming packets, sends ACKs,
+runs the retransmission timer (RTO with exponential backoff, original packet
+types preserved), and feeds `timestamp_diff` delay samples into the LEDBAT
+controller — so reads and writes never block each other.
+
+Connection IDs follow BEP 29: the initiator receives on `C` (carried by the
+SYN) and sends with `C + 1`; the acceptor mirrors that. Selective ACK is
+supported in both directions, and unknown packet extensions are skipped.
+
+Covered by loopback transfer, packet-loss-proxy, and full torrent-transfer
+tests; still opt-in via `utp.enabled`.
+
+---
+
+## Storage Layer
+
+### Storage Trait
+
+```rust
+#[async_trait]
+pub trait Storage: Send + Sync {
+    async fn save_download(&self, status: &DownloadStatus) -> Result<()>;
+    async fn load_download(&self, id: DownloadId) -> Result<Option<DownloadStatus>>;
+    async fn load_all(&self) -> Result<Vec<DownloadStatus>>;
+    async fn delete_download(&self, id: DownloadId) -> Result<()>;
+    async fn save_segments(&self, id: DownloadId, segments: &[Segment]) -> Result<()>;
+    async fn load_segments(&self, id: DownloadId) -> Result<Vec<Segment>>;
+    async fn delete_segments(&self, id: DownloadId) -> Result<()>;
+    async fn save_runtime_metadata(&self, id: DownloadId, runtime_json: &str) -> Result<()>;
+    async fn load_runtime_metadata(&self, id: DownloadId) -> Result<Option<String>>;
+    async fn load_all_runtime_metadata(&self) -> Result<HashMap<DownloadId, String>>;
+    #[cfg(feature = "recursive-http")]
+    async fn save_recursive_job(&self, job: &TrackedRecursiveJob) -> Result<()>;
+    #[cfg(feature = "recursive-http")]
+    async fn load_recursive_jobs(&self) -> Result<Vec<TrackedRecursiveJob>>;
+    #[cfg(feature = "recursive-http")]
+    async fn delete_recursive_job(&self, id: Uuid) -> Result<()>;
+    async fn health_check(&self) -> Result<()>;
+    async fn compact(&self) -> Result<()>;
+}
+```
+
+Three implementations ship with the crate: `SqliteStorage` (`storage`
+feature, WAL mode, transactional schema migrations), `FileStorage` (one JSON
+sidecar per download, fsync-before-rename atomic writes), and
+`MemoryStorage`. The runtime-metadata JSON carries the download's original
+`DownloadOptions` (so resume keeps file selection, sequential mode, and
+limits across restarts), recursive-child context, and torrent lifetime
+transfer totals (so seed-ratio decisions survive restarts).
+
+Restoration maps `Connecting`, `Downloading`, and `Seeding` to `Paused`.
+Previously queued downloads are restored and automatically resumed; completed,
+paused, and error states are retained. Saved HTTP segments are loaded for safe
+streaming as well as resume. Torrent metainfo supports offline reads and
+verification. `MemoryStorage` can be shared between engine instances in one
+process but is not durable across process exit.
+
+### Segment State
+
+```rust
+pub enum SegmentState {
+    Pending,
+    Downloading,
+    Completed,
+    Failed { error: String, retries: u32 },
+}
+
+pub struct Segment {
+    pub index: usize,
+    pub start: u64,
+    pub end: u64,
+    pub downloaded: u64,
+    pub state: SegmentState,
+}
+```
+
+### SQLite Implementation
+
+Uses WAL mode for crash safety and concurrent reads:
+
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE downloads (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    state TEXT NOT NULL,
+    state_error_kind TEXT,
+    state_error_message TEXT,
+    state_error_retryable INTEGER,
+    priority TEXT DEFAULT 'normal',
+    total_size INTEGER,
+    completed_size INTEGER DEFAULT 0,
+    download_speed INTEGER DEFAULT 0,
+    upload_speed INTEGER DEFAULT 0,
+    connections INTEGER DEFAULT 0,
+    seeders INTEGER DEFAULT 0,
+    peers INTEGER DEFAULT 0,
+    name TEXT NOT NULL,
+    url TEXT,
+    magnet_uri TEXT,
+    info_hash TEXT,
+    save_dir TEXT NOT NULL,
+    filename TEXT,
+    user_agent TEXT,
+    referer TEXT,
+    headers_json TEXT,
+    cookies_json TEXT,
+    checksum_json TEXT,
+    mirrors_json TEXT,
+    etag TEXT,
+    last_modified TEXT,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE segments (
+    download_id TEXT NOT NULL,
+    segment_index INTEGER NOT NULL,
+    start_byte INTEGER NOT NULL,
+    end_byte INTEGER NOT NULL,
+    downloaded INTEGER DEFAULT 0,
+    state TEXT NOT NULL,
+    error_message TEXT,
+    error_retries INTEGER DEFAULT 0,
+    FOREIGN KEY (download_id) REFERENCES downloads(id) ON DELETE CASCADE,
+    UNIQUE (download_id, segment_index)
+);
+
+ALTER TABLE downloads ADD COLUMN runtime_metadata_json TEXT;
+
+CREATE TABLE recursive_jobs (
+    id TEXT PRIMARY KEY,
+    root_url TEXT NOT NULL,
+    child_ids_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+```
+
+Current schema version is `4`.
+
+**Crash recovery:** Downloads in `Downloading` state are restored as `Paused` with `downloaded` bytes preserved for resume. When `recursive-http` is enabled, the runtime metadata sidecar restores recursive child redirect scope and fail-fast grouping, and the `recursive_jobs` table restores tracked parent job records.
+
+---
+
+## Scheduling and Priority
+
+### Priority Queue
+
+```rust
+pub enum DownloadPriority {
+    Low,        // -1
+    Normal,     // 0 (default)
+    High,       // 1
+    Critical,   // 2
+}
+
+pub struct PriorityQueue {
+    semaphore: Semaphore,           // Limits concurrent downloads
+    waiting: BinaryHeap<QueueEntry>,
+    active: HashMap<DownloadId, DownloadPriority>,
+}
+
+impl PriorityQueue {
+    pub async fn acquire(&self, id: DownloadId, priority: DownloadPriority) -> PriorityPermit;
+    pub fn set_priority(&self, id: DownloadId, priority: DownloadPriority) -> bool;
+    pub fn queue_position(&self, id: DownloadId) -> Option<usize>;
+    pub fn stats(&self) -> PriorityQueueStats;
+}
+```
+
+**Ordering:** Higher priority first, then FIFO within same priority level.
+
+### Bandwidth Scheduling
+
+```rust
+pub struct ScheduleRule {
+    pub start_hour: u8,             // 0-23
+    pub end_hour: u8,               // 0-23 (can wrap midnight)
+    pub days: Vec<Weekday>,         // Empty = all days
+    pub download_limit: Option<u64>,
+    pub upload_limit: Option<u64>,
+}
+
+pub struct BandwidthScheduler {
+    rules: Vec<ScheduleRule>,
+    default_limits: BandwidthLimits,
+    current_limits: RwLock<BandwidthLimits>,
+}
+
+impl BandwidthScheduler {
+    pub fn get_limits(&self) -> BandwidthLimits;
+    pub fn update(&self) -> bool;   // Returns true if limits changed
+}
+```
+
+Rules are evaluated in order; first matching rule wins. Empty rules list uses defaults.
+
+---
+
+## Configuration
+
+### EngineConfig
+
+```rust
+pub struct EngineConfig {
+    pub download_dir: PathBuf,
+    pub max_concurrent_downloads: usize,        // Default: 5
+    pub max_connections_per_download: usize,    // Default: 16
+    pub min_segment_size: u64,                  // Default: 1 MiB
+    pub global_download_limit: Option<u64>,     // bytes/sec
+    pub global_upload_limit: Option<u64>,       // bytes/sec
+    pub schedule_rules: Vec<ScheduleRule>,      // Time-based limits
+    pub user_agent: String,                     // Default: "gosh-dl/VERSION"
+    pub enable_dht: bool,                       // Default: true
+    pub enable_pex: bool,                       // Default: true
+    pub enable_lpd: bool,                       // Default: true
+    pub max_peers: usize,                       // Default: 55
+    pub seed_ratio: f64,                        // Default: 1.0
+    pub database_path: Option<PathBuf>,
+    pub http: HttpConfig,
+    pub torrent: TorrentConfig,
+}
+```
+
+### HttpConfig
+
+```rust
+pub struct HttpConfig {
+    pub connect_timeout: u64,                   // Default: 30 seconds
+    pub read_timeout: u64,                      // Default: 60 seconds
+    pub max_redirects: usize,                   // Default: 10
+    pub max_retries: usize,                     // Default: 3
+    pub retry_delay_ms: u64,                    // Default: 1000
+    pub max_retry_delay_ms: u64,                // Default: 30000
+    pub accept_invalid_certs: bool,             // Default: false
+    pub proxy_url: Option<String>,              // HTTP/HTTPS/SOCKS5
+}
+```
+
+### TorrentConfig
+
+```rust
+pub struct TorrentConfig {
+    pub listen_port_range: (u16, u16),          // Default: (6881, 6889)
+    pub dht_bootstrap_nodes: Vec<String>,
+    pub allocation_mode: AllocationMode,        // Default: None
+    pub tracker_update_interval: u64,           // Default: 1800 seconds
+    pub peer_timeout: u64,                      // Default: 120 seconds
+    pub max_pending_requests: usize,            // Default: 16
+    pub enable_endgame: bool,                   // Default: true
+    pub tick_interval_ms: u64,                  // Default: 100
+    pub connect_interval_secs: u64,             // Default: 5
+    pub choking_interval_secs: u64,             // Default: 10
+    pub webseed: WebSeedConfig,
+    pub encryption: EncryptionConfig,
+    pub utp: UtpConfigSettings,
+}
+
+pub enum AllocationMode {
+    None,       // Files grow as data arrives
+    Sparse,     // Set file size, let OS handle
+    Full,       // Preallocate with zeros
+}
+```
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Audit hardening (0.6.4)
+
+See the 0.6.4 changelog entry for the full list. Behavioural rules added by
+the audit: output names from URLs, torrent metainfo, magnet URIs, and
+recursive manifests are validated (`fsutil::check_relative_path`) before they
+are used for any filesystem operation, including deletion; untrusted peer,
+tracker, LPD, PEX, metadata, web-seed, and uTP input is size-bounded; the
+default `Preferred` encryption policy falls back to plaintext over a new
+connection; and recursive discovery bounds its frontier (1024 pages, 10,000
+files, 120 s per page) and compares origins for `same_host_only`.
+
+## Paused creation (0.6.3)
+
+`DownloadOptions::start_paused` defaults to false. When true, add operations
+persist a Paused status and options without spawning transfer workers. The
+flag affects creation only; explicit resume starts the worker normally.
+Recursive discovery is independent of child transfer startup. Raw torrent
+metainfo is retained for paused torrents even without a storage backend.

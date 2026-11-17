@@ -81,4 +81,4 @@ crediting Ahmed Nefzaoui plus a modification note. New files (`error.rs`, `tests
 > **LICENSE FLAG (for Task 4 / user review):** the vendored engine is
 > **GPL-3.0-or-later**; the root `pyproject.toml` declares **MIT**. The root license was
 > **not** changed. Distributing the combined product requires resolving this conflict
-> (see `THIRD_PARTY_NOTICES.md`, owned by the lead).
+> (per-file SPDX headers are retained).

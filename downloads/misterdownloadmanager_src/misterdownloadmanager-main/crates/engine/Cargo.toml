@@ -1,0 +1,82 @@
+[package]
+name = "mdm-engine"
+description = "MDM download engine: dynamic segmentation, workers, resume"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[features]
+default = ["browser-connection"]
+# The browser-like connection for sites whose bot check refuses MDM's own (#668,
+# src/browserlike.rs). Without it a bot check's refusal stands (the browser takes the download).
+browser-connection = ["dep:wreq", "dep:wreq-util", "dep:rustls-native-certs", "dep:webpki-root-certs"]
+
+[dependencies]
+wreq = { workspace = true, optional = true }
+wreq-util = { workspace = true, optional = true }
+rustls-native-certs = { workspace = true, optional = true }
+webpki-root-certs = { workspace = true, optional = true }
+bytes.workspace = true
+craft-atomic.workspace = true
+serde_json.workspace = true
+futures.workspace = true
+percent-encoding.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+url.workspace = true
+httpdate.workspace = true
+sha2.workspace = true
+md-5.workspace = true
+sha1.workspace = true
+crc32fast.workspace = true
+base64.workspace = true
+hex.workspace = true
+# Proxy auto-config scripts (src/pac.rs): QuickJS, built from C (no bindgen: its bindings come
+# with it). Only the language: no module loader, no file or OS access.
+rquickjs = { version = "0.14.0", default-features = false, features = ["std"] }
+suppaftp.workspace = true
+hickory-resolver.workspace = true
+socket2.workspace = true
+network-interface.workspace = true
+hyper-util.workspace = true
+# The client's connector timed, a layer around it (src/server.rs; already in the tree).
+tower-layer = "0.3.3"
+tower-service = "0.3.3"
+# hyper-util's proxy matcher takes an http::Uri (already in the tree through reqwest).
+http = "1.5.0"
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+tokio-rustls.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Sparse part files (src/sparse.rs, D-008 amendment) and the free-space probe (src/disk.rs).
+windows-sys.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+# The free-space probe (src/disk.rs): statvfs and statfs, safely (already in the tree).
+rustix = { version = "1.1.6", features = ["fs"] }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+# The free-space probe (src/disk.rs) asks for the space Finder shows, purgeable space included
+# (already in the tree through security-framework).
+core-foundation = "0.10.1"
+core-foundation-sys = "0.8.7"
+
+[dev-dependencies]
+# The free-space probe's test compares it with the volume list it replaced (#224).
+sysinfo.workspace = true
+mdm-labserver.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+# The limiter's tests run on Tokio's paused clock (src/limiter.rs, #621).
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

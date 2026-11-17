@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Prenose iz brskalnika preda programu Mister Download Manager."
+  },
+  "menu": {
+    "message": "Prenesi z Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Prenesi video"
+  },
+  "video_more": {
+    "message": "Več možnosti"
+  },
+  "video_hide_here": {
+    "message": "Skrij samo pri tem videoposnetku"
+  },
+  "video_never_site": {
+    "message": "Nikoli na $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Nastavitve gumba..."
+  },
+  "video_sent": {
+    "message": "Poslano v Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager ni nameščen ali se ni zagnal"
+  },
+  "video_drag": {
+    "message": "Povlecite za premikanje ob robu videoposnetka"
+  },
+  "menu_selected": {
+    "message": "Prenesi izbrane povezave z Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Prenesi vse povezave z Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Povezano z Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Povezano z Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Začasno ustavljeno: prenosi ostanejo v brskalniku"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager ni nameščen ali njegova integracija brskalnika ni nastavljena"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager ne sprejema te kopije razširitve"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager se ni zagnal pravočasno"
+  },
+  "status_host_failed": {
+    "message": "Povezava z Mister Download Manager ni uspela"
+  },
+  "status_too_large": {
+    "message": "Podrobnosti tega prenosa so bile prevelike za predajo"
+  },
+  "status_update_app": {
+    "message": "Posodobite Mister Download Manager, da boste lahko uporabljali vse, kar ponuja ta razširitev"
+  },
+  "popup_take": {
+    "message": "Prevzemi prenose iz tega brskalnika"
+  },
+  "popup_proxy": {
+    "message": "Pošlji prenose prek posrednika ali razširitve VPN tega brskalnika"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager nato prenaša prek istega posrednika kot ta brskalnik. Brskalnik vas enkrat vpraša, ali to dovolite; če to izklopite, se dovoljenje prekliče."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager nato prenaša prek istega posrednika kot ta brskalnik. Ko je to izklopljeno, razširitev ne bere brskalnikovega posrednika."
+  },
+  "popup_exclude_site": {
+    "message": "Nikoli ne prevzemi prenosov s spletnega mesta $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Prenosi iz $site$ ostanejo v brskalniku",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Odpri Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Možnosti..."
+  },
+  "popup_help": {
+    "message": "Pomoč"
+  },
+  "popup_support": {
+    "message": "Podprite MDM"
+  },
+  "popup_fix": {
+    "message": "Kako odpraviti težavo"
+  },
+  "popup_declined": {
+    "message": "Prepuščeno brskalniku: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Zadnja prenesena datoteka je bila prepuščena brskalniku."
+  },
+  "declined_file_type": {
+    "message": "Njena vrsta ni v Možnosti → Vrste datotek."
+  },
+  "declined_site": {
+    "message": "Njeno spletno mesto je v Možnosti → Vrste datotek, spletna mesta, prepuščena brskalniku."
+  },
+  "declined_address": {
+    "message": "Njen naslov je v Možnosti → Vrste datotek, naslovi, prepuščeni brskalniku."
+  },
+  "declined_small": {
+    "message": "Manjša je od najmanjše velikosti v Možnosti → Vrste datotek."
+  },
+  "declined_browser": {
+    "message": "Ta brskalnik ni označen v Možnosti → Splošno."
+  },
+  "declined_integration_off": {
+    "message": "Uporabi napredno integracijo brskalnika je izklopljeno v Možnosti → Splošno."
+  },
+  "declined_site_access": {
+    "message": "Razširitvi ni dovoljeno brati tega spletnega mesta (dostop brskalnika do spletnega mesta)."
+  },
+  "popup_alt": {
+    "message": "Držite Alt med klikanjem povezave, da jo prenese brskalnik."
+  },
+  "popup_media": {
+    "message": "Predstavnost na tej strani"
+  },
+  "popup_media_none": {
+    "message": "Na tej strani še ni videoposnetkov ali zvoka. Predvajajte jih, nato pa to znova odprite."
+  },
+  "popup_media_streamed": {
+    "message": "Predvajalnik na tej strani pretaka video po delih, zato ni datoteke za prikaz. Pokažite na video in uporabite njegov gumb »Prenesi video«."
+  },
+  "popup_media_store": {
+    "message": "Pravila Spletne trgovine Chrome držijo to kopijo dodatka stran od videov na tem spletnem mestu. V Pomoči piše, kaj lahko storite."
+  },
+  "popup_media_download": {
+    "message": "Prenesi"
+  },
+  "popup_media_protected": {
+    "message": "Zaščiteno"
+  },
+  "popup_media_live": {
+    "message": "V živo"
+  },
+  "video_off": {
+    "message": "Gumb za prenos je na tem spletnem mestu izklopljen"
+  },
+  "video_drm": {
+    "message": "Zaščiten videoposnetek: ni ga mogoče shraniti"
+  },
+  "video_unnamed": {
+    "message": "Ni mogoče ugotoviti, kateri videoposnetek je to: odprite njegovo stran in poskusite tam"
+  },
+  "video_looking": {
+    "message": "Iskanje kakovosti…"
+  },
+  "video_open_mdm": {
+    "message": "Odpri v programu Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Tu ni videa za prenos"
+  },
+  "video_playlist": {
+    "message": "Seznam videoposnetkov: izberite jih v programu Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager potrebuje yt-dlp za ta videoposnetek"
+  },
+  "video_too_long": {
+    "message": "Iskanje je trajalo predolgo"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager je zaseden z drugimi videoposnetki"
+  },
+  "video_queued": {
+    "message": "Dodano v čakalno vrsto"
+  },
+  "video_failed_lookup": {
+    "message": "Iskanje ni uspelo"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Zvok"
+  },
+  "video_open_post": {
+    "message": "Odprite objavo, nato uporabite gumb tam"
+  },
+  "popup_send_to": {
+    "message": "Pošlji prenose v"
+  },
+  "popup_send_here": {
+    "message": "Ta računalnik"
+  },
+  "popup_send_remote": {
+    "message": "Drugi Mister Download Manager (strežnik)"
+  },
+  "popup_remote_code": {
+    "message": "Koda za seznanjanje"
+  },
+  "popup_remote_open": {
+    "message": "Odpri"
+  },
+  "popup_remote_pair": {
+    "message": "Seznani"
+  },
+  "popup_remote_help": {
+    "message": "Enkrat odprite njegov naslov in sprejmite njegovo potrdilo, nato vnesite kodo iz možnosti, oddaljeno, seznani napravo (ali misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Prenosi gredo na $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Vnesite naslov https://."
+  },
+  "remote_unreachable": {
+    "message": "Ni dosegljivo. Enkrat odprite njegov naslov v tem brskalniku in sprejmite njegovo potrdilo, nato poskusite znova."
+  },
+  "remote_wrong_code": {
+    "message": "Napačna koda."
+  },
+  "remote_no_code": {
+    "message": "Trenutno ne prikazuje kode: najprej kliknite Seznani napravo."
+  },
+  "remote_too_soon": {
+    "message": "Počakajte trenutek, nato poskusite znova."
+  },
+  "remote_failed": {
+    "message": "Ni delovalo. Poskusite znova."
+  },
+  "remote_device_name": {
+    "message": "Razširitev brskalnika"
+  },
+  "popup_media_title_name": {
+    "message": "Dodaj naslov strani pred imena predstavnostnih datotek"
+  }
+}

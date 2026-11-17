@@ -1,0 +1,35 @@
+[package]
+name = "mdm-remote"
+description = "Mister Download Manager's remote control: a paired phone or computer on the local network adds and controls downloads over HTTPS (#141)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Random tokens and codes from the system's generator (the crypto library rustls brings).
+aws-lc-rs.workspace = true
+axum.workspace = true
+hex.workspace = true
+mdm-engine.workspace = true
+mdm-ipc.workspace = true
+# The self-signed certificate, made once and kept.
+rcgen.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+reqwest = { workspace = true, features = ["json"] }
+# Paused time for the idle-connection test (tls.rs).
+tokio = { workspace = true, features = ["test-util"] }
+tempfile.workspace = true
+
+[lints]
+workspace = true

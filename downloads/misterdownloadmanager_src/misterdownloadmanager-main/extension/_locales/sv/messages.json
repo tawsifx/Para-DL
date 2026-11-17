@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Överför nedladdningar från webbläsaren till Mister Download Manager."
+  },
+  "menu": {
+    "message": "Ladda ned med Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Hämta video"
+  },
+  "video_more": {
+    "message": "Fler alternativ"
+  },
+  "video_hide_here": {
+    "message": "Dölj bara för den här videon"
+  },
+  "video_never_site": {
+    "message": "Aldrig på $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Knappinställningar..."
+  },
+  "video_sent": {
+    "message": "Skickades till Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager är inte installerad eller startade inte"
+  },
+  "video_drag": {
+    "message": "Dra för att flytta den längs videons kant"
+  },
+  "menu_selected": {
+    "message": "Ladda ner valda länkar med Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Ladda ner alla länkar med Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Ansluten till Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Ansluten till Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Pausad: nedladdningar stannar i webbläsaren"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager är inte installerad, eller dess webbläsarintegrering är inte inställd"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager accepterar inte den här kopian av tillägget"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager startade inte i tid"
+  },
+  "status_host_failed": {
+    "message": "Anslutningen till Mister Download Manager misslyckades"
+  },
+  "status_too_large": {
+    "message": "Informationen om den här nedladdningen var för stor för att överlämnas"
+  },
+  "status_update_app": {
+    "message": "Uppdatera Mister Download Manager för att använda allt som det här tillägget erbjuder"
+  },
+  "popup_take": {
+    "message": "Ta nedladdningar från den här webbläsaren"
+  },
+  "popup_proxy": {
+    "message": "Skicka nedladdningar via den här webbläsarens proxy- eller VPN-tillägg"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager laddar sedan ned via samma proxy som den här webbläsaren. Webbläsaren frågar dig en gång om du vill tillåta det. Om du inaktiverar detta tas det tillbaka."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager hämtar sedan via samma proxy som den här webbläsaren. När detta är inaktiverat läser tillägget inte webbläsarens proxy."
+  },
+  "popup_exclude_site": {
+    "message": "Ta aldrig nedladdningar från $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Nedladdningar från $site$ stannar kvar i webbläsaren",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Öppna Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Alternativ..."
+  },
+  "popup_help": {
+    "message": "Hjälp"
+  },
+  "popup_support": {
+    "message": "Stöd MDM"
+  },
+  "popup_fix": {
+    "message": "Så här åtgärdar du det"
+  },
+  "popup_declined": {
+    "message": "Lämna till webbläsaren: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Den senaste nedladdningen lämnades till webbläsaren."
+  },
+  "declined_file_type": {
+    "message": "Dess typ finns inte i Alternativ → Filtyper."
+  },
+  "declined_site": {
+    "message": "Dess webbplats finns i Alternativ → Filtyper, webbplatser som lämnats till webbläsaren."
+  },
+  "declined_address": {
+    "message": "Dess adress finns i Alternativ → Filtyper, adresser som lämnats till webbläsaren."
+  },
+  "declined_small": {
+    "message": "Den är mindre än minimistorleken i Alternativ → Filtyper."
+  },
+  "declined_browser": {
+    "message": "Den här webbläsaren är inte markerad i Alternativ → Allmänt."
+  },
+  "declined_integration_off": {
+    "message": "Använd avancerad webbläsarintegrering är avstängd i Alternativ → Allmänt."
+  },
+  "declined_site_access": {
+    "message": "Tillägget får inte läsa den här webbplatsen (webbläsarens webbplatsåtkomst)."
+  },
+  "popup_alt": {
+    "message": "Håll Alt nedtryckt när du klickar på en länk för att låta webbläsaren ladda ner den."
+  },
+  "popup_media": {
+    "message": "Media på den här sidan"
+  },
+  "popup_media_none": {
+    "message": "Ingen video eller ljud hittades på den här sidan än. Spela upp det och öppna sedan detta igen."
+  },
+  "popup_media_streamed": {
+    "message": "Spelaren på den här sidan strömmar videon i delar, så det finns ingen fil att visa. Peka på videon och använd dess knapp Hämta video."
+  },
+  "popup_media_store": {
+    "message": "Chrome Web Stores regler håller den här kopian av tillägget borta från webbplatsens videor. Under Hjälp står vad du kan göra."
+  },
+  "popup_media_download": {
+    "message": "Ladda ned"
+  },
+  "popup_media_protected": {
+    "message": "Skyddad"
+  },
+  "popup_media_live": {
+    "message": "Live"
+  },
+  "video_off": {
+    "message": "Nedladdningsknappen är inaktiverad på den här webbplatsen"
+  },
+  "video_drm": {
+    "message": "Skyddad video: den kan inte sparas"
+  },
+  "video_unnamed": {
+    "message": "Det går inte att avgöra vilken video det här är: öppna videons egen sida och försök där"
+  },
+  "video_looking": {
+    "message": "Söker efter kvaliteter…"
+  },
+  "video_open_mdm": {
+    "message": "Öppna i Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Ingen video att hämta här"
+  },
+  "video_playlist": {
+    "message": "En lista med videor: välj dem i Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager behöver yt-dlp för den här videon"
+  },
+  "video_too_long": {
+    "message": "Sökningen tog för lång tid"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager är upptaget med andra videor"
+  },
+  "video_queued": {
+    "message": "Tillagd i kön"
+  },
+  "video_failed_lookup": {
+    "message": "Det gick inte att söka"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Ljud"
+  },
+  "video_open_post": {
+    "message": "Öppna inlägget och använd sedan knappen där"
+  },
+  "popup_send_to": {
+    "message": "Skicka nedladdningar till"
+  },
+  "popup_send_here": {
+    "message": "Den här datorn"
+  },
+  "popup_send_remote": {
+    "message": "En annan Mister Download Manager (en server)"
+  },
+  "popup_remote_code": {
+    "message": "Kopplingskod"
+  },
+  "popup_remote_open": {
+    "message": "Öppna den"
+  },
+  "popup_remote_pair": {
+    "message": "Koppla"
+  },
+  "popup_remote_help": {
+    "message": "Öppna dess adress en gång och acceptera dess certifikat, ange sedan en kod från dess Alternativ, Fjärr, Koppla en enhet (eller misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Nedladdningar går till $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Ange dess https://-adress."
+  },
+  "remote_unreachable": {
+    "message": "Nåddes inte. Öppna dess adress en gång i den här webbläsaren och acceptera dess certifikat, försök sedan igen."
+  },
+  "remote_wrong_code": {
+    "message": "Fel kod."
+  },
+  "remote_no_code": {
+    "message": "Den visar ingen kod nu: klicka på Koppla en enhet där först."
+  },
+  "remote_too_soon": {
+    "message": "Vänta ett ögonblick och försök sedan igen."
+  },
+  "remote_failed": {
+    "message": "Det fungerade inte. Försök igen."
+  },
+  "remote_device_name": {
+    "message": "Webbläsartillägg"
+  },
+  "popup_media_title_name": {
+    "message": "Lägg till sidtiteln framför mediefilernas namn"
+  }
+}

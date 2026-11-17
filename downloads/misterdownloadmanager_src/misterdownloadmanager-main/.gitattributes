@@ -1,0 +1,8 @@
+# Generated files keep the line endings their tools write, on every checkout (CI compares them).
+i18n/*.tsv text eol=lf
+tools/installer/languages.iss text eol=crlf
+tools/installer/languages/*.isl text eol=crlf
+# Test fixtures are compared byte for byte (a signed checksum list): never converted.
+crates/*/tests/fixtures/** -text
+# Scripts that run inside Linux (mdm-lab copies them in from a Windows checkout).
+tools/lab/wsl/*.sh text eol=lf

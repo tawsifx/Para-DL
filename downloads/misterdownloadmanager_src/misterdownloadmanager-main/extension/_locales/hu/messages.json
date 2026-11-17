@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Átadja a letöltéseket a böngészőből a(z) Mister Download Manager alkalmazásnak."
+  },
+  "menu": {
+    "message": "Letöltés a(z) Mister Download Manager alkalmazással"
+  },
+  "video_download": {
+    "message": "Videó letöltése"
+  },
+  "video_more": {
+    "message": "További lehetőségek"
+  },
+  "video_hide_here": {
+    "message": "Elrejtés ennél a videónál"
+  },
+  "video_never_site": {
+    "message": "Soha ne jelenjen meg ezen a webhelyen: $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Gombbeállítások..."
+  },
+  "video_sent": {
+    "message": "Elküldve a következőnek: Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Az Mister Download Manager nincs telepítve, vagy nem indult el"
+  },
+  "video_drag": {
+    "message": "Húzza a videó szélére a mozgatáshoz"
+  },
+  "menu_selected": {
+    "message": "Kijelölt hivatkozások letöltése az Mister Download Manager alkalmazással"
+  },
+  "menu_all": {
+    "message": "Összes hivatkozás letöltése az Mister Download Manager alkalmazással"
+  },
+  "status_connected": {
+    "message": "Csatlakoztatva az Mister Download Manager alkalmazáshoz"
+  },
+  "status_connected_version": {
+    "message": "Csatlakoztatva az Mister Download Manager $version$ alkalmazáshoz",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Szüneteltetve: a letöltések a böngészőben maradnak"
+  },
+  "status_not_installed": {
+    "message": "Az Mister Download Manager nincs telepítve, vagy a böngészőintegrációja nincs beállítva"
+  },
+  "status_forbidden": {
+    "message": "Az Mister Download Manager nem fogadja el a bővítmény ezen másolatát"
+  },
+  "status_not_running": {
+    "message": "Az Mister Download Manager nem indult el időben"
+  },
+  "status_host_failed": {
+    "message": "Nem sikerült csatlakozni az Mister Download Manager alkalmazáshoz"
+  },
+  "status_too_large": {
+    "message": "A letöltés részletei túl nagyok voltak az átadáshoz"
+  },
+  "status_update_app": {
+    "message": "Frissítse a(z) Mister Download Manager alkalmazást, hogy használhassa a bővítmény összes funkcióját"
+  },
+  "popup_take": {
+    "message": "Letöltések átvétele ebből a böngészőből"
+  },
+  "popup_proxy": {
+    "message": "Letöltések küldése a böngésző proxy- vagy VPN-bővítményén keresztül"
+  },
+  "popup_proxy_title": {
+    "message": "Az Mister Download Manager ezután ugyanazon a proxyn keresztül tölt le, mint ez a böngésző. A böngésző egyszer engedélyt kér erre; ennek kikapcsolásával visszavonhatja az engedélyt."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Ekkor a(z) Mister Download Manager ugyanazon a proxyn keresztül tölt le, mint ez a böngésző. Ha ez ki van kapcsolva, a bővítmény nem olvassa be a böngésző proxyját."
+  },
+  "popup_exclude_site": {
+    "message": "Soha ne töltsön le fájlokat a(z) $site$ webhelyről",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "A(z) $site$ webhelyről származó letöltések a böngészőben maradnak",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Megnyitás: Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Beállítások..."
+  },
+  "popup_help": {
+    "message": "Súgó"
+  },
+  "popup_support": {
+    "message": "MDM támogatása"
+  },
+  "popup_fix": {
+    "message": "Hogyan javítható"
+  },
+  "popup_declined": {
+    "message": "Böngészőnek meghagyva: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Az utolsó letöltés a böngészőnek lett meghagyva."
+  },
+  "declined_file_type": {
+    "message": "Típusa nincs a Beállítások → Fájltípusok menüpontban."
+  },
+  "declined_site": {
+    "message": "Webhelye a Beállítások → Fájltípusok, böngészőnek meghagyott webhelyek között van."
+  },
+  "declined_address": {
+    "message": "Címe a Beállítások → Fájltípusok, böngészőnek meghagyott címek között van."
+  },
+  "declined_small": {
+    "message": "Kisebb, mint a minimális méret a Beállítások → Fájltípusok menüpontban."
+  },
+  "declined_browser": {
+    "message": "Ez a böngésző nincs bejelölve a Beállítások → Általános menüpontban."
+  },
+  "declined_integration_off": {
+    "message": "A Speciális böngészőintegráció használata ki van kapcsolva a Beállítások → Általános menüpontban."
+  },
+  "declined_site_access": {
+    "message": "A bővítmény nem olvashatja ezt a webhelyet (a böngésző webhely-hozzáférése)."
+  },
+  "popup_alt": {
+    "message": "Tartsa lenyomva az Alt billentyűt, miközben egy hivatkozásra kattint, hogy a böngésző töltse le azt."
+  },
+  "popup_media": {
+    "message": "Média ezen az oldalon"
+  },
+  "popup_media_none": {
+    "message": "Még nem található videó vagy hang ezen az oldalon. Indítsa el a lejátszást, majd nyissa meg újra."
+  },
+  "popup_media_streamed": {
+    "message": "Ennek az oldalnak a lejátszója darabokban streameli a videót, így nincs felsorolható fájl. Mutasson a videóra, és használja a „Videó letöltése” gombját."
+  },
+  "popup_media_store": {
+    "message": "A Chrome Internetes áruház szabályai távol tartják a bővítmény e példányát az oldal videóitól. A Súgó elmondja, mit tehet."
+  },
+  "popup_media_download": {
+    "message": "Letöltés"
+  },
+  "popup_media_protected": {
+    "message": "Védett"
+  },
+  "popup_media_live": {
+    "message": "Élő"
+  },
+  "video_off": {
+    "message": "A letöltés gomb ezen a webhelyen ki van kapcsolva"
+  },
+  "video_drm": {
+    "message": "Védett videó: nem menthető"
+  },
+  "video_unnamed": {
+    "message": "Nem állapítható meg, melyik videóról van szó: nyissa meg a saját oldalát, és próbálja ott"
+  },
+  "video_looking": {
+    "message": "Minőségek keresése…"
+  },
+  "video_open_mdm": {
+    "message": "Megnyitás a Mister Download Manager alkalmazásban…"
+  },
+  "video_no_choices": {
+    "message": "Itt nincs letölthető videó"
+  },
+  "video_playlist": {
+    "message": "Videók listája: válassza ki őket a Mister Download Manager alkalmazásban"
+  },
+  "video_no_ytdlp": {
+    "message": "A Mister Download Manager alkalmazásnak szüksége van a yt-dlp eszközre ehhez a videóhoz"
+  },
+  "video_too_long": {
+    "message": "A keresés túl sokáig tartott"
+  },
+  "video_busy": {
+    "message": "A Mister Download Manager alkalmazás más videókkal van elfoglalva"
+  },
+  "video_queued": {
+    "message": "Hozzáadva a sorhoz"
+  },
+  "video_failed_lookup": {
+    "message": "A keresés sikertelen"
+  },
+  "video_tab_video": {
+    "message": "Videó"
+  },
+  "video_tab_audio": {
+    "message": "Hang"
+  },
+  "video_open_post": {
+    "message": "Nyissa meg a bejegyzést, majd használja az ottani gombot"
+  },
+  "popup_send_to": {
+    "message": "Letöltések küldése ide"
+  },
+  "popup_send_here": {
+    "message": "Ez a számítógép"
+  },
+  "popup_send_remote": {
+    "message": "Másik Mister Download Manager (kiszolgáló)"
+  },
+  "popup_remote_code": {
+    "message": "Párosítási kód"
+  },
+  "popup_remote_open": {
+    "message": "Megnyitás"
+  },
+  "popup_remote_pair": {
+    "message": "Párosítás"
+  },
+  "popup_remote_help": {
+    "message": "Nyissa meg egyszer a címét, és fogadja el a tanúsítványát, majd adja meg a kódot a Beállítások, Távoli, Eszköz párosítása (vagy misterdownloadmanager-cli pair) menüpontból."
+  },
+  "status_remote": {
+    "message": "A letöltések ide mennek: $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Adja meg a https:// címét."
+  },
+  "remote_unreachable": {
+    "message": "Nem érhető el. Nyissa meg egyszer a címét ebben a böngészőben, és fogadja el a tanúsítványát, majd próbálja újra."
+  },
+  "remote_wrong_code": {
+    "message": "Hibás kód."
+  },
+  "remote_no_code": {
+    "message": "Most nem mutat kódot: először kattintson ott az Eszköz párosítása gombra."
+  },
+  "remote_too_soon": {
+    "message": "Várjon egy pillanatot, majd próbálja újra."
+  },
+  "remote_failed": {
+    "message": "Nem sikerült. Próbálja újra."
+  },
+  "remote_device_name": {
+    "message": "Böngészőbővítmény"
+  },
+  "popup_media_title_name": {
+    "message": "Az oldal címének hozzáadása a médiafájlok neve elé"
+  }
+}

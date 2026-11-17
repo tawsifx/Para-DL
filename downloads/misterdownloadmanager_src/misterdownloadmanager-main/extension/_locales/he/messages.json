@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "מעביר הורדות מהדפדפן אל Mister Download Manager."
+  },
+  "menu": {
+    "message": "הורד באמצעות Mister Download Manager"
+  },
+  "video_download": {
+    "message": "הורד סרטון"
+  },
+  "video_more": {
+    "message": "אפשרויות נוספות"
+  },
+  "video_hide_here": {
+    "message": "הסתר בסרטון זה"
+  },
+  "video_never_site": {
+    "message": "לעולם לא ב-$site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "הגדרות לחצן..."
+  },
+  "video_sent": {
+    "message": "נשלח אל Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager אינו מותקן או לא הופעל"
+  },
+  "video_drag": {
+    "message": "גרור כדי להזיז אותו לאורך קצה הסרטון"
+  },
+  "menu_selected": {
+    "message": "הורד את הקישורים שנבחרו באמצעות Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "הורד את כל הקישורים באמצעות Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "מחובר אל Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "מחובר אל Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "מושהה: ההורדות נשארות בדפדפן"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager אינו מותקן, או ששילוב הדפדפן שלו אינו מוגדר"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager אינו מקבל עותק זה של ההרחבה"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager לא הופעל בזמן"
+  },
+  "status_host_failed": {
+    "message": "החיבור ל- Mister Download Manager נכשל"
+  },
+  "status_too_large": {
+    "message": "פרטי ההורדה הזו היו גדולים מדי למסירה"
+  },
+  "status_update_app": {
+    "message": "עדכן את Mister Download Manager כדי להשתמש בכל מה שתוסף זה מציע"
+  },
+  "popup_take": {
+    "message": "קבל הורדות מדפדפן זה"
+  },
+  "popup_proxy": {
+    "message": "שלח הורדות דרך שרת ה-Proxy או הרחבת ה-VPN של דפדפן זה"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager מוריד אז דרך אותו שרת Proxy כמו הדפדפן הזה. הדפדפן יבקש ממך פעם אחת לאפשר זאת; כיבוי אפשרות זו מבטל זאת."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager יוריד אז דרך אותו שרת proxy שבו משתמש הדפדפן הזה. כשהאפשרות הזו כבויה, התוסף לא קורא את שרת ה-proxy של הדפדפן."
+  },
+  "popup_exclude_site": {
+    "message": "לעולם אל תיקח הורדות מ־$site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "הורדות מ־$site$ נשארות בדפדפן",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "פתח את Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "אפשרויות..."
+  },
+  "popup_help": {
+    "message": "עזרה"
+  },
+  "popup_support": {
+    "message": "תמוך ב-MDM"
+  },
+  "popup_fix": {
+    "message": "איך לתקן זאת"
+  },
+  "popup_declined": {
+    "message": "הושאר לדפדפן: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "ההורדה האחרונה הושארה לדפדפן."
+  },
+  "declined_file_type": {
+    "message": "הסוג שלו אינו נמצא ב'אפשרויות' ← 'סוגי קבצים'."
+  },
+  "declined_site": {
+    "message": "האתר שלו נמצא ב'אפשרויות' ← 'סוגי קבצים', אתרים שהושארו לדפדפן."
+  },
+  "declined_address": {
+    "message": "הכתובת שלו נמצאת ב'אפשרויות' ← 'סוגי קבצים', כתובות שהושארו לדפדפן."
+  },
+  "declined_small": {
+    "message": "הוא קטן מהגודל המינימלי ב'אפשרויות' ← 'סוגי קבצים'."
+  },
+  "declined_browser": {
+    "message": "דפדפן זה אינו מסומן ב'אפשרויות' ← 'כללי'."
+  },
+  "declined_integration_off": {
+    "message": "האפשרות 'השתמש בשילוב דפדפן מתקדם' כבויה ב'אפשרויות' ← 'כללי'."
+  },
+  "declined_site_access": {
+    "message": "אין הרשאה להרחבה לקרוא אתר זה (גישת האתר של הדפדפן)."
+  },
+  "popup_alt": {
+    "message": "החזק את Alt תוך כדי לחיצה על קישור כדי לאפשר לדפדפן להוריד אותו."
+  },
+  "popup_media": {
+    "message": "מדיה בדף זה"
+  },
+  "popup_media_none": {
+    "message": "לא נמצאו סרטונים או צלילים בדף זה עדיין. הפעל אותם, ואז פתח זאת שוב."
+  },
+  "popup_media_streamed": {
+    "message": "הנגן בדף הזה מזרים את הסרטון בחלקים, לכן אין קובץ להציג ברשימה. הצביעו על הסרטון והשתמשו בלחצן שלו „הורד סרטון”."
+  },
+  "popup_media_store": {
+    "message": "כללי חנות האינטרנט של Chrome מרחיקים עותק זה של התוסף מהסרטונים באתר הזה. ב„עזרה” כתוב מה אפשר לעשות."
+  },
+  "popup_media_download": {
+    "message": "הורד"
+  },
+  "popup_media_protected": {
+    "message": "מוגן"
+  },
+  "popup_media_live": {
+    "message": "שידור חי"
+  },
+  "video_off": {
+    "message": "לחצן ההורדה כבוי באתר זה"
+  },
+  "video_drm": {
+    "message": "סרטון מוגן: לא ניתן לשמור אותו"
+  },
+  "video_unnamed": {
+    "message": "לא ניתן לדעת איזה סרטון זה: פתחו את הדף שלו ונסו שם"
+  },
+  "video_looking": {
+    "message": "מחפש את האיכויות…"
+  },
+  "video_open_mdm": {
+    "message": "פתח ב-Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "אין כאן סרטון להורדה"
+  },
+  "video_playlist": {
+    "message": "רשימת סרטונים: בחר אותם ב-Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager זקוק ל-yt-dlp עבור סרטון זה"
+  },
+  "video_too_long": {
+    "message": "החיפוש ארך זמן רב מדי"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager עסוק בסרטונים אחרים"
+  },
+  "video_queued": {
+    "message": "נוסף לתור"
+  },
+  "video_failed_lookup": {
+    "message": "החיפוש נכשל"
+  },
+  "video_tab_video": {
+    "message": "וידאו"
+  },
+  "video_tab_audio": {
+    "message": "שמע"
+  },
+  "video_open_post": {
+    "message": "פתח את הפוסט, ואז השתמש בלחצן שם"
+  },
+  "popup_send_to": {
+    "message": "שלח הורדות אל"
+  },
+  "popup_send_here": {
+    "message": "מחשב זה"
+  },
+  "popup_send_remote": {
+    "message": "Mister Download Manager אחר (שרת)"
+  },
+  "popup_remote_code": {
+    "message": "קוד צימוד"
+  },
+  "popup_remote_open": {
+    "message": "פתח אותו"
+  },
+  "popup_remote_pair": {
+    "message": "צמד"
+  },
+  "popup_remote_help": {
+    "message": "פתח את הכתובת שלו פעם אחת וקבל את האישור שלו, ואז הזן קוד מ'אפשרויות', 'מרוחק', 'צמד התקן' (או misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "ההורדות עוברות אל $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "הזן את כתובת ה-https:// שלו."
+  },
+  "remote_unreachable": {
+    "message": "לא הושג. פתח את הכתובת שלו פעם אחת בדפדפן זה וקבל את האישור שלו, ואז נסה שוב."
+  },
+  "remote_wrong_code": {
+    "message": "קוד שגוי."
+  },
+  "remote_no_code": {
+    "message": "הוא לא מציג קוד עכשיו: לחץ תחילה על 'צמד התקן' שם."
+  },
+  "remote_too_soon": {
+    "message": "המתן רגע, ואז נסה שוב."
+  },
+  "remote_failed": {
+    "message": "זה לא עבד. נסה שוב."
+  },
+  "remote_device_name": {
+    "message": "הרחבת דפדפן"
+  },
+  "popup_media_title_name": {
+    "message": "הוספת כותרת הדף לפני שמות קובצי המדיה"
+  }
+}

@@ -1,0 +1,11 @@
+{
+ "date": "2026-10-29T11:30:33",
+ "os": "Windows-11-10.0.26200-SP0",
+ "cpu": "13th Gen Intel(R) Core(TM) i5-13400F",
+ "ram_gb": 63.8,
+ "disk": "C: (both clients' destination and IDM's temp folder)",
+ "idm_version": "6, 42, 25, 3",
+ "mdm_commit": "caa200c",
+ "server": "labserver (this repo), 127.0.0.1:8097, generated content",
+ "settings": "both at defaults: 8 connections"
+}

@@ -89,7 +89,7 @@
 
 - [ ] Per-diff: generate review package (`git diff -U10` + new files) under `.superpowers/audit/reviews/`, dispatch reviewer with two explicit verdicts (`SPEC COMPLIANCE pass/fail`, `CODE QUALITY Approved/Needs changes`) + severity-tagged findings with `file:line`. Fix loops with the owning agent; cap 5 rounds; ledger ruling at cap.
 - [ ] Broad whole-branch review on the most capable model after all 4 tasks accepted.
-- [ ] Maintain `THIRD_PARTY_NOTICES.md` license note (GPL-3.0-or-later vs MIT flagged, not resolved).
+- [ ] License decision (GPL-3.0-or-later vs MIT) remains with the maintainer; per-file SPDX headers retained.
 - [ ] Final gate: fresh `cargo test --all`, `cargo clippy --all -- -D warnings`, `pytest -q`, `ruff check src tests`, `mypy src`, benchmark exit 0. `git status` reviewed. Nothing committed.
 
 ## Success Criteria (acceptable evidence = raw command output)

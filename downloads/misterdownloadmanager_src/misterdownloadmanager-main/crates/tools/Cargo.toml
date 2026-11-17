@@ -1,0 +1,52 @@
+[package]
+name = "mdm-tools"
+description = "Verified, pinned installs of helper tools (yt-dlp) for Mister Download Manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+aws-lc-rs.workspace = true
+base64.workspace = true
+craft-atomic.workspace = true
+hex.workspace = true
+mdm-engine.workspace = true
+mdm-ipc.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+percent-encoding.workspace = true
+zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+mdm-labserver.workspace = true
+tempfile.workspace = true
+
+[features]
+# Update now's end-to-end tests only, never in a release (tools/installer and release.yml don't
+# turn it on): MDM_TEST_UPDATE_KEY names a test key a fake release's checksum list may be signed
+# with instead of MDM's release key.
+test-update = []
+
+# A fake yt-dlp and the checks against it in one program (#68; see the file).
+[[test]]
+name = "fake_ytdlp"
+harness = false
+
+# System helpers use a PATH of their own in a child process, without changing the test runner's.
+[[test]]
+name = "system_helpers"
+harness = false
+
+[lints]
+workspace = true
+
+[target."cfg(windows)".dependencies]
+win32job = "2.0.3"

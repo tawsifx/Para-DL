@@ -1,0 +1,26 @@
+# Build output
+/target/
+
+# Local, untracked study material (vendor docs extracted for reading)
+/.study/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+__pycache__/
+
+node_modules/
+
+# Impeccable (.claude/skills/impeccable): its engine downloads on first use; personal Claude Code settings
+/.claude/skills/impeccable/scripts/bin/
+/.claude/settings.local.json
+/.impeccable/review/
+/.impeccable/hook.cache.json
+/.impeccable/questions/
+# Agents' git worktrees (Claude Code).
+/.claude/worktrees/
+# Keys (API keys, signing keys): never committed.
+/k/

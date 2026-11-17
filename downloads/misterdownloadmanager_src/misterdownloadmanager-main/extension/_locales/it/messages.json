@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Passa a Mister Download Manager i download del browser."
+  },
+  "menu": {
+    "message": "Scarica con Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Scarica video"
+  },
+  "video_more": {
+    "message": "Altre opzioni"
+  },
+  "video_hide_here": {
+    "message": "Nascondi su questo video"
+  },
+  "video_never_site": {
+    "message": "Mai su $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Impostazioni pulsante..."
+  },
+  "video_sent": {
+    "message": "Inviato a Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager non è installato o non si è avviato"
+  },
+  "video_drag": {
+    "message": "Trascina per spostarlo lungo il bordo del video"
+  },
+  "menu_selected": {
+    "message": "Scarica i collegamenti selezionati con Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Scarica tutti i collegamenti con Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Connesso a Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Connesso a Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "In pausa: i download restano al browser"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager non è installato oppure la sua integrazione con i browser non è configurata"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager non accetta questa copia dell'estensione"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager non si è avviato in tempo"
+  },
+  "status_host_failed": {
+    "message": "La connessione a Mister Download Manager non è riuscita"
+  },
+  "status_too_large": {
+    "message": "I dati di questo download erano troppo grandi per essere trasferiti"
+  },
+  "status_update_app": {
+    "message": "Aggiorna Mister Download Manager per usare tutte le funzioni di questa estensione"
+  },
+  "popup_take": {
+    "message": "Acquisisci i download da questo browser"
+  },
+  "popup_proxy": {
+    "message": "Invia i download tramite il proxy o l'estensione VPN di questo browser"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager scaricherà così tramite lo stesso proxy di questo browser. Il browser ti chiederà l'autorizzazione una sola volta; disattivando l'opzione la revochi."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager scaricherà così tramite lo stesso proxy di questo browser. Quando l'opzione è disattivata, l'estensione non legge il proxy del browser."
+  },
+  "popup_exclude_site": {
+    "message": "Non acquisire mai download da $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "I download da $site$ restano al browser",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Apri Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Opzioni..."
+  },
+  "popup_help": {
+    "message": "Guida"
+  },
+  "popup_support": {
+    "message": "Sostieni MDM"
+  },
+  "popup_fix": {
+    "message": "Come risolvere"
+  },
+  "popup_declined": {
+    "message": "Lasciato al browser: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "L'ultimo download è stato lasciato al browser."
+  },
+  "declined_file_type": {
+    "message": "Il suo tipo non è in Opzioni → Tipi di file."
+  },
+  "declined_site": {
+    "message": "Il suo sito è in Opzioni → Tipi di file, tra i siti lasciati al browser."
+  },
+  "declined_address": {
+    "message": "Il suo indirizzo è in Opzioni → Tipi di file, tra gli indirizzi lasciati al browser."
+  },
+  "declined_small": {
+    "message": "È più piccolo della dimensione minima in Opzioni → Tipi di file."
+  },
+  "declined_browser": {
+    "message": "Questo browser non è selezionato in Opzioni → Generale."
+  },
+  "declined_integration_off": {
+    "message": "L'opzione \"Usa l'integrazione avanzata con i browser\" è disattivata in Opzioni → Generale."
+  },
+  "declined_site_access": {
+    "message": "L'estensione non ha il permesso di leggere questo sito (accesso ai siti del browser)."
+  },
+  "popup_alt": {
+    "message": "Tieni premuto Alt mentre fai clic su un collegamento per farlo scaricare al browser."
+  },
+  "popup_media": {
+    "message": "Contenuti multimediali in questa pagina"
+  },
+  "popup_media_none": {
+    "message": "Nessun video o audio trovato ancora in questa pagina. Avvialo, poi riapri questo menu."
+  },
+  "popup_media_streamed": {
+    "message": "Il lettore di questa pagina trasmette il video a pezzi, quindi non c'è nessun file da elencare. Passa il puntatore sul video e usa il suo pulsante Scarica video."
+  },
+  "popup_media_store": {
+    "message": "Le regole del Chrome Web Store non consentono a questa copia dell'estensione di scaricare i video di questo sito. La Guida spiega cosa puoi fare."
+  },
+  "popup_media_download": {
+    "message": "Scarica"
+  },
+  "popup_media_protected": {
+    "message": "Protetto"
+  },
+  "popup_media_live": {
+    "message": "In diretta"
+  },
+  "video_off": {
+    "message": "Il pulsante di download è disattivato su questo sito"
+  },
+  "video_drm": {
+    "message": "Video protetto: non può essere salvato"
+  },
+  "video_unnamed": {
+    "message": "Impossibile capire di quale video si tratta: apri la sua pagina e riprova da lì"
+  },
+  "video_looking": {
+    "message": "Ricerca delle qualità…"
+  },
+  "video_open_mdm": {
+    "message": "Apri in Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Nessun video da scaricare qui"
+  },
+  "video_playlist": {
+    "message": "Un elenco di video: sceglili in Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager richiede yt-dlp per questo video"
+  },
+  "video_too_long": {
+    "message": "La ricerca ha richiesto troppo tempo"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager è occupato con altri video"
+  },
+  "video_queued": {
+    "message": "Aggiunto alla coda"
+  },
+  "video_failed_lookup": {
+    "message": "Impossibile eseguire la ricerca"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Apri il post, poi usa il pulsante lì"
+  },
+  "popup_send_to": {
+    "message": "Invia i download a"
+  },
+  "popup_send_here": {
+    "message": "Questo computer"
+  },
+  "popup_send_remote": {
+    "message": "Un altro Mister Download Manager (un server)"
+  },
+  "popup_remote_code": {
+    "message": "Codice di associazione"
+  },
+  "popup_remote_open": {
+    "message": "Aprilo"
+  },
+  "popup_remote_pair": {
+    "message": "Associa"
+  },
+  "popup_remote_help": {
+    "message": "Apri una volta il suo indirizzo e accetta il suo certificato, poi inserisci un codice da Opzioni → Remoto → Associa un dispositivo (o misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "I download vanno a $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Inserisci il suo indirizzo https://."
+  },
+  "remote_unreachable": {
+    "message": "Non raggiungibile. Apri una volta il suo indirizzo in questo browser e accetta il suo certificato, poi riprova."
+  },
+  "remote_wrong_code": {
+    "message": "Codice errato."
+  },
+  "remote_no_code": {
+    "message": "Al momento non mostra nessun codice: fai prima clic su Associa un dispositivo."
+  },
+  "remote_too_soon": {
+    "message": "Attendi un momento, poi riprova."
+  },
+  "remote_failed": {
+    "message": "Non ha funzionato. Riprova."
+  },
+  "remote_device_name": {
+    "message": "Estensione del browser"
+  },
+  "popup_media_title_name": {
+    "message": "Aggiungi il titolo della pagina davanti ai nomi dei file multimediali"
+  }
+}

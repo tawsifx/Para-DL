@@ -1,0 +1,156 @@
+# Build, lint and test main and every pull request: Windows and Linux, which must pass, and the
+# experimental macOS build (its failures are reported but don't fail the run).
+name: CI
+
+# Pushes to main only: a pull request's branch is tested once as the pull request (a bare push:
+# ran everything twice), and a release tag's commit was already tested on main.
+# A change to the website or the docs alone builds nothing here (the app embeds none of it; the
+# Website workflow builds the site). The app's own catalogs, i18n/*.tsv, still run everything.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "website/**"
+      - "tools/website/**"
+      - "i18n/site/**"
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    paths-ignore:
+      - "website/**"
+      - "tools/website/**"
+      - "i18n/site/**"
+      - "docs/**"
+      - "**/*.md"
+
+# A newer commit on a pull request makes its older run moot: cancel it (main runs to the end).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
+            experimental: true
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental == true }}
+    # A cold build takes about 10 minutes; a hung runner (apt-get once hung for hours) is cut off
+    # instead of running to GitHub's 6 hours.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml picks stable with rustfmt and clippy.
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # BoringSSL, under the browser-like connection (#668, crates/engine/src/browserlike.rs), is
+      # built with NASM on Windows; the runner has CMake and LLVM's libclang already.
+      - name: NASM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nasm --version 2.16.3 --no-progress -y
+          "C:\Program Files\NASM" >> $env:GITHUB_PATH
+
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev cmake libclang-dev
+
+      - name: Format
+        if: runner.os == 'Windows'
+        run: cargo fmt --all --check
+
+      # A text added to the code without running tools/i18n/extract.py fails here; missing
+      # translations don't (they show in English until tools/i18n/translate.py runs).
+      - name: English catalog matches the code
+        if: runner.os == 'Windows'
+        run: |
+          python tools/i18n/extract.py
+          git diff --exit-code -- i18n/en.tsv
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      # Safari's extension (macOS): its native half relays to the helper from inside the
+      # sandbox Safari makes it run in. Safari itself isn't needed.
+      - name: Safari extension's relay and helper, sandboxed
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --release -p mdm-nmhost
+          tools/safari/selftest.sh target/release/misterdownloadmanager-nmhost
+
+  # A translator's reviewed rows (no "#, machine" line) must survive every pull request: no
+  # tool or merge may drop them or hand them back to machine translation.
+  translations:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Reviewed translations kept
+        run: python3 tools/i18n/reviewed_guard.py --base "origin/${{ github.base_ref }}"
+
+  extension:
+    name: browser extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Logic against fake Firefox and Chrome APIs
+        run: node tools/extension/test.mjs
+
+      # Chrome, Edge, Brave, Opera, Vivaldi (mdm-chromium.zip), Firefox (mdm-firefox.xpi) and
+      # the Chrome Web Store's copy (mdm-chrome-store.zip).
+      - name: Pack for every browser
+        shell: pwsh
+        run: ./tools/extension/pack.ps1
+
+      - name: Check the packages
+        run: node tools/extension/check-pack.mjs
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: extension
+          path: |
+            target/extension/mdm-chromium.zip
+            target/extension/mdm-firefox.xpi
+            target/extension/mdm-chrome-store.zip

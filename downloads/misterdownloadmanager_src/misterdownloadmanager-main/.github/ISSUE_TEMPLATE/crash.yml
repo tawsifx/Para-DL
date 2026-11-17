@@ -1,0 +1,55 @@
+# The crash report form. MDM's crash report window (crates/app/src/crashui.rs) opens it filled in:
+# the ids below are the address's parameters (mdm_crash::github, crashui::fields), keep them in
+# step. Text fields only: GitHub's page put a dropdown's value from the address back to none.
+name: Crash report
+description: MDM closed unexpectedly or stopped responding, and its crash report window opened this form.
+labels: [bug, crash]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for sending this. **The crash report window filled this in**: please add the report's file (and the `.dmp` file, if you chose to) by dragging it into the **Report** box below.
+        No crash window? Use the [Bug report](https://github.com/anefzaoui/misterdownloadmanager/issues/new?template=bug.yml) form instead.
+  - type: input
+    id: signature
+    attributes:
+      label: Signature
+      description: The problem's short name, the same in every report of it (it finds reports of the same problem).
+    validations:
+      required: true
+  - type: input
+    id: kind
+    attributes:
+      label: What happened
+      description: "crash, panic (an internal error), freeze (stopped responding) or exit."
+  - type: input
+    id: version
+    attributes:
+      label: MDM version
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: System
+  - type: input
+    id: os-version
+    attributes:
+      label: System version
+  - type: input
+    id: install
+    attributes:
+      label: Installed with
+  - type: textarea
+    id: what
+    attributes:
+      label: What you were doing
+      description: The steps that led to it, if you remember them; an address that shows it helps a lot, if it isn't private.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: The crash report (cut to fit when long; drag its .txt file in for the whole of it).
+      render: text
+    validations:
+      required: true

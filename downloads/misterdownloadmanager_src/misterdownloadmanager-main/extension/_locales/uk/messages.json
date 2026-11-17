@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Передає завантаження з браузера до Mister Download Manager."
+  },
+  "menu": {
+    "message": "Завантажити за допомогою Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Завантажити відео"
+  },
+  "video_more": {
+    "message": "Інші параметри"
+  },
+  "video_hide_here": {
+    "message": "Приховати для цього відео"
+  },
+  "video_never_site": {
+    "message": "Ніколи не показувати на сайті $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Налаштування кнопки..."
+  },
+  "video_sent": {
+    "message": "Надіслано до Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager не встановлено або не запущено"
+  },
+  "video_drag": {
+    "message": "Перетягніть, щоб перемістити вздовж краю відео"
+  },
+  "menu_selected": {
+    "message": "Завантажити вибрані посилання за допомогою Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Завантажити всі посилання за допомогою Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Підключено до Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Підключено до Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Призупинено: завантаження залишаються в браузері"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager не встановлено або його інтеграцію з браузером не налаштовано"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager не приймає цю копію розширення"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager не запустився вчасно"
+  },
+  "status_host_failed": {
+    "message": "Не вдалося встановити з’єднання з Mister Download Manager"
+  },
+  "status_too_large": {
+    "message": "Деталі цього завантаження були завеликі для передачі"
+  },
+  "status_update_app": {
+    "message": "Оновіть Mister Download Manager, щоб використовувати всі можливості цього розширення"
+  },
+  "popup_take": {
+    "message": "Перехоплювати завантаження з цього браузера"
+  },
+  "popup_proxy": {
+    "message": "Надсилати завантаження через проксі-сервер або розширення VPN цього браузера"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager завантажує файли через той самий проксі-сервер, що й цей браузер. Браузер один раз запитає у вас дозвіл; вимкнення цієї функції скасовує його."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager завантажуватиме через той самий проксі, що й цей браузер. Якщо цю функцію вимкнено, розширення не зчитує проксі браузера."
+  },
+  "popup_exclude_site": {
+    "message": "Ніколи не завантажувати з $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Завантаження з $site$ залишаються в браузері",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Відкрити Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Параметри..."
+  },
+  "popup_help": {
+    "message": "Довідка"
+  },
+  "popup_support": {
+    "message": "Підтримати MDM"
+  },
+  "popup_fix": {
+    "message": "Як це виправити"
+  },
+  "popup_declined": {
+    "message": "Залишено браузеру: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Останнє завантаження було залишено браузеру."
+  },
+  "declined_file_type": {
+    "message": "Його тип відсутній у Параметри → Типи файлів."
+  },
+  "declined_site": {
+    "message": "Його сайт є в Параметри → Типи файлів, сайти, залишені браузеру."
+  },
+  "declined_address": {
+    "message": "Його адреса є в Параметри → Типи файлів, адреси, залишені браузеру."
+  },
+  "declined_small": {
+    "message": "Він менший за мінімальний розмір у розділі «Параметри» → «Типи файлів»."
+  },
+  "declined_browser": {
+    "message": "Цей браузер не позначено в Параметри → Загальні."
+  },
+  "declined_integration_off": {
+    "message": "Використовувати розширену інтеграцію з браузером вимкнено в Параметри → Загальні."
+  },
+  "declined_site_access": {
+    "message": "Розширенню не дозволено читати цей сайт (доступ до сайту браузера)."
+  },
+  "popup_alt": {
+    "message": "Утримуйте Alt, натискаючи посилання, щоб браузер завантажив його."
+  },
+  "popup_media": {
+    "message": "Медіа на цій сторінці"
+  },
+  "popup_media_none": {
+    "message": "На цій сторінці ще не знайдено відео чи звуку. Відтворіть його, а потім відкрийте це знову."
+  },
+  "popup_media_streamed": {
+    "message": "Програвач цієї сторінки передає відео частинами, тому показати у списку нічого. Наведіть вказівник на відео і скористайтеся його кнопкою «Завантажити відео»."
+  },
+  "popup_media_store": {
+    "message": "Правила Інтернет-магазину Chrome тримають цю копію доповнення осторонь відео цього сайту. Що можна зробити, описано в «Довідці»."
+  },
+  "popup_media_download": {
+    "message": "Завантажити"
+  },
+  "popup_media_protected": {
+    "message": "Захищено"
+  },
+  "popup_media_live": {
+    "message": "Наживо"
+  },
+  "video_off": {
+    "message": "Кнопка завантаження вимкнена на цьому сайті"
+  },
+  "video_drm": {
+    "message": "Захищене відео: його неможливо зберегти"
+  },
+  "video_unnamed": {
+    "message": "Не вдалося визначити, що це за відео: відкрийте його власну сторінку і спробуйте там"
+  },
+  "video_looking": {
+    "message": "Пошук доступних якостей…"
+  },
+  "video_open_mdm": {
+    "message": "Відкрити в Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Тут немає відео для завантаження"
+  },
+  "video_playlist": {
+    "message": "Список відео: виберіть їх у Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Для цього відео Mister Download Manager потрібен yt-dlp"
+  },
+  "video_too_long": {
+    "message": "Пошук тривав надто довго"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager зайнятий іншими відео"
+  },
+  "video_queued": {
+    "message": "Додано до черги"
+  },
+  "video_failed_lookup": {
+    "message": "Не вдалося виконати пошук"
+  },
+  "video_tab_video": {
+    "message": "Відео"
+  },
+  "video_tab_audio": {
+    "message": "Аудіо"
+  },
+  "video_open_post": {
+    "message": "Відкрийте допис, потім скористайтеся кнопкою там"
+  },
+  "popup_send_to": {
+    "message": "Надсилати завантаження до"
+  },
+  "popup_send_here": {
+    "message": "Цей комп’ютер"
+  },
+  "popup_send_remote": {
+    "message": "Інший Mister Download Manager (сервер)"
+  },
+  "popup_remote_code": {
+    "message": "Код з’єднання"
+  },
+  "popup_remote_open": {
+    "message": "Відкрити"
+  },
+  "popup_remote_pair": {
+    "message": "З’єднати"
+  },
+  "popup_remote_help": {
+    "message": "Відкрийте його адресу один раз і прийміть його сертифікат, потім введіть код з його «Параметри», «Віддалений», «З’єднати пристрій» (або misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Завантаження надсилаються на $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Введіть його https:// адресу."
+  },
+  "remote_unreachable": {
+    "message": "Недоступно. Відкрийте його адресу один раз у цьому браузері та прийміть його сертифікат, потім спробуйте ще раз."
+  },
+  "remote_wrong_code": {
+    "message": "Неправильний код."
+  },
+  "remote_no_code": {
+    "message": "Зараз він не показує код: спочатку натисніть «З’єднати пристрій» там."
+  },
+  "remote_too_soon": {
+    "message": "Зачекайте трохи, потім спробуйте ще раз."
+  },
+  "remote_failed": {
+    "message": "Не спрацювало. Спробуйте ще раз."
+  },
+  "remote_device_name": {
+    "message": "Розширення браузера"
+  },
+  "popup_media_title_name": {
+    "message": "Додавати заголовок сторінки перед назвами медіафайлів"
+  }
+}

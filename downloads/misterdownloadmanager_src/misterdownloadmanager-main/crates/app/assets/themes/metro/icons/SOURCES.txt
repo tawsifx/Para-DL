@@ -1,0 +1,13 @@
+The Metro theme's icon set (#45).
+
+Fluent UI System Icons 1.1.345, Microsoft Corporation, MIT (LICENSE, beside this file).
+https://github.com/microsoft/fluentui-system-icons, commit 9eb184e96268d3293462f9d9d19225b4c7b07774.
+Each file is one of its "regular" icons at 16 or 24 pixels, renamed to the need MDM uses it for
+(crates/app/src/themeicons.rs lists them) and recoloured from #212121 to #ffffff, so the theme can
+tint it with its text colour.
+
+MDM's own, drawn for MDM at Fluent's regular weight (GPL-3.0-or-later, as MDM): tb-add-torrent,
+cat-torrents (a magnet) and ft-torrent (Fluent's document with a small magnet), drawings as the
+others; and ui-to-tray (a window going down to the notification area, where Fluent has no icon
+of that meaning), a one-colour picture at 16, 24, 32 and 48 pixels (ui-to-tray-symbolic.png)
+that MDM draws in the theme's text colour, as the others.

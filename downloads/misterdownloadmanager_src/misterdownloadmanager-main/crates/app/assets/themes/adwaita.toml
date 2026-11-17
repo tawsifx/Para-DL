@@ -1,0 +1,122 @@
+# Adwaita: one of Mister Download Manager's built-in themes, after GNOME's look (libadwaita's
+# colours and shapes; nothing of GNOME's but its LGPL-licensed Adwaita icons).
+# It is also an example of a theme file: seeds for the colours, the roles GNOME sets apart by
+# hand, round corners, GNOME's controls, a header bar on Windows and an icon set that mixes
+# colour pictures with one-colour (symbolic) icons.
+
+name = "Adwaita"
+icon-set = "adwaita"
+icons = "mono"
+
+[controls]
+field-focus = "ring"
+check = "adwaita"
+focus = "ring"
+caption = "adwaita"
+
+[sizes]
+radius = 6
+"radius.part" = 4
+"radius.check" = 4
+"radius.flyout" = 12
+"radius.menu-item" = 6
+"radius.popup" = 6
+"radius.egui" = 6
+
+[seeds.light]
+background = "#fafafa"
+surface = "#ffffff"
+header = "#ffffff"
+text = "#2e3436"
+accent = "#1c71d8"
+selection = "#d0e2f8"
+error = "#c01c28"
+warning = "#9c6e03"
+success = "#1b8553"
+
+[seeds.dark]
+background = "#242424"
+surface = "#1e1e1e"
+header = "#1e1e1e"
+text = "#ffffff"
+accent = "#78aeed"
+selection = "#2a4a6e"
+error = "#ff7b63"
+warning = "#f8e45c"
+success = "#8ff0a4"
+
+[light]
+# GNOME's flat buttons: the text colour a tenth seen through, no edge; more under the pointer.
+button = "#e6e7e7"
+"button.hot" = "#dcdddd"
+"button.pressed" = "#c0c2c3"
+"button.border" = "#e6e7e7"
+"button.bottom" = "#e6e7e7"
+"button.default.border" = "#1c71d8"
+"button.default.bottom" = "#1c71d8"
+"button.accent.bottom" = "#1c71d8"
+# Boxes: white, a light edge, no line along the bottom.
+"field.border" = "#d5d6d7"
+"field.bottom" = "#d5d6d7"
+# Check boxes and radios: a 2-point edge at rest.
+check = "#ffffff"
+"check.hot" = "#f1f1f1"
+"check.pressed" = "#e4e4e4"
+"check.border" = "#c0bfbc"
+"check.border.hot" = "#a9a9a9"
+"check.border.pressed" = "#9a9996"
+# The keyboard focus: the accent, seen through, strong enough for 3:1 on the window and the
+# boxes (WCAG non-text contrast; GNOME's own is fainter).
+"focus.ring" = "#1c71d8bf"
+# The header bar, the menu bar under it in the same grey.
+caption = "#ebebeb"
+"caption.text" = "#2e3436"
+"caption.text.inactive" = "#929595"
+"caption.button" = "#2e34361a"
+"caption.hot" = "#2e343626"
+"caption.pressed" = "#2e34364d"
+"caption.close" = "#2e343626"
+"caption.close.text" = "#2e3436"
+menubar = "#ebebeb"
+"menubar.bottom" = "#ebebeb"
+"menubar.line" = "#dadada"
+
+[dark]
+button = "#3a3a3a"
+"button.hot" = "#454545"
+"button.pressed" = "#666666"
+"button.border" = "#3a3a3a"
+"button.bottom" = "#3a3a3a"
+"button.default.border" = "#78aeed"
+"button.default.bottom" = "#78aeed"
+# The suggested action: GNOME's blue with white text.
+"button.accent" = "#1c71d8"
+"button.accent.hot" = "#2a7de1"
+"button.accent.pressed" = "#1a62b9"
+"button.accent.bottom" = "#1c71d8"
+"button.accent.text" = "#ffffff"
+"button.accent.text.pressed" = "#e6f0fa"
+"field.border" = "#3d3d3d"
+"field.bottom" = "#3d3d3d"
+check = "#1e1e1e"
+"check.hot" = "#2a2a2a"
+"check.pressed" = "#333333"
+"check.border" = "#5e5c64"
+"check.border.hot" = "#77767b"
+"check.border.pressed" = "#9a9996"
+"check.on" = "#1c71d8"
+"check.on.hot" = "#2a7de1"
+"check.on.pressed" = "#1a62b9"
+"check.mark" = "#ffffff"
+"focus.ring" = "#78aeed8c"
+caption = "#303030"
+"caption.text" = "#ffffff"
+"caption.text.inactive" = "#919191"
+"caption.button" = "#ffffff1a"
+"caption.hot" = "#ffffff26"
+"caption.pressed" = "#ffffff4d"
+"caption.close" = "#ffffff26"
+"caption.close.text" = "#ffffff"
+menubar = "#303030"
+"menubar.bottom" = "#303030"
+"menubar.line" = "#1f1f1f"

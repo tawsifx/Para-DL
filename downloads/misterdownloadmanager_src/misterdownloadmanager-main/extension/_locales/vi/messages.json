@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Chuyển các bản tải xuống từ trình duyệt sang Mister Download Manager."
+  },
+  "menu": {
+    "message": "Tải xuống bằng Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Tải xuống video"
+  },
+  "video_more": {
+    "message": "Tùy chọn khác"
+  },
+  "video_hide_here": {
+    "message": "Ẩn trên video này"
+  },
+  "video_never_site": {
+    "message": "Không hiển thị trên $site$ nữa",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Cài đặt nút..."
+  },
+  "video_sent": {
+    "message": "Đã gửi đến Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager chưa được cài đặt hoặc chưa khởi động"
+  },
+  "video_drag": {
+    "message": "Kéo để di chuyển dọc theo cạnh video"
+  },
+  "menu_selected": {
+    "message": "Tải xuống các liên kết đã chọn bằng Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Tải xuống tất cả liên kết bằng Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Đã kết nối với Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Đã kết nối với Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Đã tạm dừng: các bản tải xuống vẫn ở trong trình duyệt"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager chưa được cài đặt hoặc tích hợp trình duyệt chưa được thiết lập"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager không chấp nhận bản sao tiện ích mở rộng này"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager chưa khởi động kịp"
+  },
+  "status_host_failed": {
+    "message": "Kết nối với Mister Download Manager không thành công"
+  },
+  "status_too_large": {
+    "message": "Thông tin của lượt tải xuống này quá lớn để chuyển giao"
+  },
+  "status_update_app": {
+    "message": "Cập nhật Mister Download Manager để sử dụng mọi tính năng mà tiện ích mở rộng này cung cấp"
+  },
+  "popup_take": {
+    "message": "Nhận tải xuống từ trình duyệt này"
+  },
+  "popup_proxy": {
+    "message": "Gửi các bản tải xuống qua proxy hoặc tiện ích VPN của trình duyệt này"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager sau đó tải xuống thông qua cùng một proxy với trình duyệt này. Trình duyệt sẽ hỏi bạn một lần để cho phép; tắt tùy chọn này sẽ thu hồi quyền đó."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager sau đó tải xuống qua cùng một proxy với trình duyệt này. Khi tắt tùy chọn này, tiện ích sẽ không đọc proxy của trình duyệt."
+  },
+  "popup_exclude_site": {
+    "message": "Không nhận tải xuống từ $site$ nữa",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Tải xuống từ $site$ vẫn ở lại trình duyệt",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mở Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Tùy chọn..."
+  },
+  "popup_help": {
+    "message": "Trợ giúp"
+  },
+  "popup_support": {
+    "message": "Hỗ trợ MDM"
+  },
+  "popup_fix": {
+    "message": "Cách khắc phục"
+  },
+  "popup_declined": {
+    "message": "Để lại cho trình duyệt: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Bản tải xuống cuối cùng đã được để lại cho trình duyệt."
+  },
+  "declined_file_type": {
+    "message": "Loại tệp không có trong Tùy chọn → Loại tệp."
+  },
+  "declined_site": {
+    "message": "Trang web của tệp nằm trong Tùy chọn → Loại tệp, trang web để lại cho trình duyệt."
+  },
+  "declined_address": {
+    "message": "Địa chỉ của tệp nằm trong Tùy chọn → Loại tệp, địa chỉ để lại cho trình duyệt."
+  },
+  "declined_small": {
+    "message": "Tệp nhỏ hơn kích thước tối thiểu trong Tùy chọn → Loại tệp."
+  },
+  "declined_browser": {
+    "message": "Trình duyệt này không được chọn trong Tùy chọn → Chung."
+  },
+  "declined_integration_off": {
+    "message": "Tích hợp trình duyệt nâng cao đang tắt trong Tùy chọn → Chung."
+  },
+  "declined_site_access": {
+    "message": "Tiện ích không được phép đọc trang web này (quyền truy cập trang web của trình duyệt)."
+  },
+  "popup_alt": {
+    "message": "Giữ phím Alt trong khi nhấp vào liên kết để trình duyệt tải xuống."
+  },
+  "popup_media": {
+    "message": "Nội dung đa phương tiện trên trang này"
+  },
+  "popup_media_none": {
+    "message": "Chưa tìm thấy video hoặc âm thanh nào trên trang này. Hãy phát rồi mở lại."
+  },
+  "popup_media_streamed": {
+    "message": "Trình phát của trang này truyền video theo từng phần nên không có tệp nào để liệt kê. Trỏ vào video và dùng nút Tải xuống video của nó."
+  },
+  "popup_media_store": {
+    "message": "Quy tắc của Cửa hàng Chrome trực tuyến giữ bản sao tiện ích này tránh xa video của trang web này. Mục Trợ giúp cho biết bạn có thể làm gì."
+  },
+  "popup_media_download": {
+    "message": "Tải xuống"
+  },
+  "popup_media_protected": {
+    "message": "Được bảo vệ"
+  },
+  "popup_media_live": {
+    "message": "Trực tiếp"
+  },
+  "video_off": {
+    "message": "Nút tải xuống bị tắt trên trang web này"
+  },
+  "video_drm": {
+    "message": "Video được bảo vệ: không thể lưu"
+  },
+  "video_unnamed": {
+    "message": "Không xác định được đây là video nào: hãy mở trang riêng của video và thử ở đó"
+  },
+  "video_looking": {
+    "message": "Đang tìm các chất lượng…"
+  },
+  "video_open_mdm": {
+    "message": "Mở trong Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Không có video nào để tải xuống ở đây"
+  },
+  "video_playlist": {
+    "message": "Danh sách video: hãy chọn chúng trong Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager cần yt-dlp cho video này"
+  },
+  "video_too_long": {
+    "message": "Việc tìm kiếm mất quá nhiều thời gian"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager đang bận với các video khác"
+  },
+  "video_queued": {
+    "message": "Đã thêm vào hàng đợi"
+  },
+  "video_failed_lookup": {
+    "message": "Không thể tìm kiếm"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Âm thanh"
+  },
+  "video_open_post": {
+    "message": "Mở bài đăng, sau đó dùng nút ở đó"
+  },
+  "popup_send_to": {
+    "message": "Gửi tải xuống đến"
+  },
+  "popup_send_here": {
+    "message": "Máy tính này"
+  },
+  "popup_send_remote": {
+    "message": "Một Mister Download Manager khác (máy chủ)"
+  },
+  "popup_remote_code": {
+    "message": "Mã ghép nối"
+  },
+  "popup_remote_open": {
+    "message": "Mở"
+  },
+  "popup_remote_pair": {
+    "message": "Ghép nối"
+  },
+  "popup_remote_help": {
+    "message": "Mở địa chỉ của nó một lần và chấp nhận chứng chỉ của nó, sau đó nhập mã từ Tùy chọn, Từ xa, Ghép nối thiết bị (hoặc misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Tải xuống chuyển đến $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Nhập địa chỉ https:// của nó."
+  },
+  "remote_unreachable": {
+    "message": "Không thể truy cập. Mở địa chỉ của nó một lần trong trình duyệt này và chấp nhận chứng chỉ của nó, sau đó thử lại."
+  },
+  "remote_wrong_code": {
+    "message": "Sai mã."
+  },
+  "remote_no_code": {
+    "message": "Hiện không có mã: trước tiên hãy nhấp vào Ghép nối thiết bị ở đó."
+  },
+  "remote_too_soon": {
+    "message": "Đợi một lát, sau đó thử lại."
+  },
+  "remote_failed": {
+    "message": "Không thành công. Thử lại."
+  },
+  "remote_device_name": {
+    "message": "Tiện ích mở rộng trình duyệt"
+  },
+  "popup_media_title_name": {
+    "message": "Thêm tiêu đề trang vào trước tên tệp phương tiện"
+  }
+}

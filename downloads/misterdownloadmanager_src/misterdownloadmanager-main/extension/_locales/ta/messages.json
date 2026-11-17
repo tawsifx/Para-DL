@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "உலாவியிலிருந்து பதிவிறக்கங்களை Mister Download Managerக்கு அனுப்புகிறது."
+  },
+  "menu": {
+    "message": "Mister Download Manager மூலம் பதிவிறக்கவும்"
+  },
+  "video_download": {
+    "message": "வீடியோவைப் பதிவிறக்கவும்"
+  },
+  "video_more": {
+    "message": "மேலும் விருப்பங்கள்"
+  },
+  "video_hide_here": {
+    "message": "இந்த வீடியோவில் மட்டும் மறைக்கவும்"
+  },
+  "video_never_site": {
+    "message": "$site$ தளத்தில் மீண்டும் காட்ட வேண்டாம்",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "பொத்தான் அமைப்புகள்..."
+  },
+  "video_sent": {
+    "message": "Mister Download Managerக்கு அனுப்பப்பட்டது"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager நிறுவப்படவில்லை அல்லது தொடங்கவில்லை"
+  },
+  "video_drag": {
+    "message": "வீடியோவின் விளிம்பில் நகர்த்த இழுக்கவும்"
+  },
+  "menu_selected": {
+    "message": "Mister Download Manager மூலம் தேர்ந்தெடுக்கப்பட்ட இணைப்புகளைப் பதிவிறக்கவும்"
+  },
+  "menu_all": {
+    "message": "Mister Download Manager மூலம் அனைத்து இணைப்புகளையும் பதிவிறக்கவும்"
+  },
+  "status_connected": {
+    "message": "Mister Download Manager உடன் இணைக்கப்பட்டுள்ளது"
+  },
+  "status_connected_version": {
+    "message": "Mister Download Manager $version$ உடன் இணைக்கப்பட்டுள்ளது",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "இடைநிறுத்தப்பட்டது: பதிவிறக்கங்கள் உலாவியிலேயே இருக்கும்"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager நிறுவப்படவில்லை, அல்லது அதன் உலாவி ஒருங்கிணைப்பு அமைக்கப்படவில்லை"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager இந்த நீட்டிப்பின் நகலை ஏற்கவில்லை"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager சரியான நேரத்தில் தொடங்கவில்லை"
+  },
+  "status_host_failed": {
+    "message": "Mister Download Manager உடனான இணைப்பு தோல்வியடைந்தது"
+  },
+  "status_too_large": {
+    "message": "இந்தப் பதிவிறக்கத்தின் விவரங்கள் ஒப்படைக்க முடியாத அளவுக்குப் பெரியதாக இருந்தன"
+  },
+  "status_update_app": {
+    "message": "இந்த நீட்டிப்பு வழங்கும் அனைத்தையும் பயன்படுத்த Mister Download Managerஐப் புதுப்பிக்கவும்"
+  },
+  "popup_take": {
+    "message": "இந்த உலாவியிலிருந்து பதிவிறக்கங்களைப் பெறவும்"
+  },
+  "popup_proxy": {
+    "message": "இந்த உலாவியின் ப்ராக்ஸி அல்லது VPN நீட்டிப்பு வழியாகப் பதிவிறக்கங்களை அனுப்பவும்"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager இந்த உலாவியின் அதே ப்ராக்ஸி வழியாகப் பதிவிறக்கும். அதை அனுமதிக்க உலாவி ஒருமுறை கேட்கும்; இதை அணைத்தால் அந்த அனுமதி திரும்பப் பெறப்படும்."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager இந்த உலாவியின் அதே ப்ராக்ஸி வழியாக பதிவிறக்குகிறது. இது முடக்கப்பட்டிருக்கும்போது, நீட்டிப்பு உலாவியின் ப்ராக்ஸியைப் படிக்காது."
+  },
+  "popup_exclude_site": {
+    "message": "$site$ இலிருந்து பதிவிறக்கங்களை இனி எடுக்க வேண்டாம்",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "$site$ இலிருந்து பதிவிறக்கங்கள் உலாவியிலேயே இருக்கும்",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Managerஐத் திறக்கவும்"
+  },
+  "popup_options": {
+    "message": "விருப்பங்கள்..."
+  },
+  "popup_help": {
+    "message": "உதவி"
+  },
+  "popup_support": {
+    "message": "MDM-ஐ ஆதரிக்கவும்"
+  },
+  "popup_fix": {
+    "message": "எப்படிச் சரிசெய்வது"
+  },
+  "popup_declined": {
+    "message": "உலாவியில் விடப்பட்டது: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "கடைசி பதிவிறக்கம் உலாவியில் விடப்பட்டது."
+  },
+  "declined_file_type": {
+    "message": "அதன் வகை விருப்பத்தேர்வுகள் → கோப்பு வகைகளில் இல்லை."
+  },
+  "declined_site": {
+    "message": "அதன் தளம் விருப்பத்தேர்வுகள் → கோப்பு வகைகள், உலாவியில் விடப்பட்ட தளங்களில் உள்ளது."
+  },
+  "declined_address": {
+    "message": "அதன் முகவரி விருப்பத்தேர்வுகள் → கோப்பு வகைகள், உலாவியில் விடப்பட்ட முகவரிகளில் உள்ளது."
+  },
+  "declined_small": {
+    "message": "விருப்பத்தேர்வுகள் → கோப்பு வகைகளில் உள்ள குறைந்தபட்ச அளவை விட இது சிறியது."
+  },
+  "declined_browser": {
+    "message": "இந்த உலாவி விருப்பத்தேர்வுகள் → பொது என்பதில் டிக் செய்யப்படவில்லை."
+  },
+  "declined_integration_off": {
+    "message": "மேம்பட்ட உலாவி ஒருங்கிணைப்பைப் பயன்படுத்து விருப்பத்தேர்வுகள் → பொது என்பதில் முடக்கப்பட்டுள்ளது."
+  },
+  "declined_site_access": {
+    "message": "இந்த தளத்தைப் படிக்க நீட்டிப்புக்கு அனுமதி இல்லை (உலாவியின் தள அணுகல்)."
+  },
+  "popup_alt": {
+    "message": "ஒரு இணைப்பைக் கிளிக் செய்யும்போது Alt ஐ அழுத்திப் பிடித்தால், உலாவி அதைப் பதிவிறக்கும்."
+  },
+  "popup_media": {
+    "message": "இந்தப் பக்கத்தில் உள்ள ஊடகங்கள்"
+  },
+  "popup_media_none": {
+    "message": "இந்தப் பக்கத்தில் இன்னும் வீடியோ அல்லது ஒலி எதுவும் கிடைக்கவில்லை. அதை இயக்கிவிட்டு, இதை மீண்டும் திறக்கவும்."
+  },
+  "popup_media_streamed": {
+    "message": "இந்தப் பக்கத்தின் பிளேயர் வீடியோவைத் துண்டுகளாக ஸ்ட்ரீம் செய்கிறது, எனவே பட்டியலிட கோப்பு எதுவும் இல்லை. வீடியோவைச் சுட்டிக்காட்டி அதன் «வீடியோவைப் பதிவிறக்கவும்» பொத்தானைப் பயன்படுத்துங்கள்."
+  },
+  "popup_media_store": {
+    "message": "Chrome Web Store விதிகள் இந்த நீட்டிப்பு நகலை இந்தத் தளத்தின் வீடியோக்களிலிருந்து விலக்கி வைக்கின்றன. நீங்கள் என்ன செய்யலாம் என்பதை «உதவி» கூறுகிறது."
+  },
+  "popup_media_download": {
+    "message": "பதிவிறக்கவும்"
+  },
+  "popup_media_protected": {
+    "message": "பாதுகாக்கப்பட்டது"
+  },
+  "popup_media_live": {
+    "message": "நேரலை"
+  },
+  "video_off": {
+    "message": "இந்தத் தளத்தில் பதிவிறக்கப் பொத்தான் முடக்கப்பட்டுள்ளது"
+  },
+  "video_drm": {
+    "message": "பாதுகாக்கப்பட்ட வீடியோ: இதைச் சேமிக்க முடியாது"
+  },
+  "video_unnamed": {
+    "message": "இது எந்த வீடியோ என்று தெரியவில்லை: அதன் சொந்தப் பக்கத்தைத் திறந்து அங்கே முயலுங்கள்"
+  },
+  "video_looking": {
+    "message": "தரங்களைத் தேடுகிறது…"
+  },
+  "video_open_mdm": {
+    "message": "Mister Download Manager இல் திறக்கவும்…"
+  },
+  "video_no_choices": {
+    "message": "இங்கே பதிவிறக்க வீடியோ எதுவும் இல்லை"
+  },
+  "video_playlist": {
+    "message": "வீடியோக்களின் பட்டியல்: அவற்றை Mister Download Manager இல் தேர்ந்தெடுக்கவும்"
+  },
+  "video_no_ytdlp": {
+    "message": "இந்த வீடியோவுக்கு Mister Download Manager க்கு yt-dlp தேவை"
+  },
+  "video_too_long": {
+    "message": "தேட மிக அதிக நேரம் ஆனது"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager பிற வீடியோக்களில் பிஸியாக உள்ளது"
+  },
+  "video_queued": {
+    "message": "வரிசையில் சேர்க்கப்பட்டது"
+  },
+  "video_failed_lookup": {
+    "message": "தேட முடியவில்லை"
+  },
+  "video_tab_video": {
+    "message": "வீடியோ"
+  },
+  "video_tab_audio": {
+    "message": "ஆடியோ"
+  },
+  "video_open_post": {
+    "message": "பதிவைத் திறந்து, அங்குள்ள பொத்தானைப் பயன்படுத்தவும்"
+  },
+  "popup_send_to": {
+    "message": "பதிவிறக்கங்களை இதற்கு அனுப்பவும்"
+  },
+  "popup_send_here": {
+    "message": "இந்தக் கணினி"
+  },
+  "popup_send_remote": {
+    "message": "மற்றொரு Mister Download Manager (ஒரு சர்வர்)"
+  },
+  "popup_remote_code": {
+    "message": "இணைக்கும் குறியீடு"
+  },
+  "popup_remote_open": {
+    "message": "திறக்கவும்"
+  },
+  "popup_remote_pair": {
+    "message": "இணை"
+  },
+  "popup_remote_help": {
+    "message": "அதன் முகவரியை ஒருமுறை திறந்து அதன் சான்றிதழை ஏற்றுக்கொண்டு, அதன் விருப்பத்தேர்வுகள், ரிமோட், சாதனத்தை இணை (அல்லது misterdownloadmanager-cli pair) என்பதிலிருந்து ஒரு குறியீட்டை உள்ளிடவும்."
+  },
+  "status_remote": {
+    "message": "பதிவிறக்கங்கள் $address$ க்குச் செல்கின்றன",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "அதன் https:// முகவரியை உள்ளிடவும்."
+  },
+  "remote_unreachable": {
+    "message": "அடையப்படவில்லை. இந்த உலாவியில் அதன் முகவரியை ஒருமுறை திறந்து அதன் சான்றிதழை ஏற்றுக்கொண்டு, மீண்டும் முயற்சிக்கவும்."
+  },
+  "remote_wrong_code": {
+    "message": "தவறான குறியீடு."
+  },
+  "remote_no_code": {
+    "message": "அது இப்போது குறியீட்டைக் காட்டவில்லை: முதலில் அங்குள்ள சாதனத்தை இணை என்பதைக் கிளிக் செய்யவும்."
+  },
+  "remote_too_soon": {
+    "message": "ஒரு கணம் காத்திருந்து, மீண்டும் முயற்சிக்கவும்."
+  },
+  "remote_failed": {
+    "message": "அது வேலை செய்யவில்லை. மீண்டும் முயற்சிக்கவும்."
+  },
+  "remote_device_name": {
+    "message": "உலாவி நீட்டிப்பு"
+  },
+  "popup_media_title_name": {
+    "message": "மீடியா கோப்புப் பெயர்களுக்கு முன் பக்கத்தின் தலைப்பைச் சேர்"
+  }
+}

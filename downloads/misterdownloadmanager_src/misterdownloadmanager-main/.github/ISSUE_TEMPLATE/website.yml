@@ -1,0 +1,25 @@
+# Problems with misterdownloadmanager.com. Each page's "Report a problem with this page" opens it
+# with the page filled in (tools/website/build.py: the id `page` is the URL's parameter).
+name: Website problem
+description: A mistake, a broken link or something hard to read on misterdownloadmanager.com.
+labels: [website]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      placeholder: https://misterdownloadmanager.com/download.html
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      description: For something that looks broken.
+      placeholder: Safari on an iPhone 15, Chrome 131 on Windows 11

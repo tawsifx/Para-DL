@@ -1,0 +1,168 @@
+# The README's, docs/' and the site's screenshots (tools/lab/docs-shots.ps1), taken on GitHub's
+# Windows runner: a stock Windows, so the file icons in them are Windows' own, not those of
+# programs someone installed. Run by hand (Actions → Docs screenshots → Run workflow) or by a
+# push to a docs-shots/** branch. Never on other pushes or pull requests. The PNGs come back as
+# the "docs-shots" artifact, with what the runner had (screen, DPI, fonts, file associations).
+# A person makes the pictures of them (tools/shots/README.md): `python tools/shots/make.py docs
+# <artifact>` (docs/images/*.webp), `python tools/website/screens.py <artifact>/site-dark --light
+# <artifact>/docs` (the site's), and the help pages' from help-raw/ (into target/shots/raw, then
+# `python tools/shots/make.py build`).
+name: Docs screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["docs-shots/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # tools/shots/make.py (the help pages' pictures) reads its list with tomllib.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Toolchain
+        run: rustup show active-toolchain; if (-not $?) { rustup toolchain install }
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      # BoringSSL, under the browser-like connection (#668, crates/engine/src/browserlike.rs), is
+      # built with NASM on Windows; the runner has CMake and LLVM's libclang already.
+      - name: NASM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nasm --version 2.16.3 --no-progress -y
+          "C:\Program Files\NASM" >> $env:GITHUB_PATH
+
+      - name: Build
+        run: |
+          cargo build -p mdm-app -p mdm-labserver -p mdm-cli -p mdm-nmhost
+          if ($LASTEXITCODE) { throw "build $LASTEXITCODE" }
+          # The torrent's progress window: a swarm of seeders and a tracker on this runner.
+          cargo build -p mdm-torrent --example swarm
+          if ($LASTEXITCODE) { throw "swarm $LASTEXITCODE" }
+
+      # The video's progress window: yt-dlp brings a lab server file in (pinned and checked).
+      - name: yt-dlp
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe"
+          Invoke-WebRequest -UseBasicParsing $url -OutFile "$env:RUNNER_TEMP\yt-dlp.exe"
+          $sum = (Get-FileHash "$env:RUNNER_TEMP\yt-dlp.exe" -Algorithm SHA256).Hash
+          if ($sum -ne "F5389D3698ECDE4EF06F4E6B1CE0294FE9AC1396228C8990B8D3416D6D177A7D") { throw "yt-dlp checksum $sum" }
+
+      # The runner has no GPU and only Windows' OpenGL 1.1; the app needs 3.x. Mesa's llvmpipe
+      # (software OpenGL 4.6) is put beside the program for this job only (mesa-dist-win,
+      # pinned and checked).
+      - name: Software OpenGL (Mesa llvmpipe)
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z"
+          Invoke-WebRequest -UseBasicParsing $url -OutFile "$env:RUNNER_TEMP\mesa.7z"
+          $sum = (Get-FileHash "$env:RUNNER_TEMP\mesa.7z" -Algorithm SHA256).Hash
+          if ($sum -ne "351FC8C8B695878FFB3EAA044B3EAD08672A48B1A045E3C3E3975811DF0F6695") { throw "mesa checksum $sum" }
+          7z e "$env:RUNNER_TEMP\mesa.7z" -otarget\debug x64\opengl32.dll x64\libgallium_wgl.dll -y
+          if ($LASTEXITCODE) { throw "7z $LASTEXITCODE" }
+
+      # What the shots were taken with, kept beside them.
+      - name: The runner's screen, DPI, fonts and file associations
+        run: |
+          $out = "$env:RUNNER_TEMP\shots"; New-Item -ItemType Directory -Force $out | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms
+          & {
+            "Windows: " + (Get-CimInstance Win32_OperatingSystem).Caption + " " + [Environment]::OSVersion.Version
+            "Screen: " + [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            "DPI: " + (Get-ItemProperty "HKCU:\Control Panel\Desktop\WindowMetrics" -ErrorAction SilentlyContinue).AppliedDPI
+            "Session: " + [Environment]::UserInteractive + ", " + (whoami)
+            ""
+            "Fonts:"
+            $fonts = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+            foreach ($f in "Segoe UI", "Tahoma", "Arial", "Microsoft Sans Serif") {
+              $hit = $fonts.PSObject.Properties | Where-Object { $_.Name -like "$f (*" -or $_.Name -like "$f &*" } | Select-Object -First 1
+              "  $f : " + $(if ($hit) { $hit.Value } else { "missing" })
+            }
+            ""
+            "File associations (HKEY_CLASSES_ROOT; the user's own choice, if any):"
+            foreach ($e in ".pdf", ".mp3", ".mp4", ".mkv", ".csv", ".zip", ".exe", ".docx", ".msi", ".iso", ".txt", ".srt") {
+              $prog = (Get-ItemProperty "Registry::HKEY_CLASSES_ROOT\$e" -ErrorAction SilentlyContinue)."(default)"
+              $icon = if ($prog) { (Get-ItemProperty "Registry::HKEY_CLASSES_ROOT\$prog\DefaultIcon" -ErrorAction SilentlyContinue)."(default)" }
+              $choice = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$e\UserChoice" -ErrorAction SilentlyContinue).ProgId
+              "  $e -> " + $(if ($prog) { $prog } else { "(none)" }) + $(if ($icon) { "  icon: $icon" }) + $(if ($choice) { "  user choice: $choice" })
+            }
+          } | Tee-Object "$out\runner.txt"
+
+      - name: Screenshots
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          $ErrorActionPreference = "Stop"
+          $out = "$env:RUNNER_TEMP\shots"
+          $exe = "target\debug\misterdownloadmanager.exe"; $srv = "target\debug\labserver.exe"
+          $torrent = "tools\lab\Open Movie Night.torrent"
+          # A neutral folder and address, as they show in the shots (Properties, Add torrent): the
+          # downloads come from downloads.example (a reserved name, pointed at the lab server
+          # on 127.0.0.1 in this runner's hosts file) on port 80. Windows' HTTP service may hold
+          # port 80 (it answers 404): it is stopped, and 8080 taken if the port stays busy.
+          $work = "C:\Demo"
+          Add-Content "$env:SystemRoot\System32\drivers\etc\hosts" "`n127.0.0.1 downloads.example"
+          $busy = { [bool](Get-NetTCPConnection -LocalPort 80 -State Listen -ErrorAction SilentlyContinue) }
+          if (& $busy) { cmd /c "net stop http /y" | Out-Null }
+          $port = if (& $busy) { 8080 } else { 80 }
+          $base = if ($port -eq 80) { "http://downloads.example" } else { "http://downloads.example:$port" }
+          # The address reaches the lab server, or no shot is taken.
+          $lab = Start-Process -PassThru -WindowStyle Hidden $srv -ArgumentList "--bind 127.0.0.1:$port"
+          Start-Sleep 2
+          try { $code = (Invoke-WebRequest -UseBasicParsing "$base/gen/1K/check.bin").StatusCode } finally { Stop-Process -Id $lab.Id }
+          "lab server at $base answers $code" | Tee-Object -Append "$out\runner.txt"
+          if ($code -ne 200) { throw "the lab server isn't reached at $base" }
+          $net = @{ Port = $port; UrlHost = "downloads.example" }
+          # Browser integration set up, as the installer does it, so the browser offer window shows
+          # a computer where it works (this runner's own user only).
+          & target\debug\misterdownloadmanager-nmhost.exe --register
+          # On the screen, as nobody watches it: llvmpipe draws nothing off the screens.
+          $at = "40,40"
+          # Every window of docs-shots.ps1's own list, light (docs/images) and dark (the site's
+          # night pictures, and the README's dark main window), then the Arabic main window.
+          tools\lab\docs-shots.ps1 -Exe $exe -Server $srv -Torrent $torrent -Work $work -At $at @net -OutDir "$out\docs"
+          tools\lab\docs-shots.ps1 -Exe $exe -Server $srv -Torrent $torrent -Work $work -At $at @net -Dark -OutDir "$out\site-dark"
+          tools\lab\docs-shots.ps1 -Exe $exe -Server $srv -Work $work -At $at @net -OutDir "$out\docs" -Lang ar -Only arabic-main
+          # A video's and a torrent's progress window (with the torrent's Pieces tab), light and dark.
+          $bin = "target\debug"
+          # One that fails is reported, and the help pages' pictures are still taken.
+          foreach ($mode in "docs", "site-dark") {
+            $d = if ($mode -eq "site-dark") { @{ Dark = $true } } else { @{} }
+            try { tools\lab\progress-shots.ps1 -Bin $bin -OutDir "$out\$mode" -YtDlp "$env:RUNNER_TEMP\yt-dlp.exe" -Work "$work\p" -At $at -TorrentTabs pieces @d }
+            catch { Write-Warning "progress-shots ($mode): $_" }
+          }
+          # The help pages' pictures (tools/shots/shots.toml), light and dark, raw: a person runs
+          # `python tools/shots/make.py build` on them (crop, annotate, WebP) and commits that.
+          python tools\shots\make.py shoot --bin target\debug --work $work --at $at --url-host downloads.example --port $port
+          if ($LASTEXITCODE) { throw "make.py shoot $LASTEXITCODE" }
+          Copy-Item -Recurse target\shots\raw "$out\help-raw"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: docs-shots
+          path: ${{ runner.temp }}/shots

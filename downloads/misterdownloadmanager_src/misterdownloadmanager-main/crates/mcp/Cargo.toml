@@ -1,0 +1,28 @@
+[package]
+name = "mdm-mcp"
+description = "MCP server: lets AI assistants list, add and control the running app's downloads"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "misterdownloadmanager-mcp"
+path = "src/main.rs"
+
+[dependencies]
+mdm-ipc.workspace = true
+rmcp.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

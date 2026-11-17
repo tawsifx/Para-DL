@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "ब्राउझरवरून Mister Download Manager ला डाउनलोड्स देतो."
+  },
+  "menu": {
+    "message": "Mister Download Manager सह डाउनलोड करा"
+  },
+  "video_download": {
+    "message": "व्हिडिओ डाउनलोड करा"
+  },
+  "video_more": {
+    "message": "अधिक पर्याय"
+  },
+  "video_hide_here": {
+    "message": "फक्त या व्हिडिओवर लपवा"
+  },
+  "video_never_site": {
+    "message": "$site$ वर कधीही दाखवू नका",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "बटण सेटिंग्ज..."
+  },
+  "video_sent": {
+    "message": "Mister Download Manager ला पाठवले"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager स्थापित केलेले नाही किंवा सुरू झाले नाही"
+  },
+  "video_drag": {
+    "message": "व्हिडिओच्या काठावर हलवण्यासाठी ड्रॅग करा"
+  },
+  "menu_selected": {
+    "message": "Mister Download Manager सह निवडलेल्या लिंक्स डाउनलोड करा"
+  },
+  "menu_all": {
+    "message": "Mister Download Manager सह सर्व लिंक्स डाउनलोड करा"
+  },
+  "status_connected": {
+    "message": "Mister Download Manager शी कनेक्ट केले"
+  },
+  "status_connected_version": {
+    "message": "Mister Download Manager $version$ शी कनेक्ट केले",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "विरामित: डाउनलोड ब्राउझरमध्येच राहतात"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager स्थापित केलेले नाही, किंवा त्याचे ब्राउझर एकत्रीकरण सेट केलेले नाही"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager एक्स्टेंशनची ही प्रत स्वीकारत नाही"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager वेळेत सुरू झाले नाही"
+  },
+  "status_host_failed": {
+    "message": "Mister Download Manager शी कनेक्शन अयशस्वी झाले"
+  },
+  "status_too_large": {
+    "message": "या डाउनलोडचे तपशील हस्तांतरित करण्यासाठी खूप मोठे होते"
+  },
+  "status_update_app": {
+    "message": "या एक्स्टेंशनची सर्व वैशिष्ट्ये वापरण्यासाठी Mister Download Manager अपडेट करा"
+  },
+  "popup_take": {
+    "message": "या ब्राउझरमधील डाउनलोड घ्या"
+  },
+  "popup_proxy": {
+    "message": "या ब्राउझरच्या प्रॉक्सी किंवा VPN एक्स्टेंशनद्वारे डाउनलोड पाठवा"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager नंतर या ब्राउझरसारख्याच प्रॉक्सीद्वारे डाउनलोड करते. ब्राउझर तुम्हाला एकदा परवानगी देण्यास सांगेल; हे बंद केल्यास ती परवानगी रद्द होते."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager नंतर या ब्राउझरच्या समान प्रॉक्सीद्वारे डाउनलोड करते. हे बंद असताना, एक्स्टेंशन ब्राउझरची प्रॉक्सी वाचत नाही."
+  },
+  "popup_exclude_site": {
+    "message": "$site$ वरील डाउनलोड कधीही घेऊ नका",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "$site$ वरील डाउनलोड ब्राउझरमध्येच होतील",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Manager उघडा"
+  },
+  "popup_options": {
+    "message": "पर्याय..."
+  },
+  "popup_help": {
+    "message": "मदत"
+  },
+  "popup_support": {
+    "message": "MDM ला सपोर्ट करा"
+  },
+  "popup_fix": {
+    "message": "ते कसे दुरुस्त करावे"
+  },
+  "popup_declined": {
+    "message": "ब्राउझरसाठी सोडले: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "शेवटचे डाउनलोड ब्राउझरसाठी सोडले होते."
+  },
+  "declined_file_type": {
+    "message": "त्याचा प्रकार पर्याय → फाइल प्रकारांमध्ये नाही."
+  },
+  "declined_site": {
+    "message": "त्याची साइट पर्याय → फाइल प्रकार, ब्राउझरसाठी सोडलेल्या साइट्समध्ये आहे."
+  },
+  "declined_address": {
+    "message": "त्याचा पत्ता पर्याय → फाइल प्रकार, ब्राउझरसाठी सोडलेले पत्ते यामध्ये आहे."
+  },
+  "declined_small": {
+    "message": "तो पर्याय → फाइल प्रकारांमधील किमान आकारापेक्षा लहान आहे."
+  },
+  "declined_browser": {
+    "message": "हा ब्राउझर पर्याय → सामान्य मध्ये निवडलेला नाही."
+  },
+  "declined_integration_off": {
+    "message": "पर्याय → सामान्य मध्ये 'प्रगत ब्राउझर एकत्रीकरण वापरा' बंद आहे."
+  },
+  "declined_site_access": {
+    "message": "या साइटला वाचण्याची विस्ताराला परवानगी नाही (ब्राउझरची साइट ॲक्सेस)."
+  },
+  "popup_alt": {
+    "message": "ब्राउझरला डाउनलोड करू देण्यासाठी लिंकवर क्लिक करताना Alt दाबून ठेवा."
+  },
+  "popup_media": {
+    "message": "या पृष्ठावरील मीडिया"
+  },
+  "popup_media_none": {
+    "message": "या पृष्ठावर अद्याप कोणताही व्हिडिओ किंवा आवाज सापडला नाही. तो प्ले करा, नंतर हे पुन्हा उघडा."
+  },
+  "popup_media_streamed": {
+    "message": "या पृष्ठाचा प्लेअर व्हिडिओ तुकड्यांमध्ये स्ट्रीम करतो, त्यामुळे यादीत दाखवण्यासाठी कोणतीही फाईल नाही. व्हिडिओवर पॉइंटर नेऊन त्याचे «व्हिडिओ डाउनलोड करा» बटण वापरा."
+  },
+  "popup_media_store": {
+    "message": "Chrome Web Store च्या नियमांमुळे अ‍ॅड-ऑनची ही प्रत या साइटच्या व्हिडिओंपासून दूर राहते. तुम्ही काय करू शकता ते «मदत» मध्ये सांगितले आहे."
+  },
+  "popup_media_download": {
+    "message": "डाउनलोड करा"
+  },
+  "popup_media_protected": {
+    "message": "संरक्षित"
+  },
+  "popup_media_live": {
+    "message": "थेट"
+  },
+  "video_off": {
+    "message": "या साइटवर डाउनलोड बटण बंद आहे"
+  },
+  "video_drm": {
+    "message": "संरक्षित व्हिडिओ: जतन करता येत नाही"
+  },
+  "video_unnamed": {
+    "message": "हा कोणता व्हिडिओ आहे ते कळत नाही: त्याचे स्वतःचे पृष्ठ उघडून तिथे प्रयत्न करा"
+  },
+  "video_looking": {
+    "message": "गुणवत्ता शोधत आहे…"
+  },
+  "video_open_mdm": {
+    "message": "Mister Download Manager मध्ये उघडा…"
+  },
+  "video_no_choices": {
+    "message": "येथे डाउनलोड करण्यासाठी व्हिडिओ नाही"
+  },
+  "video_playlist": {
+    "message": "व्हिडिओंची सूची: ते Mister Download Manager मध्ये निवडा"
+  },
+  "video_no_ytdlp": {
+    "message": "या व्हिडिओसाठी Mister Download Manager ला yt-dlp आवश्यक आहे"
+  },
+  "video_too_long": {
+    "message": "शोधण्यास खूप वेळ लागला"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager इतर व्हिडिओंमध्ये व्यस्त आहे"
+  },
+  "video_queued": {
+    "message": "रांगेत जोडले"
+  },
+  "video_failed_lookup": {
+    "message": "शोधता आले नाही"
+  },
+  "video_tab_video": {
+    "message": "व्हिडिओ"
+  },
+  "video_tab_audio": {
+    "message": "ऑडिओ"
+  },
+  "video_open_post": {
+    "message": "पोस्ट उघडा, नंतर तेथील बटण वापरा"
+  },
+  "popup_send_to": {
+    "message": "डाउनलोड्स येथे पाठवा"
+  },
+  "popup_send_here": {
+    "message": "हे संगणक"
+  },
+  "popup_send_remote": {
+    "message": "दुसरा Mister Download Manager (एक सर्व्हर)"
+  },
+  "popup_remote_code": {
+    "message": "पेअरिंग कोड"
+  },
+  "popup_remote_open": {
+    "message": "ते उघडा"
+  },
+  "popup_remote_pair": {
+    "message": "पेअर करा"
+  },
+  "popup_remote_help": {
+    "message": "त्याचा पत्ता एकदा उघडा आणि त्याचे प्रमाणपत्र स्वीकारा, नंतर त्याच्या 'पर्याय', 'रिमोट', 'डिव्हाइस पेअर करा' (किंवा misterdownloadmanager-cli pair) मधून कोड एंटर करा."
+  },
+  "status_remote": {
+    "message": "डाउनलोड्स $address$ वर जातात",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "त्याचा https:// पत्ता एंटर करा."
+  },
+  "remote_unreachable": {
+    "message": "पोहोचले नाही. या ब्राउझरमध्ये एकदा त्याचा पत्ता उघडा आणि त्याचे प्रमाणपत्र स्वीकारा, नंतर पुन्हा प्रयत्न करा."
+  },
+  "remote_wrong_code": {
+    "message": "चुकीचा कोड."
+  },
+  "remote_no_code": {
+    "message": "तो आता कोड दाखवत नाही: तिथे आधी 'डिव्हाइस पेअर करा' वर क्लिक करा."
+  },
+  "remote_too_soon": {
+    "message": "एक क्षण थांबा, नंतर पुन्हा प्रयत्न करा."
+  },
+  "remote_failed": {
+    "message": "ते काम केले नाही. पुन्हा प्रयत्न करा."
+  },
+  "remote_device_name": {
+    "message": "ब्राउझर एक्स्टेंशन"
+  },
+  "popup_media_title_name": {
+    "message": "मीडिया फायलींच्या नावांपुढे पृष्ठाचे शीर्षक जोडा"
+  }
+}

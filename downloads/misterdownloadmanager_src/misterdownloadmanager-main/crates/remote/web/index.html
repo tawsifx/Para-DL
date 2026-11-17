@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Mister Download Manager</title>
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <img src="icon.png" alt="" width="28" height="28">
+  <div class="title">
+    <strong>Mister Download Manager</strong>
+    <span id="summary" class="muted"></span>
+  </div>
+  <button id="menu" class="icon" type="button" hidden aria-haspopup="true" aria-expanded="false" data-ta="More">&#8942;</button>
+  <div id="menu-list" class="popup" role="menu" hidden>
+    <button id="forget" type="button" role="menuitem" data-t="Forget this device"></button>
+  </div>
+</header>
+
+<main>
+  <section id="pair" class="card" hidden>
+    <h1 data-t="Pair with Mister Download Manager"></h1>
+    <p data-t="On the computer, open Options, then Remote, and click Pair a device. Enter the code it shows."></p>
+    <form id="pair-form" autocomplete="off">
+      <label for="code" data-t="Code"></label>
+      <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" required dir="ltr">
+      <label for="name" data-t="This device's name"></label>
+      <input id="name" name="name" maxlength="40">
+      <p id="pair-error" class="error" role="alert"></p>
+      <button class="primary" type="submit" data-t="Pair"></button>
+    </form>
+  </section>
+
+  <section id="main" hidden>
+    <form id="add" class="card" autocomplete="off">
+      <label for="url" data-t="Address or magnet link"></label>
+      <div class="row">
+        <input id="url" type="url" inputmode="url" dir="ltr" placeholder="https://…   magnet:?…">
+        <label class="button file" tabindex="0" role="button" data-ta="Choose a .torrent file">
+          <span dir="auto" data-t=".torrent file"></span>
+          <input id="file" type="file" accept=".torrent,application/x-bittorrent">
+        </label>
+      </div>
+      <p id="file-name" class="muted" hidden></p>
+      <div class="row">
+        <label class="field"><span data-t="Category"></span><select id="category"></select></label>
+        <label class="field"><span data-t="When"></span><select id="when"></select></label>
+      </div>
+      <button class="primary" type="submit" data-t="Add"></button>
+    </form>
+
+    <div id="queues" class="chips" aria-live="polite"></div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-filter="all" aria-selected="true" data-t="All"></button>
+      <button type="button" role="tab" data-filter="active" aria-selected="false" data-t="Unfinished"></button>
+      <button type="button" role="tab" data-filter="done" aria-selected="false" data-t="Finished"></button>
+    </div>
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="muted center" hidden data-t="No downloads here."></p>
+  </section>
+
+  <p id="offline" class="banner" role="status" hidden></p>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <p id="confirm-text"></p>
+    <label class="check"><input id="confirm-file" type="checkbox"> <span data-t="Delete the file too"></span></label>
+    <div class="actions">
+      <button value="cancel" data-t="Cancel"></button>
+      <button value="ok" class="primary danger" data-t="Remove"></button>
+    </div>
+  </form>
+</dialog>
+
+<template id="item">
+  <li class="item">
+    <div class="line">
+      <span class="name" dir="auto"></span>
+      <span class="state"></span>
+    </div>
+    <div class="bar-track"><div class="bar-fill"></div></div>
+    <div class="line">
+      <span class="detail muted"></span>
+      <span class="buttons">
+        <button type="button" class="act toggle"></button>
+        <button type="button" class="act icon remove" data-ta="Remove">&#215;</button>
+      </span>
+    </div>
+    <p class="error-text error" hidden></p>
+  </li>
+</template>
+</body>
+</html>

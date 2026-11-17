@@ -1,0 +1,26 @@
+[package]
+name = "mdm-extract"
+description = "Safe archive extraction: zip, tar (gz, xz), single gz/xz; 7z and RAR through an installed 7-Zip"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+# zip's Deflate is already in the shipped app (mdm-crash, mdm-tools); Deflate64 (Explorer's zips
+# over 2 GB) and WinZip AES are small additions.
+zip = { version = "9.1.3", default-features = false, features = ["deflate", "deflate64", "aes-crypto"] }
+tar = { version = "0.4.46", default-features = false }
+flate2.workspace = true
+# The xz decoder (.xz, .tar.xz).
+lzma-rust2 = { version = "0.23", default-features = false, features = ["std", "xz", "optimization"] }
+mdm-engine.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

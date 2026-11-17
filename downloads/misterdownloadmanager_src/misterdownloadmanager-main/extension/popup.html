@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon-32.png" width="20" height="20" alt="">
+    <span>Mister Download Manager</span>
+  </header>
+  <section id="status" class="status" role="status">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="status-text"></span>
+  </section>
+  <a id="fix" class="link" hidden data-i18n="popup_fix" target="_blank" rel="noopener"></a>
+  <p id="declined" class="declined" hidden><span id="declined-what"></span><span id="declined-why"></span></p>
+  <label class="switch">
+    <input id="take" type="checkbox">
+    <span data-i18n="popup_take"></span>
+  </label>
+  <label class="switch" id="proxy-row" hidden>
+    <input id="proxy" type="checkbox">
+    <span data-i18n="popup_proxy"></span>
+  </label>
+  <section id="send" class="send">
+    <h2 data-i18n="popup_send_to"></h2>
+    <label class="choice"><input type="radio" name="to" id="to-here"> <span data-i18n="popup_send_here"></span></label>
+    <label class="choice"><input type="radio" name="to" id="to-remote"> <span data-i18n="popup_send_remote"></span></label>
+    <div id="remote-form" hidden>
+      <input id="remote-url" type="url" dir="ltr" placeholder="https://192.168.1.10:8463/" aria-labelledby="to-remote">
+      <input id="remote-code" inputmode="numeric" maxlength="9" dir="ltr" data-i18n-placeholder="popup_remote_code">
+      <div class="actions">
+        <button id="remote-open" data-i18n="popup_remote_open"></button>
+        <button id="remote-pair" class="accent" data-i18n="popup_remote_pair"></button>
+      </div>
+      <p class="note" data-i18n="popup_remote_help"></p>
+      <p id="remote-said" class="note bad" role="status" hidden></p>
+    </div>
+  </section>
+  <button id="exclude" class="row" hidden></button>
+  <p id="excluded" class="note" hidden></p>
+  <div class="actions">
+    <button id="open" class="accent" data-i18n="popup_open"></button>
+    <button id="options" data-i18n="popup_options"></button>
+  </div>
+  <section id="media" class="media" hidden>
+    <h2 data-i18n="popup_media"></h2>
+    <label class="switch">
+      <input id="media-title-name" type="checkbox">
+      <span data-i18n="popup_media_title_name"></span>
+    </label>
+    <ul id="media-list"></ul>
+    <p id="media-none" class="note" data-i18n="popup_media_none" hidden></p>
+    <p id="media-said" class="note" role="status" hidden></p>
+  </section>
+  <p class="note" data-i18n="popup_alt"></p>
+  <footer>
+    <span class="footer-links">
+      <a id="help" class="link" data-i18n="popup_help" target="_blank" rel="noopener"></a>
+      <a id="support" class="link" data-i18n="popup_support" target="_blank" rel="noopener"></a>
+    </span>
+    <span id="version"></span>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

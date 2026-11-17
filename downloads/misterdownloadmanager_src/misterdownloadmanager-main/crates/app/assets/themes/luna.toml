@@ -1,0 +1,193 @@
+# Luna: one of Mister Download Manager's built-in themes, after Windows XP's look (2001): the
+# feel of its colours and shapes, drawn by MDM (no picture, font or icon of Microsoft's), with an
+# icon set drawn for MDM in that manner.
+# It is also an example of a theme file: seeds for the colours, the roles XP sets apart by hand,
+# XP's controls (shaded buttons with a glow under the pointer, green ticks, progress in blocks),
+# a deep blue title bar on Windows and an icon set. XP had no dark mode: the dark side is the
+# same look at night.
+
+name = "Luna"
+icon-set = "luna"
+icons = "color"
+
+[controls]
+field-focus = "border"
+check = "luna"
+button = "luna"
+progress = "blocks"
+scroll = "classic"
+focus = "dotted"
+caption = "luna"
+
+[sizes]
+# Square text boxes and menus; buttons and progress bars rounded a little.
+radius = 0
+"radius.button" = 3
+"radius.part" = 0
+"radius.check" = 0
+"radius.flyout" = 0
+"radius.menu-item" = 0
+"radius.popup" = 0
+"radius.egui" = 0
+
+[seeds.light]
+background = "#ece9d8"
+surface = "#ffffff"
+header = "#ffffff"
+text = "#000000"
+accent = "#316ac5"
+selection = "#316ac5"
+error = "#c42b1c"
+warning = "#9d5d00"
+success = "#1d7c1d"
+
+[seeds.dark]
+background = "#1f2533"
+surface = "#161b26"
+header = "#161b26"
+text = "#ffffff"
+accent = "#6d9cf0"
+selection = "#2f5fb8"
+error = "#ff8f80"
+warning = "#f7c35c"
+success = "#6fd36f"
+
+[light]
+# XP's buttons: shaded from white at the top, a dark blue edge, an orange glow inside under the
+# pointer and a blue one on the default button; pressed, the face a shade deeper.
+gloss = "#ffffff"
+button = "#d8d2c6"
+"button.hot" = "#d8d2c6"
+"button.pressed" = "#c4bdaf"
+"button.border" = "#003c74"
+"button.bottom" = "#003c74"
+"button.default.border" = "#7fa2ee"
+"button.default.bottom" = "#003c74"
+"button.glow" = "#f6b73c"
+"button.text" = "#000000"
+"button.text.pressed" = "#000000"
+"button.disabled" = "#f4f3ee"
+"button.disabled.border" = "#c9c7ba"
+# Text boxes: XP's blue-grey edge, square; the accent's when focused.
+"field.border" = "#7f9db9"
+"field.bottom" = "#7f9db9"
+# Check boxes and radios: a dark blue edge, a white inside shaded from the top, a green tick.
+check = "#ffffff"
+"check.hot" = "#ffffff"
+"check.pressed" = "#dedbcf"
+"check.border" = "#1c5180"
+"check.border.hot" = "#1c5180"
+"check.border.pressed" = "#1c5180"
+"check.border.disabled" = "#cac8bb"
+"check.on" = "#21a121"
+"check.on.hot" = "#21a121"
+"check.on.pressed" = "#1a8a1a"
+"check.on.disabled" = "#cac8bb"
+"check.mark" = "#21a121"
+# Progress in green blocks, the progress window's bar too.
+"progress.bar" = "#2bb52b"
+"meter.fill" = "#2bb52b"
+"meter.track" = "#ffffff"
+"meter.edge" = "#686868"
+# The keyboard focus: Windows' dotted rectangle, black.
+"focus.ring" = "#000000"
+# Menus: a light blue item under the pointer.
+menu = "#ffffff"
+"menu.item" = "#ffffff"
+"menu.hot" = "#c1d2ee"
+"menu.border" = "#8a867a"
+menubar = "#ece9d8"
+"menubar.bottom" = "#ece9d8"
+"menubar.hot" = "#c1d2ee"
+"menubar.open" = "#c1d2ee"
+"menubar.line" = "#d8d2bd"
+# Toolbar buttons: light blue with a blue edge under the pointer.
+"toolbar.hot" = "#c1d2ee"
+"toolbar.hot.faint" = "#dfe8f6"
+"toolbar.hot.edge" = "#316ac5"
+"toolbar.hot.border" = "#316ac5"
+"toolbar.pressed" = "#98b5e2"
+# Scroll bars: a lavender blue thumb, its arrows always shown.
+"scroll.track" = "#f7f6f1"
+"scroll.corner" = "#ece9d8"
+"scroll.thumb" = "#9db6ec"
+"scroll.thumb.hot" = "#7c9de4"
+"scroll.thumb.pressed" = "#5f86d8"
+# Column headers: XP's light beige.
+header = "#f2f1e8"
+"header.sep" = "#cbc7b8"
+"header.line" = "#d6d2c2"
+"header.sorted" = "#e8e6da"
+# The title bar: a deep blue, lighter along its top edge; a paler blue while the window isn't
+# the active one. Its buttons a lighter blue, Close red-orange, with a white edge and glyph.
+caption = "#0a54e0"
+"caption.inactive" = "#7a96df"
+"caption.text" = "#ffffff"
+"caption.text.inactive" = "#d8e4f8"
+"caption.button" = "#2f6ff0"
+"caption.close" = "#e0441c"
+"caption.close.text" = "#ffffff"
+
+[dark]
+gloss = "#6a7795"
+button = "#3a4560"
+"button.hot" = "#3a4560"
+"button.pressed" = "#2c3550"
+"button.border" = "#6a80b4"
+"button.bottom" = "#6a80b4"
+"button.default.border" = "#4d7fe0"
+"button.default.bottom" = "#6a80b4"
+"button.glow" = "#e0a13a"
+"button.text" = "#ffffff"
+"button.text.pressed" = "#ffffff"
+"button.disabled" = "#2a3142"
+"button.disabled.border" = "#3c4558"
+"field.border" = "#4a5a7c"
+"field.bottom" = "#4a5a7c"
+check = "#161b26"
+"check.hot" = "#1e2535"
+"check.pressed" = "#262f44"
+"check.border" = "#7b93c8"
+"check.border.hot" = "#7b93c8"
+"check.border.pressed" = "#7b93c8"
+"check.border.disabled" = "#3c4558"
+"check.on" = "#4fc24f"
+"check.on.hot" = "#4fc24f"
+"check.on.pressed" = "#3fa83f"
+"check.on.disabled" = "#4a5266"
+"check.mark" = "#4fc24f"
+"progress.bar" = "#2fae2f"
+"meter.fill" = "#2fae2f"
+"meter.track" = "#161b26"
+"meter.edge" = "#4a5a7c"
+"focus.ring" = "#ffffff"
+menu = "#1c2230"
+"menu.item" = "#1c2230"
+"menu.hot" = "#2d4170"
+"menu.border" = "#3c4558"
+menubar = "#1f2533"
+"menubar.bottom" = "#1f2533"
+"menubar.hot" = "#2d4170"
+"menubar.open" = "#2d4170"
+"menubar.line" = "#121620"
+"toolbar.hot" = "#2d4170"
+"toolbar.hot.faint" = "#232f48"
+"toolbar.hot.edge" = "#4d7fe0"
+"toolbar.hot.border" = "#4d7fe0"
+"toolbar.pressed" = "#25365e"
+"scroll.track" = "#1a1f2b"
+"scroll.corner" = "#1f2533"
+"scroll.thumb" = "#4f6596"
+"scroll.thumb.hot" = "#6079b0"
+"scroll.thumb.pressed" = "#7890c6"
+header = "#232a3a"
+"header.sep" = "#3c4558"
+"header.line" = "#2e3648"
+"header.sorted" = "#2a3245"
+caption = "#0b3fa8"
+"caption.inactive" = "#3a4f7e"
+"caption.text" = "#ffffff"
+"caption.text.inactive" = "#a9b8d6"
+"caption.button" = "#2558c8"
+"caption.close" = "#c8401c"
+"caption.close.text" = "#ffffff"

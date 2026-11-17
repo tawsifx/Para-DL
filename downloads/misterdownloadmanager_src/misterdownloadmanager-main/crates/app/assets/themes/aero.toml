@@ -1,0 +1,184 @@
+# Aero: one of Mister Download Manager's built-in themes, after Windows 7's look (2009): the feel
+# of its colours and shapes, drawn by MDM (no picture, font or icon of Microsoft's), with an icon
+# set drawn for MDM in that manner.
+# It is also an example of a theme file: seeds for the colours, the roles Windows 7 sets apart by
+# hand, its controls (glossy buttons in two halves that turn light blue under the pointer, quiet
+# check boxes, a glossy green progress bar), a glassy title bar on Windows and an icon set.
+
+name = "Aero"
+icon-set = "aero"
+icons = "color"
+
+[controls]
+field-focus = "border"
+check = "aero"
+button = "aero"
+progress = "gloss"
+scroll = "classic"
+focus = "dotted"
+caption = "aero"
+
+[sizes]
+radius = 2
+"radius.button" = 3
+"radius.part" = 2
+"radius.check" = 0
+"radius.flyout" = 4
+"radius.menu-item" = 3
+"radius.popup" = 3
+"radius.egui" = 2
+
+[seeds.light]
+background = "#f0f0f0"
+surface = "#ffffff"
+header = "#ffffff"
+text = "#000000"
+accent = "#3274c2"
+selection = "#cce8ff"
+error = "#c42b1c"
+warning = "#9d5d00"
+success = "#0f7b0f"
+
+[seeds.dark]
+background = "#22272e"
+surface = "#1a1e24"
+header = "#1a1e24"
+text = "#ffffff"
+accent = "#5aa4e6"
+selection = "#25476b"
+error = "#ff8f8f"
+warning = "#f7c35c"
+success = "#6ccb5f"
+
+[light]
+# Windows 7's buttons: a glossy grey face, lighter in its top half, a grey edge; light blue
+# under the pointer and deeper blue pressed, the edge then the accent's.
+gloss = "#ffffff"
+button = "#cfcfcf"
+"button.hot" = "#a9daf6"
+"button.pressed" = "#6cb5de"
+"button.border" = "#707070"
+"button.bottom" = "#707070"
+"button.default.border" = "#3c7fb1"
+"button.default.bottom" = "#3c7fb1"
+"button.text" = "#000000"
+"button.text.pressed" = "#000000"
+"button.disabled" = "#f4f4f4"
+"button.disabled.border" = "#adb2b5"
+# Text boxes: a grey edge, the accent's when focused.
+"field.border" = "#abadb3"
+"field.bottom" = "#abadb3"
+# Check boxes and radios: a grey edge round a shaded square, light blue under the pointer; a
+# dark blue tick.
+check = "#f4f4f4"
+"check.hot" = "#def4fd"
+"check.pressed" = "#c2e4f6"
+"check.border" = "#8e8f8f"
+"check.border.hot" = "#3c7fb1"
+"check.border.pressed" = "#2c628b"
+"check.border.disabled" = "#bcbcbc"
+"check.on" = "#3b6fb6"
+"check.on.hot" = "#4a85d1"
+"check.on.pressed" = "#2f5f9e"
+"check.on.disabled" = "#bcbcbc"
+"check.mark" = "#25356e"
+# A glossy green progress bar on a light track.
+"progress.bar" = "#06b025"
+"meter.fill" = "#06b025"
+"meter.track" = "#e6e6e6"
+"meter.edge" = "#a8a8a8"
+"focus.ring" = "#000000"
+# Menus: a light blue item under the pointer, rounded.
+menu = "#f5f5f5"
+"menu.item" = "#f5f5f5"
+"menu.hot" = "#dce9f8"
+"menu.border" = "#979797"
+menubar = "#e3ecf7"
+"menubar.bottom" = "#e1e9f5"
+"menubar.hot" = "#cfe2f8"
+"menubar.open" = "#bed8f6"
+"menubar.line" = "#c5d3e6"
+"toolbar.hot" = "#dceaf9"
+"toolbar.hot.faint" = "#edf4fc"
+"toolbar.hot.edge" = "#7da2ce"
+"toolbar.hot.border" = "#7da2ce"
+"toolbar.pressed" = "#c2dbf6"
+"scroll.track" = "#f0f0f0"
+"scroll.corner" = "#f0f0f0"
+"scroll.thumb" = "#a7a9b0"
+"scroll.thumb.hot" = "#7fb0dc"
+"scroll.thumb.pressed" = "#5a97cc"
+header = "#ffffff"
+"header.sep" = "#dde3ea"
+"header.sorted" = "#f2f7fc"
+# The title bar: light blue glass, its top half brighter; the title dark on a soft glow.
+# Minimize and Maximize a deeper glass, Close red, their glyphs white with a shadow.
+caption = "#9cc0e6"
+"caption.inactive" = "#cddbea"
+"caption.text" = "#000000"
+"caption.text.inactive" = "#5e6a78"
+"caption.button" = "#86aedb"
+"caption.close" = "#c74343"
+"caption.close.text" = "#ffffff"
+
+[dark]
+gloss = "#7a828e"
+button = "#3b4048"
+"button.hot" = "#2b5b86"
+"button.pressed" = "#22496d"
+"button.border" = "#5d636d"
+"button.bottom" = "#5d636d"
+"button.default.border" = "#5aa4e6"
+"button.default.bottom" = "#5aa4e6"
+"button.text" = "#ffffff"
+"button.text.pressed" = "#ffffff"
+"button.disabled" = "#2a2e35"
+"button.disabled.border" = "#3b4048"
+"field.border" = "#4a515b"
+"field.bottom" = "#4a515b"
+check = "#2a2f37"
+"check.hot" = "#24425f"
+"check.pressed" = "#1f3a54"
+"check.border" = "#7d838c"
+"check.border.hot" = "#5aa4e6"
+"check.border.pressed" = "#5aa4e6"
+"check.border.disabled" = "#555b64"
+"check.on" = "#5aa4e6"
+"check.on.hot" = "#73b4ec"
+"check.on.pressed" = "#4a90d0"
+"check.on.disabled" = "#555b64"
+"check.mark" = "#a6d4ff"
+"progress.bar" = "#2fbf4f"
+"meter.fill" = "#2fbf4f"
+"meter.track" = "#1a1e24"
+"meter.edge" = "#4a515b"
+"focus.ring" = "#ffffff"
+menu = "#24292f"
+"menu.item" = "#24292f"
+"menu.hot" = "#2f4a66"
+"menu.border" = "#3b4048"
+menubar = "#1f2a36"
+"menubar.bottom" = "#1f2a36"
+"menubar.hot" = "#2f4a66"
+"menubar.open" = "#355578"
+"menubar.line" = "#121820"
+"toolbar.hot" = "#2b4058"
+"toolbar.hot.faint" = "#253240"
+"toolbar.hot.edge" = "#5aa4e6"
+"toolbar.hot.border" = "#5aa4e6"
+"toolbar.pressed" = "#22496d"
+"scroll.track" = "#1d2127"
+"scroll.corner" = "#22272e"
+"scroll.thumb" = "#59606b"
+"scroll.thumb.hot" = "#5f8fbf"
+"scroll.thumb.pressed" = "#79a9d8"
+header = "#1f242b"
+"header.sep" = "#363c45"
+"header.sorted" = "#25303c"
+caption = "#2a3a4f"
+"caption.inactive" = "#3a4554"
+"caption.text" = "#ffffff"
+"caption.text.inactive" = "#9aa6b5"
+"caption.button" = "#3c516b"
+"caption.close" = "#b83a3a"
+"caption.close.text" = "#ffffff"

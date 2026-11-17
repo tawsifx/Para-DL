@@ -1,0 +1,37 @@
+# High contrast: one of Mister Download Manager's built-in themes, and an example of a theme
+# file. Black and white, a bright accent, every text at 7:1 or more against what it sits on
+# (WCAG 2.1 AAA), every control's edge in the text's colour.
+#
+# A theme file names only what it changes. This one gives a few seed colours per variant and
+# lets MDM derive every other colour from them; `contrast = "high"` draws every edge in the
+# text's colour and keeps greyed text readable.
+
+name = "High contrast"
+icons = "mono"
+contrast = "high"
+
+[sizes]
+# A focused text box's accent line, thicker than the classic 2.
+"focus-line" = 3
+
+[seeds.light]
+background = "#ffffff"
+surface = "#ffffff"
+header = "#ffffff"
+text = "#000000"
+accent = "#00009f"
+selection = "#00009f"
+error = "#a00000"
+warning = "#6b4000"
+success = "#005a00"
+
+[seeds.dark]
+background = "#000000"
+surface = "#000000"
+header = "#000000"
+text = "#ffffff"
+accent = "#1aebff"
+selection = "#1aebff"
+error = "#ff8080"
+warning = "#ffff00"
+success = "#3ff23f"

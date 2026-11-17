@@ -1,0 +1,24 @@
+# Mister Download Manager on a server (#157): docs/server.md.
+#   mkdir -p docker/config /srv/downloads    # first, as the user below: Docker would make them root's
+#   docker compose -f docker/compose.yml up -d --build
+#   docker compose -f docker/compose.yml logs mdm         # the address and a pairing code
+#   docker compose -f docker/compose.yml exec mdm misterdownloadmanager-cli pair
+services:
+  mdm:
+    build:
+      context: ..
+    container_name: mdm
+    restart: unless-stopped
+    # The user that owns your downloads folder (`id -u`:`id -g`; 99:100 on Unraid).
+    user: "1000:1000"
+    ports:
+      - "8463:8463"
+    environment:
+      # The address you open the page with (the server's, with the port above).
+      MDM_REMOTE_URL: "https://192.168.1.10:8463/"
+      # Names besides the server's address you open the page with (comma-separated).
+      MDM_REMOTE_HOSTS: "nas.local"
+    volumes:
+      - ./config:/config
+      # Where downloads land: a folder of the server, or a network share mounted on it.
+      - /srv/downloads:/downloads

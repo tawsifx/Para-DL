@@ -1,0 +1,133 @@
+# Breeze: one of Mister Download Manager's built-in themes, after KDE Plasma's look (Breeze's
+# colours and shapes; nothing of KDE's but its LGPL-licensed Breeze icons).
+# It is also an example of a theme file: seeds for the colours, the roles KDE sets apart by hand,
+# KDE's controls (its focus frame, check boxes and buttons), its title bar on Windows and an icon
+# set of one-colour and colour drawings.
+
+name = "Breeze"
+icon-set = "breeze"
+icons = "mono"
+
+[controls]
+field-focus = "border"
+check = "breeze"
+button = "breeze"
+focus = "frame"
+caption = "breeze"
+
+[sizes]
+radius = 5
+"radius.part" = 3
+"radius.check" = 3
+"radius.flyout" = 5
+"radius.menu-item" = 3
+"radius.popup" = 5
+"radius.egui" = 3
+
+[seeds.light]
+background = "#eff0f1"
+surface = "#ffffff"
+header = "#ffffff"
+text = "#232629"
+accent = "#3daee9"
+selection = "#3daee9"
+error = "#da4453"
+warning = "#f67400"
+success = "#27ae60"
+
+[seeds.dark]
+background = "#202326"
+surface = "#141618"
+header = "#141618"
+text = "#fcfcfc"
+accent = "#3daee9"
+selection = "#3daee9"
+error = "#da4453"
+warning = "#f67400"
+success = "#27ae60"
+
+[light]
+# KDE's buttons: a light face, a quiet edge (the accent under the pointer, by the painter), the
+# face tinted with the accent pressed.
+button = "#fcfcfc"
+"button.hot" = "#fcfcfc"
+"button.pressed" = "#c3e5f6"
+"button.border" = "#bcbebf"
+"button.bottom" = "#bcbebf"
+"button.text" = "#232629"
+"button.text.pressed" = "#232629"
+"button.default.border" = "#81bad8"
+"button.default.bottom" = "#81bad8"
+# Boxes: the same quiet edge, the accent's when focused.
+"field.border" = "#bcbebf"
+"field.bottom" = "#bcbebf"
+# Check boxes and radios: the button's face, the accent's edge and a tick in the text's colour.
+check = "#fcfcfc"
+"check.hot" = "#fcfcfc"
+"check.pressed" = "#e3e3e3"
+"check.border" = "#a8aaac"
+"check.border.hot" = "#3daee9"
+"check.border.pressed" = "#3daee9"
+"check.on" = "#3daee9"
+"check.on.hot" = "#3daee9"
+"check.on.pressed" = "#2e94c9"
+"check.mark" = "#232629"
+# The keyboard focus: a frame in the accent, a shade deeper on the light window so keyboard
+# users see it (3:1, WCAG non-text contrast; KDE's own #3daee9 is 2.2:1 there).
+"focus.ring" = "#1891d1"
+# Toolbar buttons: flat, the accent's edge under the pointer, tinted with it pressed.
+"toolbar.hot" = "#e3f2fa"
+"toolbar.hot.faint" = "#f0f8fc"
+"toolbar.hot.edge" = "#3daee9"
+"toolbar.hot.border" = "#3daee9"
+"toolbar.pressed" = "#c3e5f6"
+# The title bar and the menu bar under it: KDE's header colour.
+caption = "#dee0e2"
+"caption.text" = "#232629"
+"caption.text.inactive" = "#6e7276"
+"caption.hot" = "#232629"
+"caption.pressed" = "#a6a8aa"
+"caption.close" = "#ed5565"
+"caption.close.text" = "#dee0e2"
+menubar = "#dee0e2"
+"menubar.bottom" = "#dee0e2"
+"menubar.line" = "#c9cbcd"
+
+[dark]
+button = "#292c30"
+"button.hot" = "#292c30"
+"button.pressed" = "#2f5368"
+"button.border" = "#5e6063"
+"button.bottom" = "#5e6063"
+"button.text" = "#fcfcfc"
+"button.text.pressed" = "#fcfcfc"
+"button.default.border" = "#3c7393"
+"button.default.bottom" = "#3c7393"
+"field.border" = "#4d5054"
+"field.bottom" = "#4d5054"
+check = "#292c30"
+"check.hot" = "#292c30"
+"check.pressed" = "#33363a"
+"check.border" = "#6e7175"
+"check.border.hot" = "#3daee9"
+"check.border.pressed" = "#3daee9"
+"check.on" = "#3daee9"
+"check.on.hot" = "#3daee9"
+"check.on.pressed" = "#5bbcef"
+"check.mark" = "#fcfcfc"
+"focus.ring" = "#3daee9"
+"toolbar.hot" = "#24394a"
+"toolbar.hot.faint" = "#222c35"
+"toolbar.hot.edge" = "#3daee9"
+"toolbar.hot.border" = "#3daee9"
+"toolbar.pressed" = "#2f5368"
+caption = "#292c30"
+"caption.text" = "#fcfcfc"
+"caption.text.inactive" = "#a1a9b1"
+"caption.hot" = "#fcfcfc"
+"caption.pressed" = "#686a6d"
+"caption.close" = "#ed5565"
+"caption.close.text" = "#292c30"
+menubar = "#292c30"
+"menubar.bottom" = "#292c30"
+"menubar.line" = "#1b1d20"

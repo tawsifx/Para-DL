@@ -1,0 +1,10 @@
+# Every issue starts from a form (bug.yml, feature.yml, website.yml), so reports carry the
+# system and version they happened on.
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://misterdownloadmanager.com/security.html
+    about: Report it privately, not as an issue.
+  - name: Help and questions
+    url: https://misterdownloadmanager.com/help/
+    about: The user guide, tutorials and troubleshooting; the FAQ is at misterdownloadmanager.com/faq/.

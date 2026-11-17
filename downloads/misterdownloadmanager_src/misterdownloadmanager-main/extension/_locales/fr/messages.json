@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Transfère les téléchargements du navigateur vers Mister Download Manager."
+  },
+  "menu": {
+    "message": "Télécharger avec Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Télécharger la vidéo"
+  },
+  "video_more": {
+    "message": "Plus d’options"
+  },
+  "video_hide_here": {
+    "message": "Masquer sur cette vidéo"
+  },
+  "video_never_site": {
+    "message": "Jamais sur $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Paramètres du bouton..."
+  },
+  "video_sent": {
+    "message": "Envoyé à Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager n’est pas installé ou n’a pas démarré"
+  },
+  "video_drag": {
+    "message": "Faites glisser pour le déplacer le long du bord de la vidéo"
+  },
+  "menu_selected": {
+    "message": "Télécharger les liens sélectionnés avec Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Télécharger tous les liens avec Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Connecté à Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Connecté à Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "En pause : les téléchargements restent dans le navigateur"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager n’est pas installé, ou son intégration au navigateur n’est pas configurée"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager n’accepte pas cette copie de l’extension"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager n’a pas démarré à temps"
+  },
+  "status_host_failed": {
+    "message": "La connexion à Mister Download Manager a échoué"
+  },
+  "status_too_large": {
+    "message": "Les détails de ce téléchargement étaient trop volumineux pour être transférés"
+  },
+  "status_update_app": {
+    "message": "Mettez à jour Mister Download Manager pour utiliser toutes les fonctionnalités de cette extension"
+  },
+  "popup_take": {
+    "message": "Prendre les téléchargements de ce navigateur"
+  },
+  "popup_proxy": {
+    "message": "Envoyer les téléchargements via le proxy ou l’extension VPN de ce navigateur"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager télécharge alors via le même proxy que ce navigateur. Le navigateur vous demande une fois de l’autoriser ; la désactivation de cette option annule cette autorisation."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager télécharge alors via le même proxy que ce navigateur. Lorsque cette option est désactivée, l’extension ne lit pas le proxy du navigateur."
+  },
+  "popup_exclude_site": {
+    "message": "Ne plus prendre les téléchargements de $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Les téléchargements de $site$ restent avec le navigateur",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Ouvrir Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Options..."
+  },
+  "popup_help": {
+    "message": "Aide"
+  },
+  "popup_support": {
+    "message": "Soutenir MDM"
+  },
+  "popup_fix": {
+    "message": "Comment le résoudre"
+  },
+  "popup_declined": {
+    "message": "Laissé au navigateur : $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Le dernier téléchargement a été laissé au navigateur."
+  },
+  "declined_file_type": {
+    "message": "Son type ne figure pas dans Options → Types de fichiers."
+  },
+  "declined_site": {
+    "message": "Son site se trouve dans Options → Types de fichiers, sites laissés au navigateur."
+  },
+  "declined_address": {
+    "message": "Son adresse se trouve dans Options → Types de fichiers, adresses laissées au navigateur."
+  },
+  "declined_small": {
+    "message": "La taille est inférieure à la taille minimale dans Options → Types de fichiers."
+  },
+  "declined_browser": {
+    "message": "Ce navigateur n’est pas coché dans Options → Général."
+  },
+  "declined_integration_off": {
+    "message": "L’option « Utiliser l’intégration avancée du navigateur » est désactivée dans Options → Général."
+  },
+  "declined_site_access": {
+    "message": "L’extension n’est pas autorisée à lire ce site (accès au site du navigateur)."
+  },
+  "popup_alt": {
+    "message": "Maintenez la touche Alt enfoncée en cliquant sur un lien pour laisser le navigateur le télécharger."
+  },
+  "popup_media": {
+    "message": "Contenu multimédia sur cette page"
+  },
+  "popup_media_none": {
+    "message": "Aucune vidéo ni aucun son n’a encore été détecté sur cette page. Lancez la lecture, puis rouvrez cette fenêtre."
+  },
+  "popup_media_streamed": {
+    "message": "Le lecteur de cette page diffuse la vidéo par morceaux : il n'y a donc aucun fichier à lister. Pointez la vidéo et utilisez son bouton « Télécharger la vidéo »."
+  },
+  "popup_media_store": {
+    "message": "Les règles du Chrome Web Store tiennent cette copie du module à l'écart des vidéos de ce site. L'aide indique ce que vous pouvez faire."
+  },
+  "popup_media_download": {
+    "message": "Télécharger"
+  },
+  "popup_media_protected": {
+    "message": "Protégé"
+  },
+  "popup_media_live": {
+    "message": "En direct"
+  },
+  "video_off": {
+    "message": "Le bouton de téléchargement est désactivé sur ce site"
+  },
+  "video_drm": {
+    "message": "Vidéo protégée : impossible de l’enregistrer"
+  },
+  "video_unnamed": {
+    "message": "Impossible de savoir de quelle vidéo il s'agit : ouvrez sa propre page et réessayez"
+  },
+  "video_looking": {
+    "message": "Recherche des qualités…"
+  },
+  "video_open_mdm": {
+    "message": "Ouvrir dans Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Aucune vidéo à télécharger ici"
+  },
+  "video_playlist": {
+    "message": "Une liste de vidéos : choisissez-les dans Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager a besoin de yt-dlp pour cette vidéo"
+  },
+  "video_too_long": {
+    "message": "La recherche a pris trop de temps"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager est occupé avec d’autres vidéos"
+  },
+  "video_queued": {
+    "message": "Ajouté à la file d’attente"
+  },
+  "video_failed_lookup": {
+    "message": "Recherche impossible"
+  },
+  "video_tab_video": {
+    "message": "Vidéo"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Ouvrez la publication, puis utilisez le bouton"
+  },
+  "popup_send_to": {
+    "message": "Envoyer les téléchargements vers"
+  },
+  "popup_send_here": {
+    "message": "Cet ordinateur"
+  },
+  "popup_send_remote": {
+    "message": "Un autre Mister Download Manager (un serveur)"
+  },
+  "popup_remote_code": {
+    "message": "Code de jumelage"
+  },
+  "popup_remote_open": {
+    "message": "Ouvrir"
+  },
+  "popup_remote_pair": {
+    "message": "Jumeler"
+  },
+  "popup_remote_help": {
+    "message": "Ouvrez son adresse une fois et acceptez son certificat, puis entrez un code depuis ses Options, Distant, Jumeler un appareil (ou misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Les téléchargements vont vers $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Entrez son adresse https://."
+  },
+  "remote_unreachable": {
+    "message": "Non atteint. Ouvrez son adresse une fois dans ce navigateur et acceptez son certificat, puis réessayez."
+  },
+  "remote_wrong_code": {
+    "message": "Code incorrect."
+  },
+  "remote_no_code": {
+    "message": "Il n’affiche aucun code pour l’instant : cliquez d’abord sur Jumeler un appareil."
+  },
+  "remote_too_soon": {
+    "message": "Attendez un instant, puis réessayez."
+  },
+  "remote_failed": {
+    "message": "Échec. Réessayez."
+  },
+  "remote_device_name": {
+    "message": "Extension de navigateur"
+  },
+  "popup_media_title_name": {
+    "message": "Ajouter le titre de la page devant les noms des fichiers multimédias"
+  }
+}

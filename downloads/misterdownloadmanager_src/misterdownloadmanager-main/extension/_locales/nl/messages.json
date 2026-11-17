@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Geeft downloads van de browser door aan Mister Download Manager."
+  },
+  "menu": {
+    "message": "Downloaden met Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Video downloaden"
+  },
+  "video_more": {
+    "message": "Meer opties"
+  },
+  "video_hide_here": {
+    "message": "Verbergen op deze video"
+  },
+  "video_never_site": {
+    "message": "Nooit op $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Knopinstellingen..."
+  },
+  "video_sent": {
+    "message": "Verzonden naar Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager is niet geïnstalleerd of is niet gestart"
+  },
+  "video_drag": {
+    "message": "Sleep om de knop langs de rand van de video te verplaatsen"
+  },
+  "menu_selected": {
+    "message": "Geselecteerde koppelingen downloaden met Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Alle koppelingen downloaden met Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Verbonden met Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Verbonden met Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Gepauzeerd: downloads blijven bij de browser"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager is niet geïnstalleerd, of de browserintegratie is niet ingesteld"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager accepteert deze kopie van de extensie niet"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager is niet op tijd gestart"
+  },
+  "status_host_failed": {
+    "message": "De verbinding met Mister Download Manager is mislukt"
+  },
+  "status_too_large": {
+    "message": "De details van deze download waren te groot om over te dragen"
+  },
+  "status_update_app": {
+    "message": "Update Mister Download Manager om alles te gebruiken wat deze extensie biedt"
+  },
+  "popup_take": {
+    "message": "Downloads van deze browser overnemen"
+  },
+  "popup_proxy": {
+    "message": "Downloads verzenden via de proxy- of VPN-extensie van deze browser"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager downloadt dan via dezelfde proxy als deze browser. De browser vraagt u eenmalig om dit toe te staan; als u dit uitschakelt, wordt die toestemming ingetrokken."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager downloadt dan via dezelfde proxy als deze browser. Als dit is uitgeschakeld, leest de extensie de proxy van de browser niet."
+  },
+  "popup_exclude_site": {
+    "message": "Nooit downloads van $site$ overnemen",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Downloads van $site$ blijven bij de browser",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Manager openen"
+  },
+  "popup_options": {
+    "message": "Opties..."
+  },
+  "popup_help": {
+    "message": "Help"
+  },
+  "popup_support": {
+    "message": "Steun MDM"
+  },
+  "popup_fix": {
+    "message": "Oplossen"
+  },
+  "popup_declined": {
+    "message": "Aan de browser overgelaten: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "De laatste download is aan de browser overgelaten."
+  },
+  "declined_file_type": {
+    "message": "Het type staat niet in Opties → Bestandstypen."
+  },
+  "declined_site": {
+    "message": "De site staat in Opties → Bestandstypen, sites die aan de browser zijn overgelaten."
+  },
+  "declined_address": {
+    "message": "Het adres staat in Opties → Bestandstypen, adressen die aan de browser zijn overgelaten."
+  },
+  "declined_small": {
+    "message": "Het is kleiner dan de minimumgrootte in Opties → Bestandstypen."
+  },
+  "declined_browser": {
+    "message": "Deze browser is niet aangevinkt in Opties → Algemeen."
+  },
+  "declined_integration_off": {
+    "message": "Geavanceerde browserintegratie gebruiken is uitgeschakeld in Opties → Algemeen."
+  },
+  "declined_site_access": {
+    "message": "De extensie mag deze site niet lezen (site-toegang van de browser)."
+  },
+  "popup_alt": {
+    "message": "Houd Alt ingedrukt terwijl u op een koppeling klikt om de browser deze te laten downloaden."
+  },
+  "popup_media": {
+    "message": "Media op deze pagina"
+  },
+  "popup_media_none": {
+    "message": "Nog geen video of geluid gevonden op deze pagina. Speel het af en open dit dan opnieuw."
+  },
+  "popup_media_streamed": {
+    "message": "De speler van deze pagina streamt de video in stukjes, dus er is geen bestand om te tonen. Wijs de video aan en gebruik de knop Video downloaden."
+  },
+  "popup_media_store": {
+    "message": "De regels van de Chrome Web Store houden deze kopie van de add-on weg van de video's op deze site. Onder Help staat wat u kunt doen."
+  },
+  "popup_media_download": {
+    "message": "Downloaden"
+  },
+  "popup_media_protected": {
+    "message": "Beveiligd"
+  },
+  "popup_media_live": {
+    "message": "Live"
+  },
+  "video_off": {
+    "message": "De downloadknop is uitgeschakeld op deze site"
+  },
+  "video_drm": {
+    "message": "Beveiligde video: kan niet worden opgeslagen"
+  },
+  "video_unnamed": {
+    "message": "Niet duidelijk welke video dit is: open de eigen pagina van de video en probeer het daar"
+  },
+  "video_looking": {
+    "message": "Kwaliteiten opzoeken…"
+  },
+  "video_open_mdm": {
+    "message": "Openen in Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Geen video om hier te downloaden"
+  },
+  "video_playlist": {
+    "message": "Een lijst met video's: kies ze in Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager heeft yt-dlp nodig voor deze video"
+  },
+  "video_too_long": {
+    "message": "Opzoeken duurde te lang"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager is bezig met andere video's"
+  },
+  "video_queued": {
+    "message": "Toegevoegd aan de wachtrij"
+  },
+  "video_failed_lookup": {
+    "message": "Kon het niet opzoeken"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Open het bericht en gebruik dan de knop daar"
+  },
+  "popup_send_to": {
+    "message": "Downloads verzenden naar"
+  },
+  "popup_send_here": {
+    "message": "Deze computer"
+  },
+  "popup_send_remote": {
+    "message": "Een andere Mister Download Manager (een server)"
+  },
+  "popup_remote_code": {
+    "message": "Koppelingscode"
+  },
+  "popup_remote_open": {
+    "message": "Openen"
+  },
+  "popup_remote_pair": {
+    "message": "Koppelen"
+  },
+  "popup_remote_help": {
+    "message": "Open het adres eenmaal en accepteer het certificaat, voer daarna een code in via de Opties, Extern, Een apparaat koppelen (of misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Downloads gaan naar $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Voer het https://-adres in."
+  },
+  "remote_unreachable": {
+    "message": "Niet bereikt. Open het adres eenmaal in deze browser en accepteer het certificaat, probeer het daarna opnieuw."
+  },
+  "remote_wrong_code": {
+    "message": "Onjuiste code."
+  },
+  "remote_no_code": {
+    "message": "Er wordt nu geen code weergegeven: klik daar eerst op Een apparaat koppelen."
+  },
+  "remote_too_soon": {
+    "message": "Wacht even en probeer het daarna opnieuw."
+  },
+  "remote_failed": {
+    "message": "Het is niet gelukt. Probeer het opnieuw."
+  },
+  "remote_device_name": {
+    "message": "Browserextensie"
+  },
+  "popup_media_title_name": {
+    "message": "Voeg de paginatitel toe vóór de namen van mediabestanden"
+  }
+}

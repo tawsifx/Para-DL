@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Nodod lejupielādes no pārlūkprogrammas uz Mister Download Manager."
+  },
+  "menu": {
+    "message": "Lejupielādēt ar Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Lejupielādēt video"
+  },
+  "video_more": {
+    "message": "Citas opcijas"
+  },
+  "video_hide_here": {
+    "message": "Paslēpt šajā video"
+  },
+  "video_never_site": {
+    "message": "Nekad vietnē $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Pogas iestatījumi..."
+  },
+  "video_sent": {
+    "message": "Nosūtīts uz Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager nav instalēts vai nav palaists"
+  },
+  "video_drag": {
+    "message": "Velciet, lai pārvietotu to gar video malu"
+  },
+  "menu_selected": {
+    "message": "Lejupielādēt atlasītās saites ar Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Lejupielādēt visas saites ar Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Savienots ar Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Savienots ar Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Apturēts: lejupielādes paliek pārlūkprogrammā"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager nav instalēts vai tā pārlūkprogrammas integrācija nav iestatīta"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager nepieņem šo paplašinājuma kopiju"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager nesāka darboties laikā"
+  },
+  "status_host_failed": {
+    "message": "Savienojums ar Mister Download Manager neizdevās"
+  },
+  "status_too_large": {
+    "message": "Šīs lejupielādes detaļas bija pārāk lielas, lai tās nodotu"
+  },
+  "status_update_app": {
+    "message": "Atjauniniet Mister Download Manager, lai izmantotu visu, ko piedāvā šis paplašinājums"
+  },
+  "popup_take": {
+    "message": "Pārņemt lejupielādes no šīs pārlūkprogrammas"
+  },
+  "popup_proxy": {
+    "message": "Sūtīt lejupielādes, izmantojot šīs pārlūkprogrammas starpniekservera vai VPN paplašinājumu"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager pēc tam lejupielādē, izmantojot to pašu starpniekserveri, ko izmanto šī pārlūkprogramma. Pārlūkprogramma vienreiz lūgs jums to atļaut; izslēdzot šo opciju, atļauja tiks atsaukta."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager pēc tam lejupielādē, izmantojot to pašu starpniekserveri, ko izmanto šī pārlūkprogramma. Kad šī opcija ir izslēgta, paplašinājums nenolasa pārlūkprogrammas starpniekservera iestatījumus."
+  },
+  "popup_exclude_site": {
+    "message": "Nekad nepārņemt lejupielādes no $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Lejupielādes no $site$ paliek pārlūkprogrammā",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Atvērt Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Opcijas..."
+  },
+  "popup_help": {
+    "message": "Palīdzība"
+  },
+  "popup_support": {
+    "message": "Atbalstīt MDM"
+  },
+  "popup_fix": {
+    "message": "Kā to labot"
+  },
+  "popup_declined": {
+    "message": "Atstāts pārlūkprogrammai: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Pēdējā lejupielāde tika atstāta pārlūkprogrammai."
+  },
+  "declined_file_type": {
+    "message": "Tā tips nav sadaļā Opcijas → Failu tipi."
+  },
+  "declined_site": {
+    "message": "Tā vietne ir sadaļā Opcijas → Failu tipi, vietnes, kas atstātas pārlūkprogrammai."
+  },
+  "declined_address": {
+    "message": "Tā adrese ir sadaļā Opcijas → Failu tipi, adreses, kas atstātas pārlūkprogrammai."
+  },
+  "declined_small": {
+    "message": "Tas ir mazāks par minimālo lielumu sadaļā Opcijas → Failu tipi."
+  },
+  "declined_browser": {
+    "message": "Šī pārlūkprogramma nav atzīmēta sadaļā Opcijas → Vispārīgi."
+  },
+  "declined_integration_off": {
+    "message": "Opcijās → Vispārīgi ir izslēgta opcija Izmantot uzlabotu pārlūkprogrammas integrāciju."
+  },
+  "declined_site_access": {
+    "message": "Paplašinājumam nav atļauts lasīt šo vietni (pārlūkprogrammas vietnes piekļuve)."
+  },
+  "popup_alt": {
+    "message": "Turiet nospiestu Alt un noklikšķiniet uz saites, lai ļautu pārlūkprogrammai to lejupielādēt."
+  },
+  "popup_media": {
+    "message": "Multivide šajā lapā"
+  },
+  "popup_media_none": {
+    "message": "Šajā lapā vēl nav atrasts neviens video vai skaņa. Atskaņojiet to, pēc tam atveriet to vēlreiz."
+  },
+  "popup_media_streamed": {
+    "message": "Šīs lapas atskaņotājs straumē video pa daļām, tāpēc nav faila, ko parādīt sarakstā. Norādiet uz video un izmantojiet tā pogu “Lejupielādēt video”."
+  },
+  "popup_media_store": {
+    "message": "Chrome interneta veikala noteikumi tur šo papildinājuma kopiju tālāk no šīs vietnes video. Sadaļā “Palīdzība” ir teikts, ko varat darīt."
+  },
+  "popup_media_download": {
+    "message": "Lejupielādēt"
+  },
+  "popup_media_protected": {
+    "message": "Aizsargāts"
+  },
+  "popup_media_live": {
+    "message": "Tiešraide"
+  },
+  "video_off": {
+    "message": "Lejupielādes poga šajā vietnē ir izslēgta"
+  },
+  "video_drm": {
+    "message": "Aizsargāts video: to nevar saglabāt"
+  },
+  "video_unnamed": {
+    "message": "Nevar noteikt, kurš video tas ir: atveriet tā lapu un mēģiniet tur"
+  },
+  "video_looking": {
+    "message": "Meklē kvalitātes…"
+  },
+  "video_open_mdm": {
+    "message": "Atvērt programmā Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Šeit nav lejupielādējama video"
+  },
+  "video_playlist": {
+    "message": "Video saraksts: izvēlieties tos programmā Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Programmai Mister Download Manager šim video ir nepieciešams yt-dlp"
+  },
+  "video_too_long": {
+    "message": "Meklēšana ilga pārāk ilgi"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager ir aizņemts ar citiem video"
+  },
+  "video_queued": {
+    "message": "Pievienots rindai"
+  },
+  "video_failed_lookup": {
+    "message": "Meklēšana neizdevās"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Atveriet ierakstu, tad izmantojiet pogu tur"
+  },
+  "popup_send_to": {
+    "message": "Sūtīt lejupielādes uz"
+  },
+  "popup_send_here": {
+    "message": "Šis dators"
+  },
+  "popup_send_remote": {
+    "message": "Cits Mister Download Manager (serveris)"
+  },
+  "popup_remote_code": {
+    "message": "Savienošanas kods"
+  },
+  "popup_remote_open": {
+    "message": "Atvērt"
+  },
+  "popup_remote_pair": {
+    "message": "Savienot"
+  },
+  "popup_remote_help": {
+    "message": "Vienreiz atveriet tā adresi un pieņemiet tā sertifikātu, pēc tam ievadiet kodu no tā Iespējas, Attālināti, Savienot ierīci (vai misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Lejupielādes tiek sūtītas uz $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Ievadiet tā https:// adresi."
+  },
+  "remote_unreachable": {
+    "message": "Nav sasniegts. Vienreiz atveriet tā adresi šajā pārlūkprogrammā un pieņemiet tā sertifikātu, pēc tam mēģiniet vēlreiz."
+  },
+  "remote_wrong_code": {
+    "message": "Nepareizs kods."
+  },
+  "remote_no_code": {
+    "message": "Tas tagad nerāda kodu: vispirms noklikšķiniet tur uz Savienot ierīci."
+  },
+  "remote_too_soon": {
+    "message": "Pagaidiet brīdi, tad mēģiniet vēlreiz."
+  },
+  "remote_failed": {
+    "message": "Tas nedarbojās. Mēģiniet vēlreiz."
+  },
+  "remote_device_name": {
+    "message": "Pārlūkprogrammas paplašinājums"
+  },
+  "popup_media_title_name": {
+    "message": "Pievienot lapas nosaukumu multivides failu nosaukumu priekšā"
+  }
+}

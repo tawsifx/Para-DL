@@ -1,0 +1,2 @@
+﻿Browser logos from https://github.com/alrra/browser-logos (MIT), the logos themselves are trademarks of their owners.
+

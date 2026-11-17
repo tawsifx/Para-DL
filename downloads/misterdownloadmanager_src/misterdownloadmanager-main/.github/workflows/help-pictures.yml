@@ -1,0 +1,38 @@
+# The help pages' pictures (tools/shots/): the shot list, the pages and docs/images/help agree.
+# Every picture in the list is on its page under its heading, with the list's alt text and
+# caption; no file is left over; none is over 300 KB. With them, every picture in docs/images and
+# website/assets/{screens,browser,win} (#186's budget): none over 300 KB, no PNG where lossless
+# WebP belongs, none that nothing shows. Reads files only: no build, no app.
+name: Help pictures
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "website/**"
+      - "tools/shots/**"
+      - ".github/workflows/help-pictures.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "website/**"
+      - "tools/shots/**"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Shot list, pages, files and the pictures' budget
+        run: python tools/shots/make.py check

@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "બ્રાઉઝર પરથી Mister Download Manager પર ડાઉનલોડ્સ આપે છે."
+  },
+  "menu": {
+    "message": "Mister Download Manager વડે ડાઉનલોડ કરો"
+  },
+  "video_download": {
+    "message": "વીડિયો ડાઉનલોડ કરો"
+  },
+  "video_more": {
+    "message": "વધુ વિકલ્પો"
+  },
+  "video_hide_here": {
+    "message": "આ વિડિયો માટે છુપાવો"
+  },
+  "video_never_site": {
+    "message": "$site$ પર ક્યારેય બતાવશો નહીં",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "બટન સેટિંગ્સ..."
+  },
+  "video_sent": {
+    "message": "Mister Download Manager પર મોકલવામાં આવ્યું"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager ઇન્સ્ટોલ કરેલ નથી અથવા શરૂ થયું નથી"
+  },
+  "video_drag": {
+    "message": "વીડિયોની કિનારી પર ખસેડવા માટે ખેંચો"
+  },
+  "menu_selected": {
+    "message": "Mister Download Manager સાથે પસંદ કરેલી લિંક્સ ડાઉનલોડ કરો"
+  },
+  "menu_all": {
+    "message": "Mister Download Manager સાથે બધી લિંક્સ ડાઉનલોડ કરો"
+  },
+  "status_connected": {
+    "message": "Mister Download Manager સાથે કનેક્ટેડ"
+  },
+  "status_connected_version": {
+    "message": "Mister Download Manager $version$ સાથે કનેક્ટેડ",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "થોભાવેલ: ડાઉનલોડ્સ બ્રાઉઝર સાથે રહે છે"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager ઇન્સ્ટોલ કરેલ નથી, અથવા તેનું બ્રાઉઝર ઇન્ટિગ્રેશન સેટ અપ કરેલું નથી"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager એક્સટેન્શનની આ કૉપિ સ્વીકારતું નથી"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager સમયસર શરૂ થયું નથી"
+  },
+  "status_host_failed": {
+    "message": "Mister Download Manager સાથેનું કનેક્શન નિષ્ફળ થયું"
+  },
+  "status_too_large": {
+    "message": "આ ડાઉનલોડની વિગતો સોંપવા માટે ખૂબ મોટી હતી"
+  },
+  "status_update_app": {
+    "message": "આ એક્સ્ટેંશન જે કંઈ આપે છે તેનો ઉપયોગ કરવા માટે Mister Download Manager અપડેટ કરો"
+  },
+  "popup_take": {
+    "message": "આ બ્રાઉઝરમાંથી ડાઉનલોડ્સ લો"
+  },
+  "popup_proxy": {
+    "message": "આ બ્રાઉઝરના પ્રોક્સી અથવા VPN એક્સ્ટેંશન દ્વારા ડાઉનલોડ્સ મોકલો"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager પછી આ બ્રાઉઝર જેવા જ પ્રોક્સી દ્વારા ડાઉનલોડ કરે છે. બ્રાઉઝર તમને એક વાર તેને મંજૂરી આપવા માટે પૂછે છે; આ બંધ કરવાથી તે મંજૂરી પાછી ખેંચાઈ જાય છે."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager પછી આ બ્રાઉઝર જેવા જ પ્રોક્સી દ્વારા ડાઉનલોડ કરે છે. જ્યારે આ બંધ હોય, ત્યારે એક્સ્ટેંશન બ્રાઉઝરના પ્રોક્સીને વાંચતું નથી."
+  },
+  "popup_exclude_site": {
+    "message": "હવેથી $site$ માંથી ડાઉનલોડ્સ ક્યારેય ન લો",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "$site$ માંથી ડાઉનલોડ્સ બ્રાઉઝર સાથે રહે છે",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Manager ખોલો"
+  },
+  "popup_options": {
+    "message": "વિકલ્પો..."
+  },
+  "popup_help": {
+    "message": "મદદ"
+  },
+  "popup_support": {
+    "message": "MDM ને સપોર્ટ કરો"
+  },
+  "popup_fix": {
+    "message": "તેને કેવી રીતે ઠીક કરવું"
+  },
+  "popup_declined": {
+    "message": "બ્રાઉઝર પર છોડ્યું: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "છેલ્લું ડાઉનલોડ બ્રાઉઝર પર છોડી દેવામાં આવ્યું હતું."
+  },
+  "declined_file_type": {
+    "message": "તેનો પ્રકાર વિકલ્પો → ફાઇલ પ્રકારોમાં નથી."
+  },
+  "declined_site": {
+    "message": "તેની સાઇટ વિકલ્પો → ફાઇલ પ્રકારો, બ્રાઉઝર પર છોડેલી સાઇટ્સમાં છે."
+  },
+  "declined_address": {
+    "message": "તેનું સરનામું વિકલ્પો → ફાઇલ પ્રકારો, બ્રાઉઝર પર છોડેલા સરનામાંઓમાં છે."
+  },
+  "declined_small": {
+    "message": "તે વિકલ્પો → ફાઇલ પ્રકારોમાં ન્યૂનતમ કદ કરતાં નાનું છે."
+  },
+  "declined_browser": {
+    "message": "આ બ્રાઉઝર વિકલ્પો → સામાન્યમાં ટિક કરેલું નથી."
+  },
+  "declined_integration_off": {
+    "message": "વિકલ્પો → સામાન્યમાં અદ્યતન બ્રાઉઝર એકીકરણનો ઉપયોગ કરો બંધ છે."
+  },
+  "declined_site_access": {
+    "message": "એક્સ્ટેંશનને આ સાઇટ વાંચવાની મંજૂરી નથી (બ્રાઉઝરની સાઇટ ઍક્સેસ)."
+  },
+  "popup_alt": {
+    "message": "બ્રાઉઝરને ડાઉનલોડ કરવા દેવા માટે લિંક પર ક્લિક કરતી વખતે Alt દબાવી રાખો."
+  },
+  "popup_media": {
+    "message": "આ પૃષ્ઠ પર મીડિયા"
+  },
+  "popup_media_none": {
+    "message": "આ પૃષ્ઠ પર હજી સુધી કોઈ વિડિયો કે ધ્વનિ મળ્યાં નથી. તેને ચલાવો, પછી આ ફરીથી ખોલો."
+  },
+  "popup_media_streamed": {
+    "message": "આ પેજનું પ્લેયર વીડિયોને ટુકડાઓમાં સ્ટ્રીમ કરે છે, તેથી યાદીમાં બતાવવા કોઈ ફાઇલ નથી. વીડિયો પર પોઇન્ટર લઈ જઈ તેનું «વીડિયો ડાઉનલોડ કરો» બટન વાપરો."
+  },
+  "popup_media_store": {
+    "message": "Chrome Web Store ના નિયમો એડ-ઓનની આ નકલને આ સાઇટના વીડિયોથી દૂર રાખે છે. તમે શું કરી શકો તે «મદદ»માં જણાવેલું છે."
+  },
+  "popup_media_download": {
+    "message": "ડાઉનલોડ કરો"
+  },
+  "popup_media_protected": {
+    "message": "સુરક્ષિત"
+  },
+  "popup_media_live": {
+    "message": "લાઇવ"
+  },
+  "video_off": {
+    "message": "આ સાઇટ પર ડાઉનલોડ બટન બંધ છે"
+  },
+  "video_drm": {
+    "message": "સુરક્ષિત વિડિઓ: તેને સાચવી શકાતો નથી"
+  },
+  "video_unnamed": {
+    "message": "આ કયો વીડિયો છે તે જાણી શકાતું નથી: તેનું પોતાનું પેજ ખોલીને ત્યાં પ્રયાસ કરો"
+  },
+  "video_looking": {
+    "message": "ગુણવત્તાઓ શોધી રહ્યા છીએ…"
+  },
+  "video_open_mdm": {
+    "message": "Mister Download Managerમાં ખોલો…"
+  },
+  "video_no_choices": {
+    "message": "અહીં ડાઉનલોડ કરવા માટે કોઈ વીડિયો નથી"
+  },
+  "video_playlist": {
+    "message": "વીડિયોની સૂચિ: તેમને Mister Download Managerમાં પસંદ કરો"
+  },
+  "video_no_ytdlp": {
+    "message": "આ વીડિયો માટે Mister Download Managerને yt-dlp ની જરૂર છે"
+  },
+  "video_too_long": {
+    "message": "શોધવામાં ખૂબ સમય લાગ્યો"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager અન્ય વીડિયોમાં વ્યસ્ત છે"
+  },
+  "video_queued": {
+    "message": "કતારમાં ઉમેર્યું"
+  },
+  "video_failed_lookup": {
+    "message": "શોધી શકાયું નથી"
+  },
+  "video_tab_video": {
+    "message": "વિડિઓ"
+  },
+  "video_tab_audio": {
+    "message": "ઑડિઓ"
+  },
+  "video_open_post": {
+    "message": "પોસ્ટ ખોલો, પછી ત્યાં બટનનો ઉપયોગ કરો"
+  },
+  "popup_send_to": {
+    "message": "ડાઉનલોડ્સ અહીં મોકલો"
+  },
+  "popup_send_here": {
+    "message": "આ કમ્પ્યુટર"
+  },
+  "popup_send_remote": {
+    "message": "બીજું Mister Download Manager (એક સર્વર)"
+  },
+  "popup_remote_code": {
+    "message": "જોડી બનાવવાનો કોડ"
+  },
+  "popup_remote_open": {
+    "message": "તે ખોલો"
+  },
+  "popup_remote_pair": {
+    "message": "જોડી બનાવો"
+  },
+  "popup_remote_help": {
+    "message": "તેનું સરનામું એકવાર ખોલો અને તેનું પ્રમાણપત્ર સ્વીકારો, પછી તેના Options, Remote, Pair a device (અથવા misterdownloadmanager-cli pair) માંથી કોડ દાખલ કરો."
+  },
+  "status_remote": {
+    "message": "ડાઉનલોડ્સ $address$ પર જાય છે",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "તેનું https:// સરનામું દાખલ કરો."
+  },
+  "remote_unreachable": {
+    "message": "પહોંચી શકાયું નથી. આ બ્રાઉઝરમાં તેનું સરનામું એકવાર ખોલો અને તેનું પ્રમાણપત્ર સ્વીકારો, પછી ફરી પ્રયાસ કરો."
+  },
+  "remote_wrong_code": {
+    "message": "ખોટો કોડ."
+  },
+  "remote_no_code": {
+    "message": "તે હવે કોઈ કોડ બતાવતું નથી: પહેલા ત્યાં Pair a device પર ક્લિક કરો."
+  },
+  "remote_too_soon": {
+    "message": "થોડીવાર રાહ જુઓ, પછી ફરી પ્રયાસ કરો."
+  },
+  "remote_failed": {
+    "message": "તે કામ ન કર્યું. ફરી પ્રયાસ કરો."
+  },
+  "remote_device_name": {
+    "message": "બ્રાઉઝર એક્સ્ટેંશન"
+  },
+  "popup_media_title_name": {
+    "message": "મીડિયા ફાઇલોનાં નામો પહેલાં પૃષ્ઠનું શીર્ષક ઉમેરો"
+  }
+}

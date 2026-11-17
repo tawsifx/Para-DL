@@ -1,0 +1,50 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "website/index.html"
+        ],
+        "createdAt": "2026-11-01T21:27:47.899Z",
+        "reason": "Claude's triage 2026-11-01: static scan can't see the rows' own padding; the rendered scan of the built page reports none"
+      },
+      {
+        "rule": "nested-cards",
+        "value": "*",
+        "files": [
+          "website/index.html"
+        ],
+        "createdAt": "2026-11-01T21:27:48.049Z",
+        "reason": "Claude's triage 2026-11-01: static scan only; the rendered page has no card inside a card (sheets hold rows and rules)"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "ui\",system-ui,sans-serif",
+        "createdAt": "2026-11-02T00:26:55.245Z",
+        "reason": "Claude: extension popup follows the app's native Windows controls (Segoe UI/system font, classic-look decision), not the website's DESIGN.md type system"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "website/download.html"
+        ],
+        "createdAt": "2026-11-04T07:09:38.198Z",
+        "reason": "Claude, rendered check: impeccable detect on the served page (http://127.0.0.1:8765/download.html) finds no cramped padding; the static scan misses the inset from .service rows (22px / 18-32px), .sender-sheet and .page-body (24-56px) padding"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "website/idm-alternative.html"
+        ],
+        "createdAt": "2026-11-04T21:48:23.120Z",
+        "reason": "Maintainer approved 2026-11-04 after Claude's triage: the rendered scan of the served page finds no cramped padding; the static scan misses the inset styles.css gives .sheet, .sheet-band, .wrap, .qa and the closing band"
+      }
+    ]
+  }
+}

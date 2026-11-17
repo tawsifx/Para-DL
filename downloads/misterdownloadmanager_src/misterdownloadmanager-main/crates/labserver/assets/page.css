@@ -1,0 +1,5 @@
+/* labserver's test pages (src/pages.rs): a file, so they work under a strict CSP. */
+body { margin: 20px; font: 14px sans-serif; }
+video { display: block; margin: 0 0 20px; background: #000; }
+iframe { display: block; border: 0; }
+form { margin: 0 0 20px; }

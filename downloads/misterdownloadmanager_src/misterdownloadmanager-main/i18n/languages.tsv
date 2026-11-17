@@ -1,0 +1,95 @@
+# The interface languages (D-019): every Windows 11 display language (Microsoft's "Available
+# language packs for Windows": the language packs and the language interface packs), one row each.
+# Read by crates/app/build.rs (picker, flags), tools/i18n/translate.py, tools/installer/build.ps1
+# and tools/readme. The catalog is i18n/<code>.tsv; codes are craft-i18n's (lowercase BCP 47, as
+# few subtags as Windows' tag needs to find it: sr-Latn-RS -> sr-latn, zh-TW -> zh-hant).
+# flag: a lipis/flag-icons code (crates/app/assets/flags/<flag>.svg). inno: Inno Setup's official messages file
+# (compiler:Languages\<inno>.isl), or - when there is none (tools/installer makes one).
+# windows: Windows' own tag for the language (its LCID picks the installer language).
+# code	english	native	flag	inno	windows
+en	English	English	gb	Default	en-US
+af	Afrikaans	Afrikaans	za	-	af-ZA
+am	Amharic	አማርኛ	et	-	am-ET
+ar	Arabic	العربية	sa	Arabic	ar-SA
+as	Assamese	অসমীয়া	in	-	as-IN
+az	Azerbaijani	Azərbaycan	az	-	az-Latn-AZ
+be	Belarusian	Беларуская	by	-	be-BY
+bg	Bulgarian	Български	bg	Bulgarian	bg-BG
+bn	Bangla	বাংলা	bd	-	bn-IN
+bs	Bosnian	Bosanski	ba	-	bs-Latn-BA
+ca	Catalan	Català	es-ct	Catalan	ca-ES
+ca-es-valencia	Valencian	Valencià	es	-	ca-ES-valencia
+chr	Cherokee	ᏣᎳᎩ	us	-	chr-Cher-US
+cs	Czech	Čeština	cz	Czech	cs-CZ
+cy	Welsh	Cymraeg	gb-wls	-	cy-GB
+da	Danish	Dansk	dk	Danish	da-DK
+de	German	Deutsch	de	German	de-DE
+el	Greek	Ελληνικά	gr	-	el-GR
+es	Spanish (Spain)	Español (España)	es	Spanish	es-ES
+es-mx	Spanish (Mexico)	Español (México)	mx	-	es-MX
+et	Estonian	Eesti	ee	-	et-EE
+eu	Basque	Euskara	es-pv	-	eu-ES
+fa	Persian	فارسی	ir	-	fa-IR
+fi	Finnish	Suomi	fi	Finnish	fi-FI
+fil	Filipino	Filipino	ph	-	fil-PH
+fr	French (France)	Français (France)	fr	French	fr-FR
+fr-ca	French (Canada)	Français (Canada)	ca	-	fr-CA
+ga	Irish	Gaeilge	ie	-	ga-IE
+gd	Scottish Gaelic	Gàidhlig	gb-sct	-	gd-GB
+gl	Galician	Galego	es-ga	-	gl-ES
+gu	Gujarati	ગુજરાતી	in	-	gu-IN
+he	Hebrew	עברית	il	Hebrew	he-IL
+hi	Hindi	हिन्दी	in	-	hi-IN
+hr	Croatian	Hrvatski	hr	-	hr-HR
+hu	Hungarian	Magyar	hu	Hungarian	hu-HU
+hy	Armenian	Հայերեն	am	Armenian	hy-AM
+id	Indonesian	Bahasa Indonesia	id	-	id-ID
+is	Icelandic	Íslenska	is	-	is-IS
+it	Italian	Italiano	it	Italian	it-IT
+ja	Japanese	日本語	jp	Japanese	ja-JP
+ka	Georgian	ქართული	ge	-	ka-GE
+kk	Kazakh	Қазақ тілі	kz	-	kk-KZ
+km	Khmer	ខ្មែរ	kh	-	km-KH
+kn	Kannada	ಕನ್ನಡ	in	-	kn-IN
+ko	Korean	한국어	kr	Korean	ko-KR
+kok	Konkani	कोंकणी	in	-	kok-IN
+lb	Luxembourgish	Lëtzebuergesch	lu	-	lb-LU
+lo	Lao	ລາວ	la	-	lo-LA
+lt	Lithuanian	Lietuvių	lt	-	lt-LT
+lv	Latvian	Latviešu	lv	-	lv-LV
+mi	Maori	Māori	nz	-	mi-NZ
+mk	Macedonian	Македонски	mk	-	mk-MK
+ml	Malayalam	മലയാളം	in	-	ml-IN
+mr	Marathi	मराठी	in	-	mr-IN
+ms	Malay	Bahasa Melayu	my	-	ms-MY
+mt	Maltese	Malti	mt	-	mt-MT
+nb	Norwegian Bokmål	Norsk bokmål	no	Norwegian	nb-NO
+ne	Nepali	नेपाली	np	-	ne-NP
+nl	Dutch	Nederlands	nl	Dutch	nl-NL
+nn	Norwegian Nynorsk	Norsk nynorsk	no	-	nn-NO
+or	Odia	ଓଡ଼ିଆ	in	-	or-IN
+pa	Punjabi	ਪੰਜਾਬੀ	in	-	pa-IN
+pl	Polish	Polski	pl	Polish	pl-PL
+pt	Portuguese (Portugal)	Português (Portugal)	pt	Portuguese	pt-PT
+pt-br	Portuguese (Brazil)	Português (Brasil)	br	BrazilianPortuguese	pt-BR
+quz	Quechua	Runasimi	pe	-	quz-PE
+ro	Romanian	Română	ro	-	ro-RO
+ru	Russian	Русский	ru	Russian	ru-RU
+sk	Slovak	Slovenčina	sk	Slovak	sk-SK
+sl	Slovenian	Slovenščina	si	Slovenian	sl-SI
+sq	Albanian	Shqip	al	-	sq-AL
+sr	Serbian (Cyrillic)	Српски (ћирилица)	rs	-	sr-Cyrl-RS
+sr-latn	Serbian (Latin)	Srpski (latinica)	rs	-	sr-Latn-RS
+sv	Swedish	Svenska	se	Swedish	sv-SE
+ta	Tamil	தமிழ்	in	Tamil	ta-IN
+te	Telugu	తెలుగు	in	-	te-IN
+th	Thai	ไทย	th	Thai	th-TH
+tr	Turkish	Türkçe	tr	Turkish	tr-TR
+tt	Tatar	Татар	ru	-	tt-RU
+ug	Uyghur	ئۇيغۇرچە	cn	-	ug-CN
+uk	Ukrainian	Українська	ua	Ukrainian	uk-UA
+ur	Urdu	اردو	pk	-	ur-PK
+uz	Uzbek	Oʻzbek	uz	-	uz-Latn-UZ
+vi	Vietnamese	Tiếng Việt	vn	-	vi-VN
+zh-hans	Chinese (Simplified)	简体中文	cn	-	zh-CN
+zh-hant	Chinese (Traditional)	繁體中文	tw	-	zh-TW

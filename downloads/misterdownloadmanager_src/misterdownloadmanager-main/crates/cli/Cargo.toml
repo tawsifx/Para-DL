@@ -1,0 +1,47 @@
+[package]
+name = "mdm-cli"
+description = "Mister Download Manager, headless command line (in the app's program) and its launcher"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+# The commands, which the app's program runs (mdm-app depends on this library).
+[lib]
+path = "src/lib.rs"
+
+# The launcher: starts the app's program for them (std only, but for Ctrl+C on Windows).
+[[bin]]
+name = "misterdownloadmanager-cli"
+path = "src/main.rs"
+
+[dependencies]
+mdm-ipc.workspace = true
+mdm-tools.workspace = true
+mdm-torrent.workspace = true
+tempfile.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+mdm-engine.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+# The engine's Unlocker takes a CancellationToken (a fake one in the tests, #44).
+tokio-util.workspace = true
+
+# The launcher outlives Ctrl+C (main.rs), which the program it waits for answers.
+[target.'cfg(windows)'.dependencies]
+ctrlc = "3.5"
+
+# Its own main: the test's program also stands in for the app's (tests/launcher.rs).
+[[test]]
+name = "launcher"
+harness = false
+
+[lints]
+workspace = true

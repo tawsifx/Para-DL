@@ -1,0 +1,73 @@
+The Adwaita theme's icon set (#45).
+
+adwaita-icon-theme 51.0, the GNOME Project (AUTHORS, beside this file).
+https://gitlab.gnome.org/GNOME/adwaita-icon-theme, commit 70ecd52fbe844304ed4f845a04a1757fa6284884.
+Licence: GNU LGPL v3 or CC BY-SA 3.0 US, the recipient's choice (COPYING); MDM takes the LGPL v3
+(LICENSE, beside this file; the GNU GPL v3 it builds on is MDM's own LICENSE, at the top of the
+repository).
+
+Each file is one of the theme's icons, unchanged, renamed to the need MDM uses it for
+(crates/app/src/themeicons.rs lists them):
+- 16/<need>.png: Adwaita/16x16/<context>/<icon>.png, a colour picture.
+- 24/<need>.svg: Adwaita/scalable/<context>/<icon>.svg, a colour drawing (drawn at 24 pixels
+  and up).
+- 16/ and 24/<need>-symbolic.svg: Adwaita/symbolic/<context>/<icon>-symbolic.svg, a one-colour
+  icon; MDM draws its greys in the theme's text colour as it reads it, as GNOME does.
+
+Which icon each need is (and the stand-ins, where Adwaita has no icon of that meaning):
+  tb-add-url: list-add-symbolic
+  tb-add-torrent: insert-link-symbolic (stand-in)
+  tb-resume: media-playback-start-symbolic
+  tb-stop: media-playback-stop-symbolic
+  tb-stop-all: process-stop-symbolic (stand-in)
+  tb-delete: edit-delete-symbolic
+  tb-delete-completed: edit-clear-all-symbolic (stand-in)
+  tb-options: preferences-system-symbolic
+  tb-scheduler: alarm-symbolic
+  tb-start-queue: media-seek-forward-symbolic (stand-in)
+  tb-stop-queue: media-playback-stop-symbolic (stand-in)
+  cat-all: folder
+  cat-compressed: package-x-generic
+  cat-documents: x-office-document
+  cat-music: audio-x-generic
+  cat-programs: application-x-executable
+  cat-video: video-x-generic
+  cat-torrents: folder-remote (stand-in)
+  cat-unfinished: folder-download
+  cat-finished: folder (stand-in)
+  cat-queues: view-list-symbolic (stand-in)
+  cat-folder: folder
+  cat-folder-open: folder-open-symbolic
+  st-complete: object-select-symbolic
+  st-error: dialog-error-symbolic
+  st-paused: media-playback-pause-symbolic
+  st-downloading: go-down-symbolic
+  st-queued: appointment-soon-symbolic
+  st-seeding: go-up-symbolic
+  ft-generic: application-x-generic
+  ft-archive: package-x-generic
+  ft-audio: audio-x-generic
+  ft-video: video-x-generic
+  ft-image: image-x-generic
+  ft-document: x-office-document
+  ft-spreadsheet: x-office-spreadsheet
+  ft-presentation: x-office-presentation
+  ft-executable: application-x-executable
+  ft-code: text-x-script
+  ft-text: text-x-generic
+  ft-disk-image: media-optical, media-optical-symbolic (stand-in)
+  ft-font: font-x-generic
+  ui-minimize: window-minimize-symbolic
+  ui-maximize: window-maximize-symbolic
+  ui-restore: window-restore-symbolic
+  ui-close: window-close-symbolic
+  misc-emblem-ok: object-select-symbolic
+  misc-up: go-up-symbolic
+  misc-down: go-down-symbolic
+  misc-remove: list-remove-symbolic
+
+MDM's own, drawn for MDM in Adwaita's style and colours (GPL-3.0-or-later, as MDM), where
+Adwaita has no icon of that meaning, at 16, 24, 32 and 48 pixels: ft-pdf (a page with a "PDF"
+label) and ft-torrent (a page with a magnet), colour pictures (<need>.png), and ui-to-tray (a
+window going down to the notification area), a one-colour picture (ui-to-tray-symbolic.png)
+drawn in the theme's text colour. Any can be swapped for another file of the same name.

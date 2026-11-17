@@ -1,0 +1,390 @@
+# Builds the downloads: Windows (tools/installer/build.ps1: installer, portable zip, plain zip),
+# the browser extensions (tools/extension/pack.ps1: Chromium zip, Firefox .xpi),
+# Linux (build-linux.sh: AppImage, tar.gz, .deb, .rpm) and, experimental and not yet tested by
+# us, macOS (build-macos.sh: a .dmg for Apple Silicon, one for Intel; named "-experimental").
+# - A pushed tag vX.Y.Z (matching Cargo.toml's version) publishes a GitHub release with them and
+#   SHA256SUMS.txt, its notes from CHANGELOG.md (Help -> Check for updates sees it at once). The
+#   release waits for Windows and the extensions: a failed Linux or macOS build leaves those out.
+# - Run by hand (Actions -> Release -> Run workflow) it only builds and keeps them as artifacts:
+#   nothing is published, and nothing is sent to addons.mozilla.org or the Chrome Web Store.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Read-only for every job; a job that needs more says so in its own block (publish).
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  geo:
+    # Where a download's server is (#140): this month's IP-to-country table (DB-IP's IP to Country
+    # Lite, CC BY 4.0) for every build. A failed download keeps the committed one, with a warning.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: IP-to-country table
+        run: python3 tools/geo/build.py --release
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: geo-data
+          path: crates/geo/data/*
+          retention-days: 7
+
+  windows:
+    needs: geo
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: geo-data
+          path: crates/geo/data
+
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-cargo-
+
+      - name: Tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $v = [regex]::Match((Get-Content Cargo.toml -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "tag ${{ github.ref_name }} but Cargo.toml says $v" }
+
+      # BoringSSL, under the browser-like connection (#668, crates/engine/src/browserlike.rs), is
+      # built with NASM on Windows; the runner has CMake and LLVM's libclang already.
+      - name: NASM
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nasm --version 2.16.3 --no-progress -y
+          "C:\Program Files\NASM" >> $env:GITHUB_PATH
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Code-signing certificate
+        id: cert
+        shell: pwsh
+        env:
+          PFX: ${{ secrets.CODESIGN_PFX_BASE64 }}
+          PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
+        run: |
+          if (-not $env:PFX) { "No certificate: building unsigned."; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          "command=`"$($signtool.FullName)`" sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /f `"$pfx`" /p `"$env:PASSWORD`" `$f" >> $env:GITHUB_OUTPUT
+
+      - name: Installer and portable zip
+        shell: pwsh
+        env:
+          MDM_SIGN_COMMAND: ${{ steps.cert.outputs.command }}
+        run: ./tools/installer/build.ps1
+
+      # Crash reports: the release's symbols (dump_syms reads each program's .pdb beside it; no
+      # download includes the .pdb files themselves).
+      - name: Symbols
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }} # downloads the build's helpers signed in (fetch_release.py)
+        run: |
+          $v = [regex]::Match((Get-Content Cargo.toml -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          $exes = "misterdownloadmanager", "misterdownloadmanager-nmhost", "misterdownloadmanager-cli", "misterdownloadmanager-mcp" |
+            ForEach-Object { "target/release/$_.exe" }
+          python tools/installer/symbols.py windows-x64 $v target/dist @exes
+          if ($LASTEXITCODE) { throw "symbols failed" }
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows
+          path: target/dist/*
+
+  extension:
+    # Every browser's extension as its own download: Chrome, Edge, Brave, Opera and Vivaldi
+    # (unzip, then load the folder unpacked) and Firefox (.xpi).
+    runs-on: ubuntu-latest
+    # The store steps below run only for a pushed tag, and only when their key is there: a run by
+    # hand never sends anything to a store. Each key is in the environment of its own step only.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Which store keys are set
+        id: keys
+        env:
+          AMO: ${{ secrets.AMO_JWT_ISSUER }}
+          CWS: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          echo "amo=$([ -n "$AMO" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "cws=$([ -n "$CWS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Tests
+        run: node tools/extension/test.mjs
+
+      - name: Chromium zip, Firefox .xpi and the Chrome Web Store's zip
+        shell: pwsh
+        run: |
+          ./tools/extension/pack.ps1
+          node tools/extension/check-pack.mjs
+          $v = [regex]::Match((Get-Content Cargo.toml -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          New-Item -ItemType Directory -Force target/dist | Out-Null
+          Copy-Item target/extension/mdm-chromium.zip "target/dist/MisterDownloadManager-$v-extension-chromium.zip"
+          Copy-Item target/extension/mdm-firefox.xpi "target/dist/MisterDownloadManager-$v-extension-firefox.xpi"
+          # For the Chrome Web Store (the next step, or its dashboard by hand): kept with the
+          # build, not the release.
+          New-Item -ItemType Directory -Force target/store | Out-Null
+          Copy-Item target/extension/mdm-chrome-store.zip "target/store/MisterDownloadManager-$v-chrome-web-store.zip"
+
+      # The stores' tools, at the exact versions and hashes of tools/release/package-lock.json.
+      - name: Store tools
+        if: ${{ startsWith(github.ref, 'refs/tags/') && (steps.keys.outputs.amo == 'true' || steps.keys.outputs.cws == 'true') }}
+        working-directory: tools/release
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # The Firefox add-on is listed on addons.mozilla.org: each release's version is sent there
+      # for review (not waited for); Firefox installs and updates it from its listing. The .xpi
+      # in the release stays the unsigned one (for about:debugging).
+      - name: Send the Firefox add-on to addons.mozilla.org
+        if: ${{ startsWith(github.ref, 'refs/tags/') && steps.keys.outputs.amo == 'true' }}
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        shell: pwsh
+        run: |
+          $log = & ./tools/release/node_modules/.bin/web-ext sign --source-dir target/extension/firefox --artifacts-dir target/signed `
+            --channel listed --approval-timeout 0 --api-key $env:AMO_JWT_ISSUER --api-secret $env:AMO_JWT_SECRET 2>&1
+          $log | Write-Output
+          if ($LASTEXITCODE -ne 0) {
+            # A re-run: Mozilla refuses a version it has already. Anything else fails here.
+            if (($log -join "`n") -match "already exists") {
+              Write-Output "::warning::This version is on addons.mozilla.org already."
+              exit 0
+            }
+            exit 1
+          }
+
+      # The extension is listed in the Chrome Web Store (ejoleppdfgjdndddcjoehopknmlglojp,
+      # crates/ipc STORE_ID): each release's zip is uploaded and sent for review (not waited for);
+      # Chrome, Edge, Brave, Opera and Vivaldi update from the listing. A store refusal (a version
+      # it has already) never fails the release.
+      - name: Send the extension to the Chrome Web Store
+        if: ${{ startsWith(github.ref, 'refs/tags/') && steps.keys.outputs.cws == 'true' }}
+        continue-on-error: true
+        env:
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          EXTENSION_ID: ejoleppdfgjdndddcjoehopknmlglojp
+        run: ./tools/release/node_modules/.bin/chrome-webstore-upload --source target/extension/mdm-chrome-store.zip
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chrome-web-store
+          path: target/store/*
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: extension
+          path: target/dist/*
+
+  linux:
+    # The oldest supported Ubuntu: the programs run on its glibc (2.35) and newer.
+    needs: geo
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: geo-data
+          path: crates/geo/data
+
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-cargo-
+
+      - name: Libraries and packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev rpm python3-pil zsync \
+            cmake libclang-dev
+
+      - name: AppImage, tar.gz, .deb, .rpm
+        env:
+          GH_TOKEN: ${{ github.token }} # downloads the build's helpers signed in (fetch_release.py)
+        run: bash tools/installer/build-linux.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux
+          path: target/dist/*
+
+  macos:
+    needs: geo
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: geo-data
+          path: crates/geo/data
+
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-cargo-
+
+      - name: Apple Silicon and Intel .dmg
+        env:
+          GH_TOKEN: ${{ github.token }} # downloads the build's helpers signed in (fetch_release.py)
+        run: bash tools/installer/build-macos.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos
+          path: target/dist/*
+
+  publish:
+    permissions:
+      contents: write # the release
+      actions: write # rebuilding the website
+      issues: read # the release notes' Thanks to (tools/contributors.py)
+      pull-requests: read
+    if: >-
+      always() && startsWith(github.ref, 'refs/tags/') && needs.windows.result == 'success' &&
+      needs.extension.result == 'success'
+    needs: [windows, extension, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MDM_RELEASE_KEY: ${{ secrets.MDM_RELEASE_KEY }}
+        shell: pwsh
+        run: |
+          # One SHA256SUMS.txt for every file (each build wrote its own).
+          Remove-Item dist/SHA256SUMS*.txt -ErrorAction SilentlyContinue
+          $files = Get-ChildItem dist -File | Sort-Object Name
+          $sums = $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          Set-Content -Encoding ascii dist/SHA256SUMS.txt $sums
+          # Signed with MDM's release key (fingerprint 5826D399249DE856EA087D802E293C28E8A69D74):
+          # MDM updates itself only from a list it signed
+          # (crates/tools/src/update.rs; the public key is crates/tools/keys/mdm-release.asc).
+          if ($env:MDM_RELEASE_KEY) {
+            $key = Join-Path $env:RUNNER_TEMP "mdm-release.asc"
+            Set-Content -Encoding ascii $key $env:MDM_RELEASE_KEY
+            gpg --batch --quiet --import $key
+            Remove-Item $key
+            gpg --batch --yes --detach-sign --local-user 5826D399249DE856EA087D802E293C28E8A69D74 `
+              --output dist/SHA256SUMS.txt.sig dist/SHA256SUMS.txt
+            if ($LASTEXITCODE) { throw "signing SHA256SUMS.txt failed" }
+            gpg --batch --verify dist/SHA256SUMS.txt.sig dist/SHA256SUMS.txt
+            if ($LASTEXITCODE) { throw "the signature of SHA256SUMS.txt doesn't verify" }
+          } else {
+            Write-Warning "MDM_RELEASE_KEY isn't set: this release is unsigned, and MDM won't update to it by itself."
+          }
+          # Notes: the version's section of CHANGELOG.md ("## [X.Y.Z]" up to the next "## "),
+          # else GitHub's list of changes since the last tag; first, the invitation to try the
+          # macOS builds when they are there (Linux's files are no longer "-experimental").
+          $v = "${{ github.ref_name }}".TrimStart("v")
+          $log = Get-Content CHANGELOG.md -Raw -ErrorAction SilentlyContinue
+          $m = [regex]::Match("$log", "(?ms)^## \[$([regex]::Escape($v))\][^\n]*\n(.*?)(?=^## |\z)")
+          $title = "Mister Download Manager ${{ github.ref_name }}"
+          $invite = ""
+          if ($files.Name -like "*-experimental*") {
+            $invite = "**On a Mac?** The ``-experimental`` files are fresh builds for Mac " +
+              "(Apple Silicon and Intel) that we haven't tried ourselves yet. Want to be among " +
+              "the first? Give them a go and tell us how it went in an " +
+              "[issue](https://github.com/${{ github.repository }}/issues).`n`n"
+          }
+          # Last, "Thanks to": everyone who opened a pull request or an issue, or commented, on
+          # GitHub since the previous release (by version) was published, with their avatars and
+          # @-mentions (tools/contributors.py thanks; the maintainer, Claude and bots aren't
+          # counted). Nobody, or GitHub not answering, leaves it out; it never stops the release.
+          $thanks = ""
+          try {
+            $thanks = (python3 tools/contributors.py thanks "${{ github.ref_name }}" | Out-String).Trim()
+          } catch {
+            Write-Warning "The contributors couldn't be listed: $_"
+          }
+          if ($thanks) { $thanks = "`n`n" + $thanks }
+          $all = (Get-ChildItem dist -File).FullName
+          if ($m.Success -and $m.Groups[1].Value.Trim()) {
+            # Links into the repository (docs/x.md) would resolve against the release's page:
+            # point them at the tagged files.
+            $notes = $m.Groups[1].Value.Trim() -replace '\]\((?![a-z]+:|#)([^)\s]+)\)', '](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/$1)'
+            Set-Content -Encoding utf8 notes.md ($invite + $notes + $thanks)
+            gh release create "${{ github.ref_name }}" --latest --title $title --notes-file notes.md $all
+          } else {
+            Set-Content -Encoding utf8 notes.md ($invite + $thanks.Trim())
+            gh release create "${{ github.ref_name }}" --latest --title $title --notes-file notes.md --generate-notes $all
+          }
+          # The website links to the latest published release: rebuild it now that the files are
+          # there (a release made with this token starts no workflow by itself).
+          gh workflow run pages.yml --ref main

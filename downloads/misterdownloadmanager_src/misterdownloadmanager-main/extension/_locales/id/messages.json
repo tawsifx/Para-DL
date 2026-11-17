@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Menyerahkan unduhan dari browser ke Mister Download Manager."
+  },
+  "menu": {
+    "message": "Unduh dengan Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Unduh video"
+  },
+  "video_more": {
+    "message": "Opsi lainnya"
+  },
+  "video_hide_here": {
+    "message": "Sembunyikan di video ini"
+  },
+  "video_never_site": {
+    "message": "Jangan pernah di $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Pengaturan tombol..."
+  },
+  "video_sent": {
+    "message": "Dikirim ke Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager tidak terinstal atau tidak dimulai"
+  },
+  "video_drag": {
+    "message": "Seret untuk memindahkannya di sepanjang tepi video"
+  },
+  "menu_selected": {
+    "message": "Unduh tautan yang dipilih dengan Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Unduh semua tautan dengan Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Terhubung ke Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Terhubung ke Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Dijeda: unduhan tetap di browser"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager tidak terinstal, atau integrasi browsernya tidak diatur"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager tidak menerima salinan ekstensi ini"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager tidak dimulai tepat waktu"
+  },
+  "status_host_failed": {
+    "message": "Koneksi ke Mister Download Manager gagal"
+  },
+  "status_too_large": {
+    "message": "Detail unduhan ini terlalu besar untuk diserahkan"
+  },
+  "status_update_app": {
+    "message": "Perbarui Mister Download Manager untuk menggunakan semua yang ditawarkan ekstensi ini"
+  },
+  "popup_take": {
+    "message": "Ambil unduhan dari browser ini"
+  },
+  "popup_proxy": {
+    "message": "Kirim unduhan melalui proxy atau ekstensi VPN browser ini"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager kemudian mengunduh melalui proxy yang sama dengan browser ini. Browser meminta Anda sekali untuk mengizinkannya; mematikan ini akan membatalkannya."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager kemudian mengunduh melalui proxy yang sama dengan browser ini. Saat opsi ini nonaktif, ekstensi tidak membaca proxy browser."
+  },
+  "popup_exclude_site": {
+    "message": "Jangan pernah mengambil unduhan dari $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Unduhan dari $site$ tetap di browser",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Buka Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Opsi..."
+  },
+  "popup_help": {
+    "message": "Bantuan"
+  },
+  "popup_support": {
+    "message": "Dukung MDM"
+  },
+  "popup_fix": {
+    "message": "Cara memperbaikinya"
+  },
+  "popup_declined": {
+    "message": "Diserahkan ke browser: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Unduhan terakhir diserahkan ke browser."
+  },
+  "declined_file_type": {
+    "message": "Jenisnya tidak ada di Opsi → Jenis file."
+  },
+  "declined_site": {
+    "message": "Situsnya ada di Opsi → Jenis file, situs yang diserahkan ke browser."
+  },
+  "declined_address": {
+    "message": "Alamatnya ada di Opsi → Jenis file, alamat yang diserahkan ke browser."
+  },
+  "declined_small": {
+    "message": "Ukurannya lebih kecil dari ukuran minimum di Opsi → Jenis file."
+  },
+  "declined_browser": {
+    "message": "Browser ini tidak dicentang di Opsi → Umum."
+  },
+  "declined_integration_off": {
+    "message": "Integrasi browser lanjutan tidak aktif di Opsi → Umum."
+  },
+  "declined_site_access": {
+    "message": "Ekstensi tidak diizinkan untuk membaca situs ini (akses situs browser)."
+  },
+  "popup_alt": {
+    "message": "Tahan Alt saat mengeklik tautan agar browser mengunduhnya."
+  },
+  "popup_media": {
+    "message": "Media di halaman ini"
+  },
+  "popup_media_none": {
+    "message": "Belum ada video atau suara yang ditemukan di halaman ini. Putar media, lalu buka ini lagi."
+  },
+  "popup_media_streamed": {
+    "message": "Pemutar di halaman ini mengalirkan videonya per potongan, jadi tidak ada berkas untuk dicantumkan. Arahkan ke video lalu gunakan tombol Unduh video-nya."
+  },
+  "popup_media_store": {
+    "message": "Aturan Chrome Web Store menjauhkan salinan add-on ini dari video di situs ini. Bantuan menjelaskan apa yang bisa Anda lakukan."
+  },
+  "popup_media_download": {
+    "message": "Unduh"
+  },
+  "popup_media_protected": {
+    "message": "Terlindungi"
+  },
+  "popup_media_live": {
+    "message": "Langsung"
+  },
+  "video_off": {
+    "message": "Tombol unduh nonaktif di situs ini"
+  },
+  "video_drm": {
+    "message": "Video dilindungi: tidak dapat disimpan"
+  },
+  "video_unnamed": {
+    "message": "Tidak bisa diketahui video mana ini: buka halamannya sendiri dan coba di sana"
+  },
+  "video_looking": {
+    "message": "Mencari kualitas…"
+  },
+  "video_open_mdm": {
+    "message": "Buka di Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Tidak ada video untuk diunduh di sini"
+  },
+  "video_playlist": {
+    "message": "Daftar video: pilih di Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager memerlukan yt-dlp untuk video ini"
+  },
+  "video_too_long": {
+    "message": "Pencarian memakan waktu terlalu lama"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager sedang sibuk dengan video lain"
+  },
+  "video_queued": {
+    "message": "Ditambahkan ke antrean"
+  },
+  "video_failed_lookup": {
+    "message": "Gagal mencarinya"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Buka postingan, lalu gunakan tombol di sana"
+  },
+  "popup_send_to": {
+    "message": "Kirim unduhan ke"
+  },
+  "popup_send_here": {
+    "message": "Komputer ini"
+  },
+  "popup_send_remote": {
+    "message": "Mister Download Manager lain (server)"
+  },
+  "popup_remote_code": {
+    "message": "Kode pemasangan"
+  },
+  "popup_remote_open": {
+    "message": "Buka"
+  },
+  "popup_remote_pair": {
+    "message": "Pasangkan"
+  },
+  "popup_remote_help": {
+    "message": "Buka alamatnya sekali dan terima sertifikatnya, lalu masukkan kode dari Opsi, Jarak Jauh, Pasangkan perangkat (atau misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Unduhan masuk ke $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Masukkan alamat https://-nya."
+  },
+  "remote_unreachable": {
+    "message": "Tidak terjangkau. Buka alamatnya sekali di browser ini dan terima sertifikatnya, lalu coba lagi."
+  },
+  "remote_wrong_code": {
+    "message": "Kode salah."
+  },
+  "remote_no_code": {
+    "message": "Tidak ada kode sekarang: klik Pasangkan perangkat di sana terlebih dahulu."
+  },
+  "remote_too_soon": {
+    "message": "Tunggu sebentar, lalu coba lagi."
+  },
+  "remote_failed": {
+    "message": "Gagal. Coba lagi."
+  },
+  "remote_device_name": {
+    "message": "Ekstensi browser"
+  },
+  "popup_media_title_name": {
+    "message": "Tambahkan judul halaman di depan nama file media"
+  }
+}

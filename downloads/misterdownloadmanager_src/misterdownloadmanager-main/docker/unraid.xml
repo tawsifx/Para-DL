@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!-- Mister Download Manager for Unraid (#157): docs/server.md. Copy to
+     /boot/config/plugins/dockerMan/templates-user/my-misterdownloadmanager.xml, then Docker →
+     Add Container → misterdownloadmanager. The image is built from MDM's source first. -->
+<Container version="2">
+  <Name>misterdownloadmanager</Name>
+  <Repository>misterdownloadmanager</Repository>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/anefzaoui/misterdownloadmanager/issues</Support>
+  <Project>https://github.com/anefzaoui/misterdownloadmanager</Project>
+  <Overview>Mister Download Manager without a window: add links, magnets and torrents from your phone or browser, and the server downloads them into a share. Pair a phone with the code in the container's log.</Overview>
+  <Category>Downloaders:</Category>
+  <WebUI>https://[IP]:[PORT:8463]/</WebUI>
+  <ExtraParams>--user 99:100</ExtraParams>
+  <Config Name="Remote control" Target="8463" Default="8463" Mode="tcp" Description="The page phones and browsers use (HTTPS)." Type="Port" Display="always" Required="true" Mask="false">8463</Config>
+  <Config Name="Settings" Target="/config" Default="/mnt/user/appdata/misterdownloadmanager" Mode="rw" Description="The list, settings, certificate and paired devices." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/misterdownloadmanager</Config>
+  <Config Name="Downloads" Target="/downloads" Default="/mnt/user/downloads" Mode="rw" Description="Where downloads land (a folder per category inside)." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/downloads</Config>
+  <Config Name="Page address" Target="MDM_REMOTE_URL" Default="" Mode="" Description="The address you open the page with, such as https://192.168.1.10:8463/ (shown with the pairing code)." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Server names" Target="MDM_REMOTE_HOSTS" Default="tower.local" Mode="" Description="Names besides the address the page may be opened by, separated by commas." Type="Variable" Display="advanced" Required="false" Mask="false">tower.local</Config>
+</Container>

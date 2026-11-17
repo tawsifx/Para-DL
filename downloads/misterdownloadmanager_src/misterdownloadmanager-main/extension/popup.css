@@ -1,0 +1,97 @@
+/* The toolbar button's popup: the app's look (Windows 11 controls, one blue), day and dark. */
+:root {
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #5f5f5f;
+  --edge: #d6d6d6;
+  --field: #f5f5f5;
+  --accent: #0078d4;
+  --accent-text: #ffffff;
+  --ok: #0f7b0f;
+  --bad: #c42b1c;
+  --warn: #9d5d00;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #202020;
+    --text: #f3f3f3;
+    --muted: #b5b5b5;
+    --edge: #3d3d3d;
+    --field: #2b2b2b;
+    --accent: #4cc2ff;
+    --accent-text: #000000;
+    --ok: #6ccb5f;
+    --bad: #ff99a4;
+    --warn: #fce100;
+  }
+}
+* { box-sizing: border-box; }
+/* The hidden attribute wins over a class's display ("How to fix it" showed while connected). */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  width: 300px;
+  padding: 12px 14px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+}
+header { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 10px; }
+.status { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; background: var(--field); border: 1px solid var(--edge); border-radius: 4px; }
+.dot { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--muted); }
+.status.ok .dot { background: var(--ok); }
+.status.bad .dot { background: var(--bad); }
+.status.warn .dot { background: var(--warn); }
+.link { display: inline-block; margin: 6px 0 0; color: var(--accent); text-decoration: none; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.switch { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; cursor: pointer; }
+.switch input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--field);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+button:hover { filter: brightness(0.96); }
+button:focus-visible, input:focus-visible, .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.accent { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.row { width: 100%; text-align: start; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Each button as wide as its text; when both don't fit on one line (a wider font, a longer
+   language), Options goes below Open and each takes the whole line, so neither is cut. */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.actions button { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note { color: var(--muted); margin: 10px 0 0; font-size: 12px; }
+/* The last download left to the browser, and why (#208): its name on one line, the rule below. */
+.declined { margin: 10px 0 0; font-size: 12px; }
+.declined span { display: block; }
+#declined-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#declined-why { color: var(--muted); }
+footer { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; border-top: 1px solid var(--edge); padding-top: 6px; color: var(--muted); font-size: 12px; }
+/* Help and Support MDM side by side on the footer's one line: the popup keeps its height. */
+.footer-links { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+/* The media the tab loaded (#38): one row each, its type, name, what is known, and Download. */
+.media { margin-top: 12px; border-top: 1px solid var(--edge); padding-top: 8px; }
+.media h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.media ul { list-style: none; margin: 0; padding: 0; max-height: 228px; overflow-y: auto; }
+.media li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--edge); }
+.media li:last-child { border-bottom: 0; }
+.tag { flex: none; min-width: 38px; padding: 1px 4px; border: 1px solid var(--edge); border-radius: 3px; background: var(--field); font-size: 10px; font-weight: 600; text-align: center; letter-spacing: .02em; }
+.what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.what .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.what .meta { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media li button { flex: none; padding: 3px 10px; }
+.media li button:disabled { cursor: default; color: var(--muted); filter: none; }
+.drm { flex: none; color: var(--bad); font-size: 11px; font-weight: 600; }
+.media .note { margin-top: 6px; }
+.media .note.bad { color: var(--bad); }
+/* Send downloads to (#157): this computer, or another MDM with its address and a pairing code. */
+.send { margin-top: 12px; border-top: 1px solid var(--edge); padding-top: 8px; }
+.send h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.choice { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+#remote-form input[type="url"], #remote-form input[inputmode] { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 4px 6px; border: 1px solid var(--edge); border-radius: 4px; background: var(--field); color: inherit; font: inherit; }
+#remote-form .actions { margin-top: 8px; }
+.note.bad { color: var(--bad); }

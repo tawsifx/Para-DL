@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "ブラウザーから Mister Download Manager にダウンロードを渡します。"
+  },
+  "menu": {
+    "message": "Mister Download Manager でダウンロード"
+  },
+  "video_download": {
+    "message": "動画をダウンロード"
+  },
+  "video_more": {
+    "message": "その他のオプション"
+  },
+  "video_hide_here": {
+    "message": "この動画では非表示"
+  },
+  "video_never_site": {
+    "message": "$site$ では常に非表示",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "ボタンの設定..."
+  },
+  "video_sent": {
+    "message": "Mister Download Manager に送信済み"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager がインストールされていないか、起動していません"
+  },
+  "video_drag": {
+    "message": "ドラッグして動画の端に沿って移動"
+  },
+  "menu_selected": {
+    "message": "Mister Download Manager で選択したリンクをダウンロード"
+  },
+  "menu_all": {
+    "message": "Mister Download Manager で全リンクをダウンロード"
+  },
+  "status_connected": {
+    "message": "Mister Download Manager に接続済み"
+  },
+  "status_connected_version": {
+    "message": "Mister Download Manager $version$ に接続済み",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "一時停止: ダウンロードはブラウザーに残ります"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager がインストールされていないか、ブラウザー統合が設定されていません"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager はこの拡張機能のコピーを受け入れません"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager が時間内に起動しませんでした"
+  },
+  "status_host_failed": {
+    "message": "Mister Download Manager への接続に失敗しました"
+  },
+  "status_too_large": {
+    "message": "このダウンロードの詳細は大きすぎて引き渡せませんでした"
+  },
+  "status_update_app": {
+    "message": "この拡張機能のすべての機能を使用するには、Mister Download Manager を更新してください"
+  },
+  "popup_take": {
+    "message": "このブラウザーからのダウンロードを取得する"
+  },
+  "popup_proxy": {
+    "message": "このブラウザーのプロキシまたは VPN 拡張機能経由でダウンロードを送信する"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager は、このブラウザーと同じプロキシ経由でダウンロードします。ブラウザーは一度だけ許可を求めます。これをオフにすると、その許可は取り消されます。"
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager は、このブラウザーと同じプロキシ経由でダウンロードします。これがオフの場合、拡張機能はブラウザーのプロキシを読み取りません。"
+  },
+  "popup_exclude_site": {
+    "message": "$site$ からのダウンロードは今後取得しない",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "$site$ からのダウンロードはブラウザーに残ります",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Manager を開く"
+  },
+  "popup_options": {
+    "message": "オプション..."
+  },
+  "popup_help": {
+    "message": "ヘルプ"
+  },
+  "popup_support": {
+    "message": "MDM をサポート"
+  },
+  "popup_fix": {
+    "message": "修正方法"
+  },
+  "popup_declined": {
+    "message": "ブラウザーに残されました: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "前回のダウンロードはブラウザーに残されました。"
+  },
+  "declined_file_type": {
+    "message": "その種類は、オプション → ファイルの種類にありません。"
+  },
+  "declined_site": {
+    "message": "そのサイトは、オプション → ファイルの種類にある、ブラウザーに残すサイトのリストに含まれています。"
+  },
+  "declined_address": {
+    "message": "そのアドレスは、オプション → ファイルの種類にある、ブラウザーに残すアドレスのリストに含まれています。"
+  },
+  "declined_small": {
+    "message": "オプション → ファイルの種類で、最小サイズより小さいです。"
+  },
+  "declined_browser": {
+    "message": "このブラウザーは、オプション → 全般でチェックされていません。"
+  },
+  "declined_integration_off": {
+    "message": "オプション → 全般で「高度なブラウザー統合を使用する」がオフになっています。"
+  },
+  "declined_site_access": {
+    "message": "このサイトの読み取りは拡張機能に許可されていません (ブラウザーのサイト アクセス)。"
+  },
+  "popup_alt": {
+    "message": "リンクをクリックするときに Alt キーを押したままにすると、ブラウザーでダウンロードされます。"
+  },
+  "popup_media": {
+    "message": "このページのメディア"
+  },
+  "popup_media_none": {
+    "message": "このページでは、まだ動画や音声が見つかりません。再生してから、もう一度開いてください。"
+  },
+  "popup_media_streamed": {
+    "message": "このページのプレーヤーは動画を分割してストリーミングしているため、一覧に表示するファイルはありません。動画にポインターを合わせ、[動画をダウンロード] ボタンを使ってください。"
+  },
+  "popup_media_store": {
+    "message": "Chrome ウェブストアの規則により、このコピーのアドオンはこのサイトの動画には対応していません。対処方法はヘルプをご覧ください。"
+  },
+  "popup_media_download": {
+    "message": "ダウンロード"
+  },
+  "popup_media_protected": {
+    "message": "保護されています"
+  },
+  "popup_media_live": {
+    "message": "ライブ"
+  },
+  "video_off": {
+    "message": "このサイトではダウンロード ボタンがオフになっています"
+  },
+  "video_drm": {
+    "message": "保護されたビデオ: 保存できません"
+  },
+  "video_unnamed": {
+    "message": "どの動画か判別できません。動画自体のページを開いて、そこでお試しください"
+  },
+  "video_looking": {
+    "message": "画質を検索しています…"
+  },
+  "video_open_mdm": {
+    "message": "Mister Download Manager で開く…"
+  },
+  "video_no_choices": {
+    "message": "ここにはダウンロードできる動画がありません"
+  },
+  "video_playlist": {
+    "message": "動画の一覧: Mister Download Manager で選択してください"
+  },
+  "video_no_ytdlp": {
+    "message": "この動画には Mister Download Manager に yt-dlp が必要です"
+  },
+  "video_too_long": {
+    "message": "検索に時間がかかりすぎました"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager は他の動画の処理中です"
+  },
+  "video_queued": {
+    "message": "キューに追加しました"
+  },
+  "video_failed_lookup": {
+    "message": "検索できませんでした"
+  },
+  "video_tab_video": {
+    "message": "ビデオ"
+  },
+  "video_tab_audio": {
+    "message": "オーディオ"
+  },
+  "video_open_post": {
+    "message": "投稿を開いて、そこにあるボタンを使用してください"
+  },
+  "popup_send_to": {
+    "message": "ダウンロードの送信先"
+  },
+  "popup_send_here": {
+    "message": "このコンピューター"
+  },
+  "popup_send_remote": {
+    "message": "別の Mister Download Manager (サーバー)"
+  },
+  "popup_remote_code": {
+    "message": "ペアリング コード"
+  },
+  "popup_remote_open": {
+    "message": "開く"
+  },
+  "popup_remote_pair": {
+    "message": "ペアリング"
+  },
+  "popup_remote_help": {
+    "message": "一度アドレスを開いて証明書を承認し、そのオプション、リモート、デバイスのペアリング (または misterdownloadmanager-cli pair) からコードを入力してください。"
+  },
+  "status_remote": {
+    "message": "ダウンロードは $address$ に送信されます",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "https:// アドレスを入力してください。"
+  },
+  "remote_unreachable": {
+    "message": "到達できません。このブラウザーで一度アドレスを開き、証明書を承認してから、もう一度お試しください。"
+  },
+  "remote_wrong_code": {
+    "message": "コードが間違っています。"
+  },
+  "remote_no_code": {
+    "message": "現在コードが表示されていません: まず「デバイスのペアリング」をクリックしてください。"
+  },
+  "remote_too_soon": {
+    "message": "しばらく待ってから、もう一度お試しください。"
+  },
+  "remote_failed": {
+    "message": "動作しませんでした。もう一度お試しください。"
+  },
+  "remote_device_name": {
+    "message": "ブラウザー拡張機能"
+  },
+  "popup_media_title_name": {
+    "message": "メディアファイル名の前にページのタイトルを付ける"
+  }
+}

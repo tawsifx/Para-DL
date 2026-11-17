@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "బ్రౌజర్ నుండి Mister Download Managerకి డౌన్‌లోడ్‌లను అందిస్తుంది."
+  },
+  "menu": {
+    "message": "Mister Download Managerతో డౌన్‌లోడ్ చేయండి"
+  },
+  "video_download": {
+    "message": "వీడియోను డౌన్‌లోడ్ చేయండి"
+  },
+  "video_more": {
+    "message": "మరిన్ని ఎంపికలు"
+  },
+  "video_hide_here": {
+    "message": "ఈ వీడియోలో దాచు"
+  },
+  "video_never_site": {
+    "message": "$site$లో మళ్లీ ఎప్పుడూ వద్దు",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "బటన్ సెట్టింగ్‌లు..."
+  },
+  "video_sent": {
+    "message": "Mister Download Managerకు పంపబడింది"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager ఇన్‌స్టాల్ చేయబడలేదు లేదా ప్రారంభం కాలేదు"
+  },
+  "video_drag": {
+    "message": "వీడియో అంచున తరలించడానికి లాగండి"
+  },
+  "menu_selected": {
+    "message": "Mister Download Managerతో ఎంచుకున్న లింక్‌లను డౌన్‌లోడ్ చేయండి"
+  },
+  "menu_all": {
+    "message": "Mister Download Managerతో అన్ని లింక్‌లను డౌన్‌లోడ్ చేయండి"
+  },
+  "status_connected": {
+    "message": "Mister Download Managerకి కనెక్ట్ చేయబడింది"
+  },
+  "status_connected_version": {
+    "message": "Mister Download Manager $version$కి కనెక్ట్ చేయబడింది",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "పాజ్ చేయబడింది: డౌన్‌లోడ్‌లు బ్రౌజర్‌లోనే ఉంటాయి"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager ఇన్‌స్టాల్ చేయబడలేదు లేదా దాని బ్రౌజర్ అనుసంధానం సెటప్ చేయబడలేదు"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager పొడిగింపు యొక్క ఈ కాపీని అంగీకరించదు"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager సమయానికి ప్రారంభం కాలేదు"
+  },
+  "status_host_failed": {
+    "message": "Mister Download Managerకి కనెక్షన్ విఫలమైంది"
+  },
+  "status_too_large": {
+    "message": "ఈ డౌన్‌లోడ్ వివరాలు అందించడానికి చాలా పెద్దవిగా ఉన్నాయి"
+  },
+  "status_update_app": {
+    "message": "ఈ పొడిగింపు అందించే ప్రతిదాన్ని ఉపయోగించడానికి Mister Download Managerని అప్‌డేట్ చేయండి"
+  },
+  "popup_take": {
+    "message": "ఈ బ్రౌజర్ నుండి డౌన్‌లోడ్‌లను తీసుకోండి"
+  },
+  "popup_proxy": {
+    "message": "ఈ బ్రౌజర్ ప్రాక్సీ లేదా VPN పొడిగింపు ద్వారా డౌన్‌లోడ్‌లను పంపండి"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager ఈ బ్రౌజర్ వలె అదే ప్రాక్సీ ద్వారా డౌన్‌లోడ్ చేస్తుంది. బ్రౌజర్ దీన్ని అనుమతించమని మిమ్మల్ని ఒకసారి అడుగుతుంది; దీన్ని ఆఫ్ చేయడం ద్వారా అది తిరిగి తీసుకోబడుతుంది."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager ఈ బ్రౌజర్ వలె అదే ప్రాక్సీ ద్వారా డౌన్‌లోడ్ చేస్తుంది. ఇది ఆఫ్ చేయబడినప్పుడు, పొడిగింపు బ్రౌజర్ ప్రాక్సీని చదవదు."
+  },
+  "popup_exclude_site": {
+    "message": "$site$ నుండి డౌన్‌లోడ్‌లను ఇకపై తీసుకోకండి",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "$site$ నుండి డౌన్‌లోడ్‌లు బ్రౌజర్‌తో ఉంటాయి",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Mister Download Managerని తెరవండి"
+  },
+  "popup_options": {
+    "message": "ఎంపికలు..."
+  },
+  "popup_help": {
+    "message": "సహాయం"
+  },
+  "popup_support": {
+    "message": "MDMకి మద్దతు ఇవ్వండి"
+  },
+  "popup_fix": {
+    "message": "దీన్ని ఎలా పరిష్కరించాలి"
+  },
+  "popup_declined": {
+    "message": "బ్రౌజర్‌కు వదిలివేయబడింది: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "చివరి డౌన్‌లోడ్ బ్రౌజర్‌కు వదిలివేయబడింది."
+  },
+  "declined_file_type": {
+    "message": "దీని రకం ఎంపికలు → ఫైల్ రకాలులో లేదు."
+  },
+  "declined_site": {
+    "message": "దీని సైట్ ఎంపికలు → ఫైల్ రకాలు, బ్రౌజర్‌కు వదిలివేయబడిన సైట్‌లులో ఉంది."
+  },
+  "declined_address": {
+    "message": "దీని చిరునామా ఎంపికలు → ఫైల్ రకాలు, బ్రౌజర్‌కు వదిలివేయబడిన చిరునామాలులో ఉంది."
+  },
+  "declined_small": {
+    "message": "ఇది ఎంపికలు → ఫైల్ రకాలులో కనీస పరిమాణం కంటే చిన్నది."
+  },
+  "declined_browser": {
+    "message": "ఈ బ్రౌజర్ ఎంపికలు → సాధారణలో టిక్ చేయబడలేదు."
+  },
+  "declined_integration_off": {
+    "message": "ఎంపికలు → సాధారణలో అధునాతన బ్రౌజర్ ఇంటిగ్రేషన్‌ను ఉపయోగించు అనేది ఆఫ్ చేయబడింది."
+  },
+  "declined_site_access": {
+    "message": "ఈ సైట్‌ను చదవడానికి పొడిగింపుకు అనుమతి లేదు (బ్రౌజర్ సైట్ యాక్సెస్)."
+  },
+  "popup_alt": {
+    "message": "బ్రౌజర్ ద్వారా డౌన్‌లోడ్ చేయడానికి లింక్‌ను క్లిక్ చేస్తున్నప్పుడు Alt కీని నొక్కి ఉంచండి."
+  },
+  "popup_media": {
+    "message": "ఈ పేజీలోని మీడియా"
+  },
+  "popup_media_none": {
+    "message": "ఈ పేజీలో ఇంకా వీడియో లేదా ఆడియో కనుగొనబడలేదు. ప్లే చేసి, ఆపై దీన్ని మళ్ళీ తెరవండి."
+  },
+  "popup_media_streamed": {
+    "message": "ఈ పేజీ ప్లేయర్ వీడియోను ముక్కలుగా స్ట్రీమ్ చేస్తుంది, కాబట్టి జాబితాలో చూపడానికి ఫైల్ లేదు. వీడియోపై పాయింటర్ ఉంచి దాని «వీడియోను డౌన్‌లోడ్ చేయండి» బటన్‌ను ఉపయోగించండి."
+  },
+  "popup_media_store": {
+    "message": "Chrome Web Store నియమాలు ఈ యాడ్-ఆన్ కాపీని ఈ సైట్ వీడియోలకు దూరంగా ఉంచుతాయి. మీరు ఏమి చేయగలరో «సహాయం» చెబుతుంది."
+  },
+  "popup_media_download": {
+    "message": "డౌన్‌లోడ్ చేయండి"
+  },
+  "popup_media_protected": {
+    "message": "రక్షితం"
+  },
+  "popup_media_live": {
+    "message": "ప్రత్యక్ష ప్రసారం"
+  },
+  "video_off": {
+    "message": "ఈ సైట్‌లో డౌన్‌లోడ్ బటన్ ఆఫ్ చేయబడింది"
+  },
+  "video_drm": {
+    "message": "రక్షిత వీడియో: దీన్ని సేవ్ చేయలేము"
+  },
+  "video_unnamed": {
+    "message": "ఇది ఏ వీడియోనో తెలియడం లేదు: దాని స్వంత పేజీని తెరిచి అక్కడ ప్రయత్నించండి"
+  },
+  "video_looking": {
+    "message": "నాణ్యతలను వెతుకుతోంది…"
+  },
+  "video_open_mdm": {
+    "message": "Mister Download Managerలో తెరువు…"
+  },
+  "video_no_choices": {
+    "message": "ఇక్కడ డౌన్‌లోడ్ చేయడానికి వీడియో లేదు"
+  },
+  "video_playlist": {
+    "message": "వీడియోల జాబితా: వాటిని Mister Download Managerలో ఎంచుకోండి"
+  },
+  "video_no_ytdlp": {
+    "message": "ఈ వీడియో కోసం Mister Download Managerకి yt-dlp అవసరం"
+  },
+  "video_too_long": {
+    "message": "వెతకడానికి చాలా సమయం పట్టింది"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager ఇతర వీడియోలతో బిజీగా ఉంది"
+  },
+  "video_queued": {
+    "message": "క్యూకి జోడించబడింది"
+  },
+  "video_failed_lookup": {
+    "message": "వెతకడం సాధ్యం కాలేదు"
+  },
+  "video_tab_video": {
+    "message": "వీడియో"
+  },
+  "video_tab_audio": {
+    "message": "ఆడియో"
+  },
+  "video_open_post": {
+    "message": "పోస్ట్‌ను తెరవండి, ఆపై అక్కడ బటన్‌ను ఉపయోగించండి"
+  },
+  "popup_send_to": {
+    "message": "డౌన్‌లోడ్‌లను దీనికి పంపండి"
+  },
+  "popup_send_here": {
+    "message": "ఈ కంప్యూటర్"
+  },
+  "popup_send_remote": {
+    "message": "మరొక Mister Download Manager (ఒక సర్వర్)"
+  },
+  "popup_remote_code": {
+    "message": "జత చేసే కోడ్"
+  },
+  "popup_remote_open": {
+    "message": "దీన్ని తెరవండి"
+  },
+  "popup_remote_pair": {
+    "message": "జత చేయి"
+  },
+  "popup_remote_help": {
+    "message": "దాని చిరునామాను ఒకసారి తెరిచి, దాని సర్టిఫికేట్‌ను ఆమోదించండి, ఆపై దాని ఎంపికలు, రిమోట్, పరికరాన్ని జత చేయి (లేదా misterdownloadmanager-cli pair) నుండి కోడ్‌ను నమోదు చేయండి."
+  },
+  "status_remote": {
+    "message": "డౌన్‌లోడ్‌లు $address$కి వెళ్తాయి",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "దాని https:// చిరునామాను నమోదు చేయండి."
+  },
+  "remote_unreachable": {
+    "message": "చేరలేదు. ఈ బ్రౌజర్‌లో దాని చిరునామాను ఒకసారి తెరిచి, దాని సర్టిఫికేట్‌ను ఆమోదించి, ఆపై మళ్లీ ప్రయత్నించండి."
+  },
+  "remote_wrong_code": {
+    "message": "తప్పు కోడ్."
+  },
+  "remote_no_code": {
+    "message": "ఇది ఇప్పుడు కోడ్‌ను చూపడం లేదు: ముందుగా అక్కడ పరికరాన్ని జత చేయి క్లిక్ చేయండి."
+  },
+  "remote_too_soon": {
+    "message": "ఒక క్షణం వేచి ఉండి, ఆపై మళ్లీ ప్రయత్నించండి."
+  },
+  "remote_failed": {
+    "message": "ఇది పని చేయలేదు. మళ్లీ ప్రయత్నించండి."
+  },
+  "remote_device_name": {
+    "message": "బ్రౌజర్ పొడిగింపు"
+  },
+  "popup_media_title_name": {
+    "message": "మీడియా ఫైల్ పేర్ల ముందు పేజీ శీర్షికను జోడించు"
+  }
+}

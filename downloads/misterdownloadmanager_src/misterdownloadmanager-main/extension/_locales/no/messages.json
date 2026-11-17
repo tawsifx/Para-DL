@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Sender nedlastinger fra nettleseren til Mister Download Manager."
+  },
+  "menu": {
+    "message": "Last ned med Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Last ned video"
+  },
+  "video_more": {
+    "message": "Flere alternativer"
+  },
+  "video_hide_here": {
+    "message": "Skjul for denne videoen"
+  },
+  "video_never_site": {
+    "message": "Aldri på $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Knappeinnstillinger ..."
+  },
+  "video_sent": {
+    "message": "Sendt til Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager er ikke installert eller startet ikke"
+  },
+  "video_drag": {
+    "message": "Dra for å flytte den langs videokanten"
+  },
+  "menu_selected": {
+    "message": "Last ned valgte koblinger med Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Last ned alle koblinger med Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Tilkoblet Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Tilkoblet Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Pauset: nedlastingene blir i nettleseren"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager er ikke installert, eller nettleserintegrasjonen er ikke konfigurert"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager godtar ikke denne kopien av utvidelsen"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager startet ikke i tide"
+  },
+  "status_host_failed": {
+    "message": "Tilkoblingen til Mister Download Manager mislyktes"
+  },
+  "status_too_large": {
+    "message": "Detaljene for denne nedlastingen var for store til å overføre"
+  },
+  "status_update_app": {
+    "message": "Oppdater Mister Download Manager for å bruke alt denne utvidelsen tilbyr"
+  },
+  "popup_take": {
+    "message": "Ta nedlastinger fra denne nettleseren"
+  },
+  "popup_proxy": {
+    "message": "Send nedlastinger via denne nettleserens proxy- eller VPN-utvidelse"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager laster da ned via samme proxy som denne nettleseren. Nettleseren spør deg én gang om å tillate det; hvis du slår dette av, trekkes tillatelsen tilbake."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager laster da ned via samme proxy som denne nettleseren. Når dette er slått av, leser ikke utvidelsen nettleserens proxy."
+  },
+  "popup_exclude_site": {
+    "message": "Aldri ta nedlastinger fra $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Nedlastinger fra $site$ blir igjen i nettleseren",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Åpne Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Alternativer..."
+  },
+  "popup_help": {
+    "message": "Hjelp"
+  },
+  "popup_support": {
+    "message": "Støtt MDM"
+  },
+  "popup_fix": {
+    "message": "Hvordan fikse det"
+  },
+  "popup_declined": {
+    "message": "Beholdt av nettleseren: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Den siste nedlastingen ble beholdt av nettleseren."
+  },
+  "declined_file_type": {
+    "message": "Typen er ikke i Alternativer → Filtyper."
+  },
+  "declined_site": {
+    "message": "Nettstedet er i Alternativer → Filtyper, nettsteder som beholdes av nettleseren."
+  },
+  "declined_address": {
+    "message": "Adressen er i Alternativer → Filtyper, adresser som beholdes av nettleseren."
+  },
+  "declined_small": {
+    "message": "Den er mindre enn minimumsstørrelsen i Alternativer → Filtyper."
+  },
+  "declined_browser": {
+    "message": "Denne nettleseren er ikke avkrysset i Alternativer → Generelt."
+  },
+  "declined_integration_off": {
+    "message": "Bruk avansert nettleserintegrasjon er deaktivert i Alternativer → Generelt."
+  },
+  "declined_site_access": {
+    "message": "Utvidelsen har ikke tillatelse til å lese dette nettstedet (nettleserens nettstedstilgang)."
+  },
+  "popup_alt": {
+    "message": "Hold Alt mens du klikker på en kobling for å la nettleseren laste den ned."
+  },
+  "popup_media": {
+    "message": "Medier på denne siden"
+  },
+  "popup_media_none": {
+    "message": "Ingen video eller lyd funnet på denne siden ennå. Spill den av, og åpne dette igjen."
+  },
+  "popup_media_streamed": {
+    "message": "Spilleren på denne siden strømmer videoen i biter, så det finnes ingen fil å vise. Pek på videoen og bruk knappen Last ned video."
+  },
+  "popup_media_store": {
+    "message": "Reglene til Chrome Nettmarked holder denne kopien av tillegget unna videoene på dette nettstedet. Hjelp forteller hva du kan gjøre."
+  },
+  "popup_media_download": {
+    "message": "Last ned"
+  },
+  "popup_media_protected": {
+    "message": "Beskyttet"
+  },
+  "popup_media_live": {
+    "message": "Direkte"
+  },
+  "video_off": {
+    "message": "Nedlastingsknappen er av på dette nettstedet"
+  },
+  "video_drm": {
+    "message": "Beskyttet video: kan ikke lagres"
+  },
+  "video_unnamed": {
+    "message": "Kan ikke se hvilken video dette er: åpne videoens egen side og prøv der"
+  },
+  "video_looking": {
+    "message": "Finner kvalitetene…"
+  },
+  "video_open_mdm": {
+    "message": "Åpne i Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Ingen video å laste ned her"
+  },
+  "video_playlist": {
+    "message": "En liste med videoer: velg dem i Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager trenger yt-dlp for denne videoen"
+  },
+  "video_too_long": {
+    "message": "Oppslaget tok for lang tid"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager er opptatt med andre videoer"
+  },
+  "video_queued": {
+    "message": "Lagt til i køen"
+  },
+  "video_failed_lookup": {
+    "message": "Kunne ikke slå det opp"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Lyd"
+  },
+  "video_open_post": {
+    "message": "Åpne innlegget, og bruk deretter knappen der"
+  },
+  "popup_send_to": {
+    "message": "Send nedlastinger til"
+  },
+  "popup_send_here": {
+    "message": "Denne datamaskinen"
+  },
+  "popup_send_remote": {
+    "message": "En annen Mister Download Manager (en server)"
+  },
+  "popup_remote_code": {
+    "message": "Paringskode"
+  },
+  "popup_remote_open": {
+    "message": "Åpne den"
+  },
+  "popup_remote_pair": {
+    "message": "Par"
+  },
+  "popup_remote_help": {
+    "message": "Åpne adressen én gang og godta sertifikatet, og skriv deretter inn en kode fra Alternativer, Ekstern, Par en enhet (eller misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Nedlastinger går til $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Skriv inn https://-adressen."
+  },
+  "remote_unreachable": {
+    "message": "Ikke nådd. Åpne adressen én gang i denne nettleseren og godta sertifikatet, og prøv deretter igjen."
+  },
+  "remote_wrong_code": {
+    "message": "Feil kode."
+  },
+  "remote_no_code": {
+    "message": "Den viser ingen kode nå: klikk Par en enhet der først."
+  },
+  "remote_too_soon": {
+    "message": "Vent et øyeblikk, og prøv deretter igjen."
+  },
+  "remote_failed": {
+    "message": "Det fungerte ikke. Prøv igjen."
+  },
+  "remote_device_name": {
+    "message": "Nettleserutvidelse"
+  },
+  "popup_media_title_name": {
+    "message": "Legg til sidetittelen foran navn på mediefiler"
+  }
+}

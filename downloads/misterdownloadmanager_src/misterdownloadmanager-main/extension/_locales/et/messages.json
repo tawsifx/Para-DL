@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Annab allalaadimised brauserist rakendusele Mister Download Manager."
+  },
+  "menu": {
+    "message": "Laadi alla rakendusega Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Laadi video alla"
+  },
+  "video_more": {
+    "message": "Rohkem valikuid"
+  },
+  "video_hide_here": {
+    "message": "Peida ainult selle video puhul"
+  },
+  "video_never_site": {
+    "message": "Mitte kunagi saidil $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Nupu sätted..."
+  },
+  "video_sent": {
+    "message": "Saadetud rakendusse Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager pole installitud või ei käivitunud"
+  },
+  "video_drag": {
+    "message": "Lohista video serva mööda, et seda liigutada"
+  },
+  "menu_selected": {
+    "message": "Laadi valitud lingid alla rakendusega Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Laadi kõik lingid alla rakendusega Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Ühendatud rakendusega Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Ühendatud rakendusega Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Peatatud: allalaadimised jäävad brauserisse"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager pole installitud või selle brauseri integreerimine pole seadistatud"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager ei aktsepteeri seda laienduse koopiat"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager ei käivitunud õigel ajal"
+  },
+  "status_host_failed": {
+    "message": "Ühenduse loomine rakendusega Mister Download Manager nurjus"
+  },
+  "status_too_large": {
+    "message": "Selle allalaadimise üksikasjad olid edastamiseks liiga suured"
+  },
+  "status_update_app": {
+    "message": "Värskendage rakendust Mister Download Manager, et kasutada kõiki laienduse võimalusi"
+  },
+  "popup_take": {
+    "message": "Suuna allalaadimised sellest brauserist rakendusse"
+  },
+  "popup_proxy": {
+    "message": "Suuna allalaadimised selle brauseri puhverserveri või VPN-laienduse kaudu"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager laadib seejärel alla sama puhverserveri kaudu, mida see brauser kasutab. Brauser küsib teilt selleks ühe korra luba; selle väljalülitamisel luba tühistatakse."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager laadib seejärel alla sama puhverserveri kaudu, mida see brauser kasutab. Kui see on välja lülitatud, ei loe laiendus brauseri puhverserverit."
+  },
+  "popup_exclude_site": {
+    "message": "Ära võta enam allalaadimisi saidilt $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Allalaadimised saidilt $site$ jäävad brauserisse",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Ava Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Suvandid..."
+  },
+  "popup_help": {
+    "message": "Abi"
+  },
+  "popup_support": {
+    "message": "Toeta MDM-i"
+  },
+  "popup_fix": {
+    "message": "Kuidas seda parandada"
+  },
+  "popup_declined": {
+    "message": "Jäeti brauserile: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Viimane allalaadimine jäeti brauserile."
+  },
+  "declined_file_type": {
+    "message": "Selle tüüp ei ole valikutes Suvandid → Failitüübid."
+  },
+  "declined_site": {
+    "message": "Selle sait on valikutes Suvandid → Failitüübid, brauserile jäetud saidid."
+  },
+  "declined_address": {
+    "message": "Selle aadress on valikutes Suvandid → Failitüübid, brauserile jäetud aadressid."
+  },
+  "declined_small": {
+    "message": "See on väiksem kui miinimumsuurus valikutes Suvandid → Failitüübid."
+  },
+  "declined_browser": {
+    "message": "See brauser pole valikutes Suvandid → Üldine märgitud."
+  },
+  "declined_integration_off": {
+    "message": "Valik „Kasuta täiustatud brauseri integreerimist” on valikutes Suvandid → Üldine välja lülitatud."
+  },
+  "declined_site_access": {
+    "message": "Laiendil pole lubatud seda saiti lugeda (brauseri saidi juurdepääs)."
+  },
+  "popup_alt": {
+    "message": "Hoia all Alt-klahvi ja klõpsa lingil, et brauser selle alla laadiks."
+  },
+  "popup_media": {
+    "message": "Meedia sellel lehel"
+  },
+  "popup_media_none": {
+    "message": "Sellelt lehelt pole veel videot ega heli leitud. Esitage seda ja avage seejärel see uuesti."
+  },
+  "popup_media_streamed": {
+    "message": "Selle lehe mängija voogedastab videot tükkidena, seega pole ühtegi faili, mida loetleda. Osuta videole ja kasuta selle nuppu „Laadi video alla“."
+  },
+  "popup_media_store": {
+    "message": "Chrome'i veebipoe reeglid hoiavad selle lisandmooduli koopia selle saidi videotest eemal. „Abi“ ütleb, mida saad teha."
+  },
+  "popup_media_download": {
+    "message": "Laadi alla"
+  },
+  "popup_media_protected": {
+    "message": "Kaitstud"
+  },
+  "popup_media_live": {
+    "message": "Otseülekanne"
+  },
+  "video_off": {
+    "message": "Sellel saidil on allalaadimisnupp välja lülitatud"
+  },
+  "video_drm": {
+    "message": "Kaitstud videot ei saa salvestada"
+  },
+  "video_unnamed": {
+    "message": "Ei saa aru, mis video see on: ava video enda leht ja proovi seal"
+  },
+  "video_looking": {
+    "message": "Kvaliteetide otsimine…"
+  },
+  "video_open_mdm": {
+    "message": "Ava rakenduses Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Siin pole allalaaditavat videot"
+  },
+  "video_playlist": {
+    "message": "Videode loend: valige need rakenduses Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager vajab selle video jaoks programmi yt-dlp"
+  },
+  "video_too_long": {
+    "message": "Otsimine võttis liiga kaua aega"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager on teiste videotega hõivatud"
+  },
+  "video_queued": {
+    "message": "Lisatud järjekorda"
+  },
+  "video_failed_lookup": {
+    "message": "Otsimine ebaõnnestus"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Heli"
+  },
+  "video_open_post": {
+    "message": "Ava postitus, siis kasuta sealset nuppu"
+  },
+  "popup_send_to": {
+    "message": "Saada allalaadimised asukohta"
+  },
+  "popup_send_here": {
+    "message": "See arvuti"
+  },
+  "popup_send_remote": {
+    "message": "Muu Mister Download Manager (server)"
+  },
+  "popup_remote_code": {
+    "message": "Sidumiskood"
+  },
+  "popup_remote_open": {
+    "message": "Ava see"
+  },
+  "popup_remote_pair": {
+    "message": "Seo"
+  },
+  "popup_remote_help": {
+    "message": "Avage selle aadress üks kord ja aktsepteerige selle sertifikaat, seejärel sisestage kood selle valikutest Options, Remote, Pair a device (või misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Allalaadimised lähevad asukohta $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Sisestage selle https:// aadress."
+  },
+  "remote_unreachable": {
+    "message": "Pole kättesaadav. Avage selle aadress selles brauseris üks kord ja aktsepteerige selle sertifikaat, seejärel proovige uuesti."
+  },
+  "remote_wrong_code": {
+    "message": "Vale kood."
+  },
+  "remote_no_code": {
+    "message": "See ei näita praegu koodi: klõpsake seal esmalt nuppu Seo seade."
+  },
+  "remote_too_soon": {
+    "message": "Oodake hetk, seejärel proovige uuesti."
+  },
+  "remote_failed": {
+    "message": "See ei töötanud. Proovige uuesti."
+  },
+  "remote_device_name": {
+    "message": "Brauserilaiend"
+  },
+  "popup_media_title_name": {
+    "message": "Lisa meediafailide nimede ette lehe pealkiri"
+  }
+}

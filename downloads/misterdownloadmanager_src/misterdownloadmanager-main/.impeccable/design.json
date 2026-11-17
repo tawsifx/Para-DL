@@ -1,0 +1,783 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T21:52:56+00:00",
+  "title": "Design System: Mister Download Manager website",
+  "extensions": {
+    "colorMeta": {
+      "board": {
+        "role": "primary",
+        "displayName": "Logo Blue Board",
+        "canonical": "#1f63d6",
+        "oklch": "oklch(52.8% 0.190 260.5)",
+        "purpose": "The page, the header, everything between sheets. Text on it: on-board / on-board-2 only.",
+        "tonalRamp": [
+          "#000826",
+          "#001f59",
+          "#013993",
+          "#1258ca",
+          "#387cf1",
+          "#70a4fe",
+          "#abcaff",
+          "#e6efff"
+        ]
+      },
+      "board-deep": {
+        "role": "primary",
+        "displayName": "Board Deep",
+        "canonical": "#1854bb",
+        "oklch": "oklch(47.3% 0.174 260.7)",
+        "purpose": "The closing section.",
+        "tonalRamp": [
+          "#000826",
+          "#001f5a",
+          "#013995",
+          "#1e5ac2",
+          "#417ee8",
+          "#70a4fe",
+          "#accafe",
+          "#e6efff"
+        ]
+      },
+      "board-edge": {
+        "role": "primary",
+        "displayName": "Board Edge",
+        "canonical": "#3b78e0",
+        "oklch": "oklch(58.7% 0.171 260.3)",
+        "purpose": "Hairline under the header and above the closing.",
+        "tonalRamp": [
+          "#000826",
+          "#002059",
+          "#003a93",
+          "#1e5bc0",
+          "#417ee7",
+          "#6ea4ff",
+          "#abcafe",
+          "#e6effe"
+        ]
+      },
+      "on-board": {
+        "role": "neutral",
+        "displayName": "On-Board White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "purpose": "Primary text on the board (AA checked).",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "on-board-2": {
+        "role": "neutral",
+        "displayName": "On-Board Haze",
+        "canonical": "#e6eefd",
+        "oklch": "oklch(94.8% 0.022 263.2)",
+        "purpose": "Secondary text on the board (AA checked).",
+        "tonalRamp": [
+          "#080b11",
+          "#20252f",
+          "#3c424e",
+          "#5b616e",
+          "#7b8390",
+          "#9ea5b3",
+          "#c4c9d3",
+          "#edeef2"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Thermal Paper",
+        "canonical": "#fcfcfb",
+        "oklch": "oklch(99.1% 0.001 106.4)",
+        "purpose": "Every sheet, label, menu and dialog.",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252524",
+          "#424241",
+          "#616160",
+          "#828281",
+          "#a5a5a4",
+          "#c9c9c8",
+          "#eeeeee"
+        ]
+      },
+      "paper-2": {
+        "role": "neutral",
+        "displayName": "Paper Grey",
+        "canonical": "#f0f3f7",
+        "oklch": "oklch(96.3% 0.006 255.5)",
+        "purpose": "Hover and selected rows on a sheet; code and quote wells.",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232528",
+          "#404245",
+          "#5f6165",
+          "#808286",
+          "#a2a5a9",
+          "#c7c9cc",
+          "#eeeeef"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Label Ink",
+        "canonical": "#111318",
+        "oklch": "oklch(18.7% 0.011 268.1)",
+        "purpose": "Reading text on sheets, field rules, label bands, footer.",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#23252a",
+          "#3f4248",
+          "#5e6168",
+          "#7f8289",
+          "#a2a5ac",
+          "#c7c9ce",
+          "#eeeef0"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#434956",
+        "oklch": "oklch(40.5% 0.023 265.7)",
+        "purpose": "Secondary text on sheets.",
+        "tonalRamp": [
+          "#080b11",
+          "#202530",
+          "#3c424f",
+          "#5b616f",
+          "#7c8291",
+          "#9ea5b4",
+          "#c4c9d3",
+          "#edeef2"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "#5f6676",
+        "oklch": "oklch(51.0% 0.027 266.7)",
+        "purpose": "Field names, fine print, captions on sheets.",
+        "tonalRamp": [
+          "#080b12",
+          "#1f2531",
+          "#3b4251",
+          "#5a6171",
+          "#7b8293",
+          "#9ea5b6",
+          "#c4c9d5",
+          "#eceef3"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#dde1e8",
+        "oklch": "oklch(90.9% 0.010 261.8)",
+        "purpose": "Quiet dividers inside a sheet.",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#22252a",
+          "#3f4248",
+          "#5e6167",
+          "#7f8289",
+          "#a2a5ac",
+          "#c7c9ce",
+          "#edeef0"
+        ]
+      },
+      "go": {
+        "role": "secondary",
+        "displayName": "Dispatch Green",
+        "canonical": "#57cc5a",
+        "oklch": "oklch(75.3% 0.187 143.9)",
+        "purpose": "The Download action and delivered states only.",
+        "tonalRamp": [
+          "#001001",
+          "#012f04",
+          "#00510a",
+          "#037615",
+          "#1b9d28",
+          "#51c154",
+          "#97de95",
+          "#def7dd"
+        ]
+      },
+      "go-hover": {
+        "role": "secondary",
+        "displayName": "Dispatch Green Hover",
+        "canonical": "#47b94a",
+        "oklch": "oklch(69.7% 0.183 143.7)",
+        "purpose": "Download hover.",
+        "tonalRamp": [
+          "#001000",
+          "#002f03",
+          "#01510a",
+          "#017712",
+          "#239c2b",
+          "#54c056",
+          "#98de96",
+          "#dff6dd"
+        ]
+      },
+      "go-ink": {
+        "role": "secondary",
+        "displayName": "Go Ink",
+        "canonical": "#08200b",
+        "oklch": "oklch(21.8% 0.050 146.1)",
+        "purpose": "Text on Dispatch Green; never white.",
+        "tonalRamp": [
+          "#040e04",
+          "#152b17",
+          "#304932",
+          "#4f6950",
+          "#6f8b71",
+          "#92ae93",
+          "#bccfbd",
+          "#eaf1ea"
+        ]
+      },
+      "link": {
+        "role": "tertiary",
+        "displayName": "Label Link Blue",
+        "canonical": "#0d58c9",
+        "oklch": "oklch(49.1% 0.189 259.9)",
+        "purpose": "Links on sheets; the focus ring.",
+        "tonalRamp": [
+          "#000825",
+          "#002058",
+          "#013b91",
+          "#0e59ca",
+          "#367df1",
+          "#6ea4fe",
+          "#abcbfe",
+          "#e6effe"
+        ]
+      },
+      "stamp": {
+        "role": "secondary",
+        "displayName": "Stamp Ink",
+        "canonical": "#1b7a26",
+        "oklch": "oklch(50.8% 0.148 144.5)",
+        "purpose": "Delivered green for text and rules on label stock.",
+        "tonalRamp": [
+          "#001001",
+          "#002f05",
+          "#02510f",
+          "#147521",
+          "#3f9845",
+          "#67bc6a",
+          "#a2daa2",
+          "#e1f5e1"
+        ]
+      },
+      "board-dark": {
+        "role": "primary",
+        "displayName": "Logo Blue Board (navy depot)",
+        "canonical": "#0c1a33",
+        "oklch": "oklch(22.1% 0.053 261.1)",
+        "purpose": "Dark theme value of board. The page, the header, everything between sheets. Text on it: on-board / on-board-2 only.",
+        "tonalRamp": [
+          "#040b19",
+          "#17253d",
+          "#32425e",
+          "#506280",
+          "#7183a3",
+          "#93a6c6",
+          "#bdcae1",
+          "#eaeff7"
+        ]
+      },
+      "board-deep-dark": {
+        "role": "primary",
+        "displayName": "Board Deep (navy depot)",
+        "canonical": "#081226",
+        "oklch": "oklch(18.5% 0.044 262.6)",
+        "purpose": "Dark theme value of board-deep. The closing section.",
+        "tonalRamp": [
+          "#060b16",
+          "#1a2539",
+          "#36425a",
+          "#54627b",
+          "#74839d",
+          "#97a6c0",
+          "#bfcadd",
+          "#ebeff5"
+        ]
+      },
+      "board-edge-dark": {
+        "role": "primary",
+        "displayName": "Board Edge (navy depot)",
+        "canonical": "#1c2e52",
+        "oklch": "oklch(30.6% 0.069 262.9)",
+        "purpose": "Dark theme value of board-edge. Hairline under the header and above the closing.",
+        "tonalRamp": [
+          "#030a1d",
+          "#142444",
+          "#2e4167",
+          "#4c6189",
+          "#6c82ad",
+          "#8fa5d0",
+          "#bacae8",
+          "#e9effa"
+        ]
+      },
+      "on-board-dark": {
+        "role": "neutral",
+        "displayName": "On-Board White (navy depot)",
+        "canonical": "#f2f5fb",
+        "oklch": "oklch(97.0% 0.009 264.5)",
+        "purpose": "Dark theme value of on-board. Primary text on the board (AA checked).",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232529",
+          "#404247",
+          "#5f6166",
+          "#808288",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#eeeef0"
+        ]
+      },
+      "on-board-2-dark": {
+        "role": "neutral",
+        "displayName": "On-Board Haze (navy depot)",
+        "canonical": "#c3cde0",
+        "oklch": "oklch(84.7% 0.029 263.4)",
+        "purpose": "Dark theme value of on-board-2. Secondary text on the board (AA checked).",
+        "tonalRamp": [
+          "#070b13",
+          "#1e2532",
+          "#3a4252",
+          "#596172",
+          "#798394",
+          "#9ca5b7",
+          "#c3c9d6",
+          "#eceef3"
+        ]
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "Thermal Paper (navy depot)",
+        "canonical": "#11151d",
+        "oklch": "oklch(19.5% 0.017 264.0)",
+        "purpose": "Dark theme value of paper. Every sheet, label, menu and dialog.",
+        "tonalRamp": [
+          "#090b10",
+          "#21252d",
+          "#3d424c",
+          "#5c616b",
+          "#7d828d",
+          "#a0a5b0",
+          "#c5c9d1",
+          "#edeef1"
+        ]
+      },
+      "paper-2-dark": {
+        "role": "neutral",
+        "displayName": "Paper Grey (navy depot)",
+        "canonical": "#192030",
+        "oklch": "oklch(24.5% 0.032 265.9)",
+        "purpose": "Dark theme value of paper-2. Hover and selected rows on a sheet; code and quote wells.",
+        "tonalRamp": [
+          "#070b14",
+          "#1e2534",
+          "#3a4254",
+          "#586174",
+          "#798296",
+          "#9ca5b9",
+          "#c3c9d8",
+          "#eceef4"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Label Ink (navy depot)",
+        "canonical": "#eef1f6",
+        "oklch": "oklch(95.7% 0.007 260.7)",
+        "purpose": "Dark theme value of ink. Reading text on sheets, field rules, label bands, footer.",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232528",
+          "#404246",
+          "#5f6166",
+          "#808287",
+          "#a2a5aa",
+          "#c7c9cc",
+          "#eeeeef"
+        ]
+      },
+      "ink-2-dark": {
+        "role": "neutral",
+        "displayName": "Ink 2 (navy depot)",
+        "canonical": "#c3cad6",
+        "oklch": "oklch(83.7% 0.018 261.3)",
+        "purpose": "Dark theme value of ink-2. Secondary text on sheets.",
+        "tonalRamp": [
+          "#090b10",
+          "#20252e",
+          "#3d424c",
+          "#5b626c",
+          "#7c838e",
+          "#9fa5b1",
+          "#c5c9d1",
+          "#edeef1"
+        ]
+      },
+      "ink-3-dark": {
+        "role": "neutral",
+        "displayName": "Ink 3 (navy depot)",
+        "canonical": "#98a1b1",
+        "oklch": "oklch(70.7% 0.026 262.1)",
+        "purpose": "Dark theme value of ink-3. Field names, fine print, captions on sheets.",
+        "tonalRamp": [
+          "#080b12",
+          "#1f2531",
+          "#3b4250",
+          "#596270",
+          "#7a8392",
+          "#9da5b5",
+          "#c3c9d4",
+          "#eceef2"
+        ]
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (navy depot)",
+        "canonical": "#2a3242",
+        "oklch": "oklch(31.7% 0.031 264.0)",
+        "purpose": "Dark theme value of line. Quiet dividers inside a sheet.",
+        "tonalRamp": [
+          "#070b13",
+          "#1e2533",
+          "#3a4253",
+          "#586173",
+          "#798395",
+          "#9ca5b8",
+          "#c2c9d7",
+          "#eceef3"
+        ]
+      },
+      "link-dark": {
+        "role": "tertiary",
+        "displayName": "Label Link Blue (navy depot)",
+        "canonical": "#86b6ff",
+        "oklch": "oklch(77.1% 0.117 258.6)",
+        "purpose": "Dark theme value of link. Links on sheets; the focus ring.",
+        "tonalRamp": [
+          "#000923",
+          "#002254",
+          "#143f7f",
+          "#3560a3",
+          "#5583c8",
+          "#79a6ec",
+          "#abcbfc",
+          "#e5effe"
+        ]
+      },
+      "stamp-dark": {
+        "role": "secondary",
+        "displayName": "Stamp Ink (navy depot)",
+        "canonical": "#6bdb6e",
+        "oklch": "oklch(80.1% 0.180 144.2)",
+        "purpose": "Dark theme value of stamp. Delivered green for text and rules on label stock.",
+        "tonalRamp": [
+          "#001001",
+          "#012f05",
+          "#00510c",
+          "#027617",
+          "#239c2f",
+          "#54c058",
+          "#98de98",
+          "#dff6de"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "One word or phrase per section at poster scale: the closing line, the race ratio, the 404 number."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headings on the board."
+      },
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "Inner pages' h1 on the board, max 20ch."
+      },
+      "label-headline": {
+        "displayName": "Label Headline",
+        "purpose": "The headline printed on a waybill."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Prose h2 on reading sheets."
+      },
+      "band": {
+        "displayName": "Band",
+        "purpose": "Sender line and sheet name in an ink band."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Section and page introductions."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text, max 72ch."
+      },
+      "field-value": {
+        "displayName": "Field Value",
+        "purpose": "The value under a field name, tabular figures."
+      },
+      "fine": {
+        "displayName": "Fine Print",
+        "purpose": "Captions, sources, small print."
+      },
+      "field-name": {
+        "displayName": "Field Name",
+        "purpose": "Uppercase condensed name over a field value, table column heads, help nav groups. Never a kicker."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code and the barcode's human-readable line."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet",
+        "value": "0 1px 0 rgba(6, 22, 60, .14), 0 16px 32px -14px rgba(4, 18, 52, .5)",
+        "dark": "0 1px 0 rgba(0, 0, 0, .5), 0 18px 36px -16px rgba(0, 0, 0, .8)",
+        "purpose": "Every sheet lying on the board."
+      },
+      {
+        "name": "lift",
+        "value": "0 2px 0 rgba(6, 22, 60, .16), 0 28px 48px -18px rgba(3, 14, 44, .6)",
+        "dark": "0 2px 0 rgba(0, 0, 0, .5), 0 30px 50px -18px rgba(0, 0, 0, .9)",
+        "purpose": "Stuck-on things: the waybill, screenshots, menus, the language dialog and offer."
+      },
+      {
+        "name": "sticker-edge",
+        "value": "inset 0 -3px 0 rgba(0, 0, 0, .18), 0 0 0 1.5px rgba(4, 32, 10, .55)",
+        "purpose": "The Download button only."
+      },
+      {
+        "name": "prose-shot",
+        "value": "0 1px 0 var(--line), 0 10px 24px -14px rgba(4, 18, 52, .45)",
+        "purpose": "Screenshots inside help prose."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-settle",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "The one easing for things that arrive and settle: label feed, dialog, stamp, bars, press."
+      },
+      {
+        "name": "label-feed",
+        "value": "1.1s cubic-bezier(.16, 1, .3, 1) .15s; clip-path inset top to bottom plus an 18px drop",
+        "purpose": "The waybill feeds out once on load, like a thermal printer."
+      },
+      {
+        "name": "stamp-thunk",
+        "value": ".32s cubic-bezier(.16, 1, .3, 1); from scale 1.6",
+        "purpose": "The Delivered stamp landing on a finished lane."
+      },
+      {
+        "name": "sheet-in",
+        "value": ".28s cubic-bezier(.16, 1, .3, 1); from 14px down",
+        "purpose": "The language dialog opening."
+      },
+      {
+        "name": "bar-grow",
+        "value": "1.3s cubic-bezier(.16, 1, .3, 1); staggered by --d",
+        "purpose": "Benchmark speed-up bars growing into view."
+      },
+      {
+        "name": "press",
+        "value": ".15s cubic-bezier(.16, 1, .3, 1); translateY(1px)",
+        "purpose": "Button press."
+      },
+      {
+        "name": "race",
+        "value": "real time (requestAnimationFrame), no easing",
+        "purpose": "The tracking race plays at the benchmark's measured times; reduced motion shows the finish at once."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "nav-collapse",
+        "value": "1100px",
+        "purpose": "Header links fold into a menu."
+      },
+      {
+        "name": "single-column",
+        "value": "980px",
+        "purpose": "One column; the waybill moves below the window, overlapping its foot."
+      },
+      {
+        "name": "phone",
+        "value": "720px",
+        "purpose": "Field grids stack (the waybill keeps two), segmented tabs stack, comparison rows stack."
+      }
+    ],
+    "chartPalette": {
+      "light": {
+        "bench-idm": "#6b7280",
+        "bench-mdm": "#2f9a33",
+        "bench-startup": "#b7791f",
+        "bench-transfer": "#2563c9",
+        "bench-finish": "#7d4fc0"
+      },
+      "dark": {
+        "bench-idm": "#98a1b1",
+        "bench-mdm": "#57cc5a",
+        "bench-startup": "#e0a53a",
+        "bench-transfer": "#7aa9f5",
+        "bench-finish": "#b48cf2"
+      },
+      "purpose": "Read by bench.js for the benchmark page's charts only."
+    }
+  },
+  "components": [
+    {
+      "name": "Download Button",
+      "kind": "button",
+      "refersTo": "button-go",
+      "description": "The green sticker: the one action, Download, and nothing else.",
+      "html": "<a class=\"ds-btn-go\" href=\"#\"><svg viewBox=\"0 0 16 16\" width=\"18\" height=\"18\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M0 2.2 6.5 1.3v6.3H0zm7.3-1L16 0v7.6H7.3zM0 8.4h6.5v6.3L0 13.8zm7.3 0H16V16l-8.7-1.2z\"/></svg>Download for Windows</a>",
+      "css": ".ds-btn-go { display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 20px; border-radius: 8px; background: var(--go, #57cc5a); color: var(--go-ink, #08200b); font: 700 16px/1 Archivo, 'Segoe UI', system-ui, sans-serif; font-stretch: 92%; text-decoration: none; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 0 0 1.5px rgba(4,32,10,.55); transition: background-color .15s ease, transform .15s cubic-bezier(.16,1,.3,1); } .ds-btn-go:hover { background: var(--go-hover, #47b94a); } .ds-btn-go:active { transform: translateY(1px); } .ds-btn-go:focus-visible { outline: 3px solid var(--link, #0d58c9); outline-offset: 2px; }"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line",
+      "description": "Every other button: drawn in line in the current text colour, on board or sheet.",
+      "html": "<a class=\"ds-btn-line\" href=\"#\">All downloads</a>",
+      "css": ".ds-btn-line { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 8px; background: transparent; color: var(--ink, #111318); box-shadow: inset 0 0 0 1.5px currentColor; font: 700 16px/1 Archivo, 'Segoe UI', system-ui, sans-serif; font-stretch: 92%; text-decoration: none; transition: background-color .15s ease, transform .15s cubic-bezier(.16,1,.3,1); } .ds-btn-line:hover { background: color-mix(in srgb, currentColor 10%, transparent); } .ds-btn-line:active { transform: translateY(1px); } .ds-btn-line:focus-visible { outline: 3px solid var(--link, #0d58c9); outline-offset: 2px; }"
+    },
+    {
+      "name": "Waybill",
+      "kind": "custom",
+      "refersTo": "waybill",
+      "description": "The signature label: ink band, label headline, fields, a real Code 128 barcode under a dashed tear line.",
+      "html": "<div class=\"ds-waybill\"><div class=\"ds-wb-band\"><b>Mister Download Manager</b><small>Free and open source · GPL-3.0</small></div><p class=\"ds-wb-head\">The download manager you already know.</p><dl class=\"ds-fields\"><div><dt>Postage</dt><dd>Free</dd></div><div><dt>Delivery</dt><dd>1 GiB in 1.0 s</dd></div><div><dt>For</dt><dd>Windows 10 and 11</dd></div><div><dt>Version</dt><dd>0.2.4</dd></div></dl><div class=\"ds-wb-code\"><svg class=\"ds-barcode\" viewBox=\"0 0 154 48\" preserveAspectRatio=\"none\" role=\"img\" aria-label=\"MDM 0.2.4\"><path fill=\"currentColor\" d=\"M10 0h2v48h-2zM13 0h1v48h-1zM16 0h1v48h-1zM21 0h1v48h-1zM23 0h3v48h-3zM27 0h2v48h-2zM32 0h1v48h-1zM34 0h2v48h-2zM39 0h1v48h-1zM43 0h1v48h-1zM45 0h3v48h-3zM49 0h2v48h-2zM54 0h2v48h-2zM57 0h2v48h-2zM61 0h2v48h-2zM65 0h1v48h-1zM68 0h3v48h-3zM72 0h2v48h-2zM76 0h1v48h-1zM79 0h2v48h-2zM83 0h3v48h-3zM87 0h2v48h-2zM91 0h3v48h-3zM96 0h1v48h-1zM98 0h1v48h-1zM101 0h2v48h-2zM105 0h3v48h-3zM109 0h2v48h-2zM113 0h1v48h-1zM116 0h3v48h-3zM120 0h2v48h-2zM125 0h1v48h-1zM128 0h1v48h-1zM131 0h2v48h-2zM136 0h3v48h-3zM140 0h1v48h-1zM142 0h2v48h-2z\"/></svg><span>MDM 0.2.4</span></div></div>",
+      "css": ".ds-waybill { width: 380px; background: var(--paper, #fcfcfb); color: var(--ink, #111318); border-radius: 12px; box-shadow: 0 1px 1px rgba(3,14,44,.22), 0 6px 10px -4px rgba(3,14,44,.3), 18px 34px 50px -16px rgba(3,14,44,.55), 40px 70px 90px -40px rgba(3,14,44,.45); transform: rotate(-2deg); font-family: Archivo, 'Segoe UI', system-ui, sans-serif; overflow: hidden; } .ds-wb-band { padding: 12px 18px; background: var(--ink, #111318); color: var(--paper, #fcfcfb); } .ds-wb-band b { display: block; font-size: 17px; font-weight: 800; font-stretch: 80%; } .ds-wb-band small { font-size: 12.5px; opacity: .78; } .ds-wb-head { margin: 0; padding: 20px 20px 18px; font-size: 34px; font-weight: 850; font-stretch: 72%; line-height: 1; letter-spacing: -.012em; } .ds-fields { display: grid; grid-template-columns: 1fr 1fr; margin: 0; } .ds-fields > div { padding: 10px 16px 11px; border-top: 1.5px solid currentColor; } .ds-fields > div:nth-child(even) { border-inline-start: 1.5px solid currentColor; } .ds-fields dt { font-size: 12px; font-weight: 750; font-stretch: 74%; letter-spacing: .045em; text-transform: uppercase; color: var(--ink-3, #5f6676); } .ds-fields dd { margin: 2px 0 0; font-size: 16.5px; font-weight: 650; font-variant-numeric: tabular-nums; } .ds-wb-code { padding: 14px 24px 16px; border-top: 2px dashed color-mix(in srgb, currentColor 45%, transparent); text-align: center; } .ds-barcode { display: block; width: 100%; height: 54px; } .ds-wb-code span { display: block; margin-top: 6px; font: 600 12px/1 'Cascadia Mono', Consolas, monospace; letter-spacing: .32em; }"
+    },
+    {
+      "name": "Labelled Sheet",
+      "kind": "card",
+      "refersTo": "sheet",
+      "description": "Paper on the board, opened by an ink band: what it is, and its fine print.",
+      "html": "<section class=\"ds-sheet\"><p class=\"ds-sheet-band\"><b>Delivery options</b><span>Version 0.2.4 · free for everyone</span></p><div class=\"ds-sheet-row\"><b>Windows</b><span class=\"ds-tag ds-tag-stable\">Stable</span><span class=\"ds-tag\">Recommended</span></div><div class=\"ds-sheet-row\"><b>Linux</b><span class=\"ds-tag\">Experimental</span></div></section>",
+      "css": ".ds-sheet { max-width: 560px; background: var(--paper, #fcfcfb); color: var(--ink, #111318); border-radius: 10px; box-shadow: 0 1px 0 rgba(6,22,60,.14), 0 16px 32px -14px rgba(4,18,52,.5); overflow: hidden; font-family: Archivo, 'Segoe UI', system-ui, sans-serif; } .ds-sheet-band { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin: 0; padding: 12px 24px; background: var(--ink, #111318); color: var(--paper, #fcfcfb); } .ds-sheet-band b { font-size: 17px; font-weight: 800; font-stretch: 80%; } .ds-sheet-band span { font-size: 13.5px; opacity: .8; } .ds-sheet-row { display: flex; align-items: center; gap: 8px; padding: 18px 24px; border-top: 1.5px solid var(--ink, #111318); } .ds-sheet-band + .ds-sheet-row { border-top: 0; } .ds-sheet-row b { font-size: 24px; font-weight: 800; font-stretch: 80%; margin-inline-end: auto; } .ds-sheet-row:hover { background: var(--paper-2, #f0f3f7); } .ds-tag { padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; box-shadow: inset 0 0 0 1.5px var(--ink, #111318); } .ds-tag-stable { background: var(--ink, #111318); color: var(--paper, #fcfcfb); }"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Release status on a delivery row: Stable filled ink, the rest outlined.",
+      "html": "<span class=\"ds-chip ds-chip-on\">Stable</span> <span class=\"ds-chip\">Recommended</span> <span class=\"ds-chip\">Experimental</span>",
+      "css": ".ds-chip { display: inline-block; padding: 3px 8px; border-radius: 4px; color: var(--ink, #111318); background: var(--paper, #fcfcfb); font: 700 11.5px/1.4 Archivo, 'Segoe UI', system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; box-shadow: inset 0 0 0 1.5px var(--ink, #111318); } .ds-chip-on { background: var(--ink, #111318); color: var(--paper, #fcfcfb); }"
+    },
+    {
+      "name": "Rubber Stamp",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Delivered, inked twice round at a slant. Only for arrival.",
+      "html": "<p class=\"ds-stamp\"><b>Delivered</b><span>1 GiB in 1.01 s</span></p>",
+      "css": ".ds-stamp { display: inline-flex; flex-direction: column; align-items: center; margin: 12px; padding: 5px 12px; border: 2.5px solid var(--stamp, #1b7a26); outline: 1.5px solid var(--stamp, #1b7a26); outline-offset: 2px; border-radius: 6px; background: var(--paper, #fcfcfb); color: var(--stamp, #1b7a26); font-family: Archivo, 'Segoe UI', system-ui, sans-serif; font-size: 24px; font-weight: 900; font-stretch: 70%; line-height: 1.05; text-transform: uppercase; letter-spacing: .06em; transform: rotate(-6deg); } .ds-stamp span { font-size: .78em; font-weight: 750; letter-spacing: .03em; }"
+    },
+    {
+      "name": "Segmented Tabs",
+      "kind": "nav",
+      "refersTo": "segmented-tab-selected",
+      "description": "Race scenarios: an ink-ruled segmented control; selected is filled ink.",
+      "html": "<div class=\"ds-seg\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">1 GiB, fast link</button><button role=\"tab\" aria-selected=\"false\">A small file</button><button role=\"tab\" aria-selected=\"false\">Server allows 2 connections</button></div>",
+      "css": ".ds-seg { display: inline-flex; border-radius: 8px; box-shadow: inset 0 0 0 1.5px var(--ink, #111318); overflow: hidden; background: var(--paper, #fcfcfb); } .ds-seg button { padding: 10px 16px; border: 0; background: none; color: var(--ink, #111318); font: 650 14.5px/1.2 Archivo, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-seg button + button { box-shadow: inset 1.5px 0 0 var(--ink, #111318); } .ds-seg button:hover { background: var(--paper-2, #f0f3f7); } .ds-seg button[aria-selected=true] { background: var(--ink, #111318); color: var(--paper, #fcfcfb); } .ds-seg button:focus-visible { outline: 3px solid var(--link, #0d58c9); outline-offset: -3px; }"
+    },
+    {
+      "name": "Header",
+      "kind": "nav",
+      "refersTo": "header",
+      "description": "The board's slim sticky header: brand, links, language, the green Download.",
+      "html": "<header class=\"ds-top\"><b class=\"ds-brand\">Mister Download Manager</b><nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Features</a><a href=\"#\">Download</a><a href=\"#\">Help</a><a href=\"#\">Benchmark</a></nav><a class=\"ds-langs\" href=\"#\">English</a><a class=\"ds-top-dl\" href=\"#\">Download</a></header>",
+      "css": ".ds-top { display: flex; align-items: center; gap: 24px; height: 68px; padding: 0 24px; background: var(--board, #1f63d6); color: var(--on-board, #ffffff); border-bottom: 1px solid var(--board-edge, #3b78e0); font-family: Archivo, 'Segoe UI', system-ui, sans-serif; } .ds-brand { font-size: 18px; font-weight: 800; font-stretch: 80%; } .ds-nav { display: flex; gap: 4px; } .ds-nav a, .ds-langs { padding: 8px 10px; border-radius: 6px; color: inherit; font-size: 15px; font-weight: 600; text-decoration: none; } .ds-nav a:hover, .ds-langs:hover { background: color-mix(in srgb, currentColor 12%, transparent); } .ds-nav a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; } .ds-langs { margin-inline-start: auto; border-radius: 8px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 55%, transparent); } .ds-top-dl { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 8px; background: var(--go, #57cc5a); color: var(--go-ink, #08200b); font-weight: 700; font-size: 15px; text-decoration: none; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 0 0 1.5px rgba(4,32,10,.55); } .ds-top-dl:hover { background: var(--go-hover, #47b94a); } .ds-top a:focus-visible { outline: 3px solid var(--link, #0d58c9); outline-offset: 2px; }"
+    },
+    {
+      "name": "The Crew",
+      "kind": "avatar-row",
+      "refersTo": "pile",
+      "description": "Contributors' round photos linked to GitHub: an overlapping row on the hero's board with +N to /contributors.html; a ruled roster on that page; a row under each release on the News page.",
+      "html": "<ul class=\"ds-pile\"><li><span class=\"ds-face\"></span></li><li><span class=\"ds-face\"></span></li><li><span class=\"ds-face\"></span></li><li><span class=\"ds-face ds-more\">+11</span></li></ul>",
+      "css": ".ds-pile { display: flex; margin: 0; padding: 16px; list-style: none; background: var(--board, #1f63d6); } .ds-pile li + li { margin-inline-start: -8px; } .ds-face { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--paper-2, #f0f3f7); box-shadow: 0 0 0 2.5px var(--on-board, #ffffff); } .ds-more { background: var(--on-board, #ffffff); color: var(--board, #1f63d6); font: 800 15px/1 Archivo, 'Segoe UI', system-ui, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Waybill on the Parcel",
+    "overview": "A download is a delivery. The page is the board the parcel sits on, in the logo's blue; the real app window is the parcel; what the visitor reads is printed on thermal-label sheets stuck to it, in black ink with hairline field rules, ranked like a courier label: who sends it, the headline, the fine print, the fields, a real barcode. The benchmark is tracking: two shipments scanned event by event to the measured times, each event showing its rate as well as its time.\n\nThe world is the owner's choice. The blue board (#1f63d6) replaced kraft brown after four rendered options; dark theme is a navy depot where the same labels print in reverse (near-black stock, cool white ink). Density is a label's, not a brochure's: few elements, each one a field with a name and a value, numbers in tabular figures. Every screenshot is the real, unretouched app, shown at full content width; the site never draws a fake window, a glowing mock-up or a row of icon cards. Reading pages (help, FAQ, news, legal) take the same world with restraint: the board above, one sheet to read.\n\nThe site ships in 21 languages, Arabic and Persian right to left. Every direction-bound value is a logical property; labels tilt the other way in RTL; only native language names are isolated with `bdi`.",
+    "keyCharacteristics": [
+      "Blue board, white label stock, black ink; green only for Download and delivered.",
+      "One self-hosted face, Archivo, condensed by its width axis for headings and field names.",
+      "Fields, not cards: name over value, ink rules between.",
+      "Real artefacts only: the unretouched app, a scannable Code 128 barcode, the benchmark's own times.",
+      "Motion is mechanical and rare: the label feeds out once, progress moves in real time, a stamp lands."
+    ],
+    "rules": [
+      {
+        "name": "The Green By Law Rule",
+        "body": "Green appears only on the Download action and on delivered states (the done lane, the stamp). Never on a secondary button, a badge, a link or a decorative accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Text Systems Rule",
+        "body": "Text on the board is on-board or on-board-2; text on label stock is ink, ink-2 or ink-3. Never put ink on the board or board text on a sheet; every element printed on stock declares ink colour, whatever it inherits.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour Lives In Fields Rule",
+        "body": "Reading text stays ink. Colour belongs to the board, the action, the stamp and links, not to paragraphs or headings.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number that can be compared (times, sizes, ratios, versions, dates) is set in tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Condense, Don't Swap Rule",
+        "body": "Hierarchy comes from Archivo's width and weight axes, never from a second display face. Scripts Archivo lacks fall back to the system's face, without condensing, tracking or uppercase.",
+        "section": "typography"
+      },
+      {
+        "name": "The Paper On Board Rule",
+        "body": "Depth means paper on the board. A surface either lies (Sheet) or is stuck on (Lift); there is no third height and no glow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do set every page on the board (#1f63d6, navy #0c1a33 in dark) and everything read on paper sheets in ink.",
+      "Do keep green for the Download action and delivered states only, with Go Ink text on it.",
+      "Do use on-board / on-board-2 for text on the board and ink / ink-2 / ink-3 on sheets; check AA in both themes.",
+      "Do present facts as fields: a 12px condensed uppercase name over a 650-weight tabular value, 1.5px ink rules between.",
+      "Do show only the real, unretouched app in screenshots, in its day and night versions, left to right even on RTL pages.",
+      "Do use logical properties for every direction, mirror tilts in RTL, and drop tracking, uppercase and condensing for Arabic, Persian, Indic, Thai and CJK scripts.",
+      "Do keep the barcode a real, scannable Code 128 of what it says.",
+      "Do honour reduced motion: the race shows its finish, the label does not feed, bars and grids sit at rest."
+    ],
+    "donts": [
+      "Don't use green on secondary buttons, tags, links, icons or decoration.",
+      "Don't put ink-coloured reading text directly on the board, or board text on a sheet.",
+      "Don't add a second typeface for display; condense Archivo instead.",
+      "Don't set a field name above a section headline as a kicker; field names name fields, table columns and nav groups.",
+      "Don't add elevations beyond Sheet, Lift and the Download sticker edge (screenshots inside prose take a lighter contact shadow), and never a glow.",
+      "Don't draw a mock window, retouch a screenshot or use IDM artwork; IDM appears only as a named, text-marked comparison.",
+      "Don't animate anything on entry except the label's single feed and progress moving into place (the race, the speed-up bars, the connection grids)."
+    ]
+  }
+}

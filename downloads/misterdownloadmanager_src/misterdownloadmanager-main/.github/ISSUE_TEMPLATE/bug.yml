@@ -1,0 +1,107 @@
+# The bug report form. MDM's Help -> Report a problem opens it with the text fields filled in
+# (crates/app/src/help.rs: the ids below are the URL's parameters; keep them in step). System and
+# Installed with are text fields, not dropdowns: GitHub's page showed a dropdown's value from the
+# address for a moment, then put it back to none.
+name: Bug report
+description: Something in Mister Download Manager doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. **Help → Report a problem** in MDM opens this form with your version and system already filled in.
+        A security problem? Please don't report it here: see the [security page](https://misterdownloadmanager.com/security.html).
+  - type: input
+    id: os
+    attributes:
+      label: System
+      description: "Windows 11, Windows 10, macOS (Apple Silicon), macOS (Intel), Linux or Other."
+      placeholder: Windows 11
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: System version
+      description: Windows' version and build, macOS' version, or your Linux distribution and its version.
+      placeholder: Windows 11 24H2 (26100), macOS 15.1, Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MDM version
+      description: Help → About shows it.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: install
+    attributes:
+      label: Installed with
+      description: "The installer (setup.exe), The portable zip, The plain zip, The .dmg, The AppImage, The .deb, The .rpm, The .tar.gz, Another package manager or Built from source."
+      placeholder: The installer (setup.exe)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Part of MDM
+      options:
+        - Downloads (speed, resuming, errors)
+        - Browser extension
+        - Video downloads
+        - Torrents
+        - Queues and the Scheduler
+        - The window, menus and dialogs
+        - Languages and translations
+        - Installing, updating or removing MDM
+        - Command line, automation API or MCP server
+        - Something else
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: For a problem with the browser extension or the Download video button.
+      placeholder: Chrome 131, Firefox 133, Edge 131
+  - type: input
+    id: language
+    attributes:
+      label: MDM's language
+      placeholder: en
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: An address that shows the problem helps a lot, if it isn't private.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or screenshots
+      description: |
+        A download's recent events: hover over its **Status** in the list. A crash: crash.log in MDM's data folder (Windows: %APPDATA%\misterdownloadmanager). Drag screenshots in here.
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you send it
+      options:
+        - label: I looked through the [open issues](https://github.com/anefzaoui/misterdownloadmanager/issues) and this one isn't there yet.
+          required: true

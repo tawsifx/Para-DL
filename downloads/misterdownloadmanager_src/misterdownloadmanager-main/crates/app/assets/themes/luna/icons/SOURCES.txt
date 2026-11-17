@@ -1,0 +1,13 @@
+The Luna theme's icon set (#45).
+
+MDM's own: pictures drawn for Mister Download Manager in the manner of Windows XP's desktop icons (2001): a three-quarter view, a thin dark outline,
+saturated colours lit from the top left. Not one of
+Microsoft's icons, or any other project's, is used or copied. GPL-3.0-or-later, as MDM (its
+LICENSE, at the top of the repository).
+
+Each file is a colour picture named for the need MDM uses it for (crates/app/src/themeicons.rs
+lists them), at four sizes: 16/<need>.png, 24/, 32/ and 48/ (a screen at 100 % to 300 %). Any
+can be swapped for another file of the same name.
+
+The title bar's Minimize, Maximize, Restore and Close are drawn by the theme's title bar itself
+(crates/app/src/winui.rs); every other need has a picture here.

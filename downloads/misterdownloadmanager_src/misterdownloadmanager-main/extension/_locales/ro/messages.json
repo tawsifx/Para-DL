@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Transferă descărcările din browser către Mister Download Manager."
+  },
+  "menu": {
+    "message": "Descărcați cu Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Descărcați videoclipul"
+  },
+  "video_more": {
+    "message": "Mai multe opțiuni"
+  },
+  "video_hide_here": {
+    "message": "Ascundeți pe acest videoclip"
+  },
+  "video_never_site": {
+    "message": "Niciodată pe $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Setări buton..."
+  },
+  "video_sent": {
+    "message": "Trimis la Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager nu este instalat sau nu a pornit"
+  },
+  "video_drag": {
+    "message": "Trageți pentru a-l muta de-a lungul marginii videoclipului"
+  },
+  "menu_selected": {
+    "message": "Descărcați linkurile selectate cu Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Descărcați toate linkurile cu Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Conectat la Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Conectat la Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Întrerupt: descărcările rămân în browser"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager nu este instalat sau integrarea browserului nu este configurată"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager nu acceptă această copie a extensiei"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager nu a pornit la timp"
+  },
+  "status_host_failed": {
+    "message": "Conexiunea la Mister Download Manager a eșuat"
+  },
+  "status_too_large": {
+    "message": "Detaliile acestei descărcări au fost prea mari pentru a fi transferate"
+  },
+  "status_update_app": {
+    "message": "Actualizați Mister Download Manager pentru a utiliza tot ce oferă această extensie"
+  },
+  "popup_take": {
+    "message": "Preluare descărcări din acest browser"
+  },
+  "popup_proxy": {
+    "message": "Trimiteți descărcările prin proxy-ul sau extensia VPN a acestui browser"
+  },
+  "popup_proxy_title": {
+    "message": "Mister Download Manager descarcă apoi prin același proxy ca și acest browser. Browserul vă va cere o singură dată să permiteți acest lucru; dezactivarea acestei opțiuni anulează permisiunea."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager descarcă apoi prin același proxy ca acest browser. Cât timp această opțiune este dezactivată, extensia nu citește setările proxy ale browserului."
+  },
+  "popup_exclude_site": {
+    "message": "Nu preluați niciodată descărcări de pe $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Descărcările de pe $site$ rămân în browser",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Deschideți Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Opțiuni..."
+  },
+  "popup_help": {
+    "message": "Ajutor"
+  },
+  "popup_support": {
+    "message": "Susține MDM"
+  },
+  "popup_fix": {
+    "message": "Cum se remediază"
+  },
+  "popup_declined": {
+    "message": "Lăsat browserului: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Ultima descărcare a fost lăsată browserului."
+  },
+  "declined_file_type": {
+    "message": "Tipul său nu este în Opțiuni → Tipuri de fișiere."
+  },
+  "declined_site": {
+    "message": "Site-ul său este în Opțiuni → Tipuri de fișiere, site-uri lăsate browserului."
+  },
+  "declined_address": {
+    "message": "Adresa sa este în Opțiuni → Tipuri de fișiere, adrese lăsate browserului."
+  },
+  "declined_small": {
+    "message": "Este mai mic decât dimensiunea minimă din Opțiuni → Tipuri de fișiere."
+  },
+  "declined_browser": {
+    "message": "Acest browser nu este bifat în Opțiuni → General."
+  },
+  "declined_integration_off": {
+    "message": "Opțiunea „Utilizare integrare avansată browser” este dezactivată în Opțiuni → General."
+  },
+  "declined_site_access": {
+    "message": "Extensia nu are permisiunea de a citi acest site (accesul la site al browserului)."
+  },
+  "popup_alt": {
+    "message": "Țineți apăsat Alt în timp ce faceți clic pe un link pentru a lăsa browserul să-l descarce."
+  },
+  "popup_media": {
+    "message": "Media pe această pagină"
+  },
+  "popup_media_none": {
+    "message": "Nu s-a găsit încă niciun videoclip sau sunet pe această pagină. Redați-l, apoi deschideți din nou."
+  },
+  "popup_media_streamed": {
+    "message": "Playerul acestei pagini transmite videoclipul pe bucăți, așa că nu există niciun fișier de afișat. Indicați videoclipul și folosiți butonul său „Descărcați videoclipul”."
+  },
+  "popup_media_store": {
+    "message": "Regulile Magazinului web Chrome țin această copie a suplimentului departe de videoclipurile acestui site. La „Ajutor” găsiți ce puteți face."
+  },
+  "popup_media_download": {
+    "message": "Descărcați"
+  },
+  "popup_media_protected": {
+    "message": "Protejat"
+  },
+  "popup_media_live": {
+    "message": "În direct"
+  },
+  "video_off": {
+    "message": "Butonul de descărcare este dezactivat pe acest site"
+  },
+  "video_drm": {
+    "message": "Videoclip protejat: nu poate fi salvat"
+  },
+  "video_unnamed": {
+    "message": "Nu se poate stabili ce videoclip este: deschideți pagina proprie a videoclipului și încercați acolo"
+  },
+  "video_looking": {
+    "message": "Se caută calitățile…"
+  },
+  "video_open_mdm": {
+    "message": "Deschideți în Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Nu există niciun videoclip de descărcat aici"
+  },
+  "video_playlist": {
+    "message": "O listă de videoclipuri: alegeți-le în Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager are nevoie de yt-dlp pentru acest videoclip"
+  },
+  "video_too_long": {
+    "message": "Căutarea a durat prea mult"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager este ocupat cu alte videoclipuri"
+  },
+  "video_queued": {
+    "message": "Adăugat la coadă"
+  },
+  "video_failed_lookup": {
+    "message": "Căutarea nu a reușit"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Audio"
+  },
+  "video_open_post": {
+    "message": "Deschideți postarea, apoi utilizați butonul de acolo"
+  },
+  "popup_send_to": {
+    "message": "Trimite descărcările la"
+  },
+  "popup_send_here": {
+    "message": "Acest computer"
+  },
+  "popup_send_remote": {
+    "message": "Alt Mister Download Manager (un server)"
+  },
+  "popup_remote_code": {
+    "message": "Cod de asociere"
+  },
+  "popup_remote_open": {
+    "message": "Deschideți-l"
+  },
+  "popup_remote_pair": {
+    "message": "Asociați"
+  },
+  "popup_remote_help": {
+    "message": "Deschideți adresa o dată și acceptați certificatul, apoi introduceți un cod din Opțiuni, la distanță, Asociați un dispozitiv (sau misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Descărcările merg la $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Introduceți adresa https://."
+  },
+  "remote_unreachable": {
+    "message": "Nu s-a ajuns la destinație. Deschideți adresa o dată în acest browser și acceptați certificatul, apoi încercați din nou."
+  },
+  "remote_wrong_code": {
+    "message": "Cod greșit."
+  },
+  "remote_no_code": {
+    "message": "Nu afișează niciun cod acum: faceți clic pe Asociați un dispozitiv acolo mai întâi."
+  },
+  "remote_too_soon": {
+    "message": "Așteptați un moment, apoi încercați din nou."
+  },
+  "remote_failed": {
+    "message": "Nu a funcționat. Încercați din nou."
+  },
+  "remote_device_name": {
+    "message": "Extensie de browser"
+  },
+  "popup_media_title_name": {
+    "message": "Adaugă titlul paginii înaintea numelor fișierelor media"
+  }
+}

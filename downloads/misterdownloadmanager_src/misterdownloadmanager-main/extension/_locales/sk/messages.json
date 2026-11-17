@@ -1,0 +1,281 @@
+{
+  "name": {
+    "message": "Mister Download Manager"
+  },
+  "description": {
+    "message": "Odovzdá sťahovanie z prehliadača do Mister Download Manager."
+  },
+  "menu": {
+    "message": "Stiahnuť pomocou Mister Download Manager"
+  },
+  "video_download": {
+    "message": "Stiahnuť video"
+  },
+  "video_more": {
+    "message": "Ďalšie možnosti"
+  },
+  "video_hide_here": {
+    "message": "Skryť pri tomto videu"
+  },
+  "video_never_site": {
+    "message": "Nikdy na $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "video_settings": {
+    "message": "Nastavenia tlačidla..."
+  },
+  "video_sent": {
+    "message": "Odoslané do Mister Download Manager"
+  },
+  "video_failed": {
+    "message": "Mister Download Manager nie je nainštalovaný alebo sa nespustil"
+  },
+  "video_drag": {
+    "message": "Potiahnutím ho presuniete pozdĺž okraja videa"
+  },
+  "menu_selected": {
+    "message": "Stiahnuť vybrané odkazy pomocou Mister Download Manager"
+  },
+  "menu_all": {
+    "message": "Stiahnuť všetky odkazy pomocou Mister Download Manager"
+  },
+  "status_connected": {
+    "message": "Pripojené k Mister Download Manager"
+  },
+  "status_connected_version": {
+    "message": "Pripojené k Mister Download Manager $version$",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.2.5"
+      }
+    }
+  },
+  "status_paused": {
+    "message": "Pozastavené: sťahovania zostávajú v prehliadači"
+  },
+  "status_not_installed": {
+    "message": "Mister Download Manager nie je nainštalovaný alebo jeho integrácia prehliadača nie je nastavená"
+  },
+  "status_forbidden": {
+    "message": "Mister Download Manager neprijíma túto kópiu rozšírenia"
+  },
+  "status_not_running": {
+    "message": "Mister Download Manager sa nespustil včas"
+  },
+  "status_host_failed": {
+    "message": "Pripojenie k aplikácii Mister Download Manager zlyhalo"
+  },
+  "status_too_large": {
+    "message": "Podrobnosti tohto sťahovania boli príliš veľké na odovzdanie"
+  },
+  "status_update_app": {
+    "message": "Aktualizujte aplikáciu Mister Download Manager, aby ste mohli používať všetko, čo toto rozšírenie ponúka"
+  },
+  "popup_take": {
+    "message": "Preberať sťahovania z tohto prehliadača"
+  },
+  "popup_proxy": {
+    "message": "Odosielať sťahovania cez proxy alebo rozšírenie VPN tohto prehliadača"
+  },
+  "popup_proxy_title": {
+    "message": "Aplikácia Mister Download Manager potom sťahuje cez rovnaký server proxy ako tento prehliadač. Prehliadač vás raz požiada o povolenie; vypnutím tejto možnosti sa povolenie odoberie."
+  },
+  "popup_proxy_title_chromium": {
+    "message": "Mister Download Manager potom sťahuje cez rovnaký server proxy ako tento prehliadač. Keď je táto možnosť vypnutá, rozšírenie nečíta server proxy prehliadača."
+  },
+  "popup_exclude_site": {
+    "message": "Nikdy nepreberať sťahovania z webu $site$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_excluded": {
+    "message": "Stiahnutia z $site$ zostávajú v prehliadači",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "popup_open": {
+    "message": "Otvoriť Mister Download Manager"
+  },
+  "popup_options": {
+    "message": "Možnosti..."
+  },
+  "popup_help": {
+    "message": "Pomocník"
+  },
+  "popup_support": {
+    "message": "Podporte MDM"
+  },
+  "popup_fix": {
+    "message": "Ako to opraviť"
+  },
+  "popup_declined": {
+    "message": "Ponechané prehliadaču: $name$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "setup.png"
+      }
+    }
+  },
+  "popup_declined_unnamed": {
+    "message": "Posledné stiahnutie bolo ponechané prehliadaču."
+  },
+  "declined_file_type": {
+    "message": "Jeho typ nie je v Možnostiach → Typy súborov."
+  },
+  "declined_site": {
+    "message": "Jeho stránka je v Možnostiach → Typy súborov, stránky ponechané prehliadaču."
+  },
+  "declined_address": {
+    "message": "Jeho adresa je v Možnostiach → Typy súborov, adresy ponechané prehliadaču."
+  },
+  "declined_small": {
+    "message": "Je menšia ako minimálna veľkosť v Možnostiach → Typy súborov."
+  },
+  "declined_browser": {
+    "message": "Tento prehliadač nie je začiarknutý v Možnostiach → Všeobecné."
+  },
+  "declined_integration_off": {
+    "message": "Použiť rozšírenú integráciu prehliadača je vypnuté v Možnostiach → Všeobecné."
+  },
+  "declined_site_access": {
+    "message": "Rozšírenie nemá povolené čítať túto stránku (prístup prehliadača k stránke)."
+  },
+  "popup_alt": {
+    "message": "Podržte kláves Alt a kliknite na odkaz, aby ho stiahol prehliadač."
+  },
+  "popup_media": {
+    "message": "Médiá na tejto stránke"
+  },
+  "popup_media_none": {
+    "message": "Na tejto stránke sa zatiaľ nenašlo žiadne video ani zvuk. Prehrajte ho a potom toto znova otvorte."
+  },
+  "popup_media_streamed": {
+    "message": "Prehrávač na tejto stránke streamuje video po častiach, takže tu nie je žiadny súbor na zobrazenie. Ukážte na video a použite jeho tlačidlo „Stiahnuť video“."
+  },
+  "popup_media_store": {
+    "message": "Pravidlá Internetového obchodu Chrome držia túto kópiu doplnku mimo videí tejto stránky. V Pomocníkovi nájdete, čo môžete urobiť."
+  },
+  "popup_media_download": {
+    "message": "Stiahnuť"
+  },
+  "popup_media_protected": {
+    "message": "Chránené"
+  },
+  "popup_media_live": {
+    "message": "Naživo"
+  },
+  "video_off": {
+    "message": "Tlačidlo sťahovania je na tejto stránke vypnuté"
+  },
+  "video_drm": {
+    "message": "Chránené video: nedá sa uložiť"
+  },
+  "video_unnamed": {
+    "message": "Nedá sa zistiť, o ktoré video ide: otvorte jeho vlastnú stránku a skúste to tam"
+  },
+  "video_looking": {
+    "message": "Vyhľadávanie kvalít…"
+  },
+  "video_open_mdm": {
+    "message": "Otvoriť v Mister Download Manager…"
+  },
+  "video_no_choices": {
+    "message": "Tu nie je žiadne video na stiahnutie"
+  },
+  "video_playlist": {
+    "message": "Zoznam videí: vyberte ich v Mister Download Manager"
+  },
+  "video_no_ytdlp": {
+    "message": "Mister Download Manager potrebuje pre toto video yt-dlp"
+  },
+  "video_too_long": {
+    "message": "Vyhľadávanie trvalo príliš dlho"
+  },
+  "video_busy": {
+    "message": "Mister Download Manager je zaneprázdnený inými videami"
+  },
+  "video_queued": {
+    "message": "Pridané do radu"
+  },
+  "video_failed_lookup": {
+    "message": "Vyhľadanie zlyhalo"
+  },
+  "video_tab_video": {
+    "message": "Video"
+  },
+  "video_tab_audio": {
+    "message": "Zvuk"
+  },
+  "video_open_post": {
+    "message": "Otvorte príspevok a potom použite tlačidlo na tej stránke"
+  },
+  "popup_send_to": {
+    "message": "Odoslať sťahovania do"
+  },
+  "popup_send_here": {
+    "message": "Tento počítač"
+  },
+  "popup_send_remote": {
+    "message": "Iný Mister Download Manager (server)"
+  },
+  "popup_remote_code": {
+    "message": "Párovací kód"
+  },
+  "popup_remote_open": {
+    "message": "Otvoriť"
+  },
+  "popup_remote_pair": {
+    "message": "Spárovať"
+  },
+  "popup_remote_help": {
+    "message": "Otvorte jeho adresu raz a prijmite jeho certifikát, potom zadajte kód z jeho Možnosti, Vzdialené, Spárovať zariadenie (alebo misterdownloadmanager-cli pair)."
+  },
+  "status_remote": {
+    "message": "Sťahovania idú na $address$",
+    "placeholders": {
+      "address": {
+        "content": "$1",
+        "example": "https://192.168.1.10:8463/"
+      }
+    }
+  },
+  "remote_address": {
+    "message": "Zadajte jeho adresu https://."
+  },
+  "remote_unreachable": {
+    "message": "Nedostupné. Otvorte jeho adresu raz v tomto prehliadači a prijmite jeho certifikát, potom skúste znova."
+  },
+  "remote_wrong_code": {
+    "message": "Nesprávny kód."
+  },
+  "remote_no_code": {
+    "message": "Teraz nezobrazuje žiadny kód: najprv tam kliknite na Spárovať zariadenie."
+  },
+  "remote_too_soon": {
+    "message": "Počkajte chvíľu a potom skúste znova."
+  },
+  "remote_failed": {
+    "message": "Nepodarilo sa. Skúste znova."
+  },
+  "remote_device_name": {
+    "message": "Rozšírenie prehliadača"
+  },
+  "popup_media_title_name": {
+    "message": "Pridať názov stránky pred názvy mediálnych súborov"
+  }
+}

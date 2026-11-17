@@ -1,0 +1,73 @@
+The Breeze theme's icon set (#45).
+
+breeze-icons 6.31.0, Uri Herrera and the KDE Visual Design Group.
+https://invent.kde.org/frameworks/breeze-icons, commit 60ca51729f00b85813f01580fc9e85723245054d.
+Licence: GNU LGPL v3 or later, with KDE's clarification for artwork (LICENSE, beside this file;
+the GNU GPL v3 it builds on is MDM's own LICENSE, at the top of the repository).
+
+Each file is one of the theme's icons, unchanged, renamed to the need MDM uses it for
+(crates/app/src/themeicons.rs lists them):
+- 16/: icons/<context>/16/<icon>.svg, drawn for 16 pixels.
+- 24/: icons/<context>/22/ or 32/<icon>.svg, drawn at 24 pixels and up.
+- <need>-symbolic.svg: a one-colour icon (KDE's ColorScheme-Text); MDM draws its greys in the
+  theme's text colour as it reads it, as KDE does, and keeps its highlight and warning colours.
+- <need>.svg: a colour icon, drawn as it is.
+
+Which icon each need is (and the stand-ins, where Breeze has no icon of that meaning):
+  tb-add-url: list-add
+  tb-add-torrent: kt-magnet
+  tb-resume: kt-start
+  tb-stop: kt-stop
+  tb-stop-all: kt-stop-all
+  tb-delete: edit-delete
+  tb-delete-completed: edit-clear-all (stand-in)
+  tb-options: configure
+  tb-scheduler: appointment-new
+  tb-start-queue: kt-start-all
+  tb-stop-queue: kt-stop-all
+  cat-all: folder
+  cat-compressed: package-x-generic
+  cat-documents: x-office-document
+  cat-music: audio-x-generic
+  cat-programs: application-x-executable
+  cat-video: video-x-generic
+  cat-torrents: application-x-bittorrent
+  cat-unfinished: folder-download
+  cat-finished: folder (stand-in)
+  cat-queues: view-list-details
+  cat-folder: folder
+  cat-folder-open: folder-open
+  st-complete: task-complete
+  st-error: emblem-error
+  st-paused: emblem-pause
+  st-downloading: download
+  st-queued: chronometer (stand-in)
+  st-seeding: go-up
+  ft-generic: unknown
+  ft-archive: application-x-archive
+  ft-audio: audio-x-generic
+  ft-video: video-x-generic
+  ft-image: image-x-generic
+  ft-document: x-office-document
+  ft-spreadsheet: x-office-spreadsheet
+  ft-presentation: x-office-presentation
+  ft-executable: application-x-executable
+  ft-code: text-x-script
+  ft-text: text-x-generic
+  ft-disk-image: application-x-cd-image
+  ft-font: application-x-font-ttf
+  ft-torrent: application-x-bittorrent
+  ui-minimize: window-minimize
+  ui-maximize: window-maximize
+  ui-restore: window-restore
+  ui-close: window-close
+  misc-emblem-ok: emblem-checked
+  misc-up: go-up
+  misc-down: go-down
+  misc-remove: list-remove
+
+MDM's own, drawn for MDM in Breeze's flat style (GPL-3.0-or-later, as MDM), at 16, 24, 32 and
+48 pixels: ft-pdf (a page with "PDF" letters, ft-pdf.png), instead of Breeze's application-pdf,
+whose mark recalls a brand's, and ui-to-tray (a window going down to the notification area,
+where Breeze has no icon of that meaning), a one-colour picture (ui-to-tray-symbolic.png) drawn
+in the theme's text colour. Either can be swapped for another file of the same name.
