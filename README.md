@@ -15,8 +15,8 @@
 
 | Feature | What it does |
 |---------|--------------|
-| **16-Channel Parallel Engine** | Splits transfers into concurrent HTTP range streams to maximize bandwidth. |
-| **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in ~150ms to restore full speed. Stays active even on single-stream (no-Range) servers, pausing/unpausing the sole connection to reset ISP per-flow throttling. |
+| **16-Channel Parallel Engine** | Native in-process Rust (`rapids`) engine splits HTTP(S) transfers into up to 16 concurrent range streams. A legacy aria2 backend is available via `--engine aria2`. |
+| **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in-process (no daemon restart) to restore full speed. On no-Range single-stream servers it stays active for telemetry but does not cycle sockets. |
 | **SHA-256 Verification** | Cryptographically validates every download before writing to disk. |
 | **Cross-Platform** | Native Windows 10/11 and macOS (Intel & Apple Silicon) support. |
 | **Python Packages** | `paradl pip install <pkg>` — resolves and installs wheels with transitive deps via `uv`. |
@@ -53,10 +53,12 @@ brew install parallel-dl
 
 ### Prerequisites
 
-`paradl` uses [`aria2`](https://aria2.github.io/) for segmented transport and optionally [`ffmpeg`](https://ffmpeg.org/) for media extraction:
+HTTP(S) downloads use the **native Rust `rapids` engine** built into `paradl` — no external download daemon is needed for the default path. [`aria2`](https://aria2.github.io/) is only required if you force `--engine aria2` or download torrents/magnets/metalinks, and [`ffmpeg`](https://ffmpeg.org/) is optional for media extraction:
 
-- **Windows:** `winget install aria2.aria2 Gyan.FFmpeg` (or scoop / chocolatey)
-- **macOS:** `brew install aria2 ffmpeg`
+- **Windows:** `winget install Gyan.FFmpeg` (add `aria2.aria2` only for the legacy engine / torrents)
+- **macOS:** `brew install ffmpeg` (add `aria2` only for the legacy engine / torrents)
+
+If the native extension is not built, `paradl` gracefully falls back to aria2 for HTTP(S). Build it with `maturin develop --release` from `rust/paradl-rs` (see the [contributor setup](#contributor-setup) section).
 
 Verify the install:
 
@@ -75,7 +77,9 @@ paradl doctor
 paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -o ./downloads
 ```
 
-> **Note on single-stream (no-Range) servers:** Some servers (e.g. GitHub `archive/refs/heads/main.zip`) do not honor HTTP `Range` requests (`206 Partial Content`). `paradl` detects this up-front, downgrades to a single stream, and **keeps the anti-throttle watchdog active** — it pauses/unpauses the sole connection to reset ISP per-flow throttling. Parallel chunking is impossible on such URLs regardless of downloader; use `git clone` or GitHub Release assets instead for parallel downloads.
+> **GitHub archive URLs:** `codeload.github.com` ignores `Range`, so a plain `/archive/` URL is a single stream. `paradl` auto-routes these through a Range-capable mirror so they can use all 16 channels, keeping the canonical URL as failover. Override the mirror with `PARADL_GITHUB_ARCHIVE_MIRROR` (default `https://gh-proxy.com/`); set it to an empty string to disable acceleration.
+>
+> **Other no-Range servers:** `paradl` detects them up-front, downloads in a single stream, and keeps the watchdog active for telemetry only (no socket cycling — those servers reject mid-stream resume). Parallel chunking is impossible on such URLs regardless of downloader.
 
 ### Download with custom channel count
 
@@ -195,11 +199,40 @@ Features: task list with progress bars, pause/resume/delete, categories, search,
 
 ---
 
+## Engine selection
+
+`paradl` picks a transfer backend per target:
+
+- **HTTP(S)** uses the native Rust `rapids` engine by default (`--engine rust`).
+- `--engine aria2` selects the legacy JSON-RPC daemon backend.
+- **Torrents, magnets, and metalinks** are always delegated to aria2, regardless of selection.
+
+If the compiled extension is unavailable, HTTP(S) transfers automatically fall back to aria2. Check which engine is active with `paradl doctor`.
+
+---
+
 ## Configuration
 
 | Environment Variable | Description | Default |
 |----------------------|-------------|---------|
 | `PARADL_HOME` | Config & data directory | `~/.config/paradl` (macOS/Linux) <br> `%LOCALAPPDATA%\paradl` (Windows) |
+| `PARADL_GITHUB_ARCHIVE_MIRROR` | Range-capable mirror prefix for GitHub `/archive/` URLs (empty disables acceleration) | `https://gh-proxy.com/` |
+
+---
+
+## Contributor setup
+
+To build the native `rapids` engine from source (Rust 1.98+ and `maturin` required):
+
+```bash
+cd rust/paradl-rs
+maturin develop --release
+cp python/paradl/_rust_engine*.so ../../src/paradl/
+cd ../..
+python -m pytest -q
+```
+
+The workspace lives under `rust/` (`rapids` core + `paradl-rs` PyO3 bindings). Run `cargo test --all` and `cargo clippy --all -- -D warnings` from `rust/` to verify the Rust side.
 
 ---
 
