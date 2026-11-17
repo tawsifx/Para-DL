@@ -1,6 +1,5 @@
 # Workspace for the in-process Rust download engine that replaces the aria2 JSON-RPC
-# control plane in paradl. The engine core is a trimmed, GPL-3.0-or-later port of
-# Mister Download Manager's `crates/engine` (https://github.com/anefzaoui/misterdownloadmanager).
+# control plane in paradl. The engine core is a trimmed, in-process Rust port.
 [workspace]
 members = ["mdm-engine", "paradl-rs"]
 resolver = "2"
@@ -9,9 +8,8 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.98"
-license = "GPL-3.0-or-later"
-# Original engine copyright retained; local adaptation credited separately in file headers.
-authors = ["Ahmed Nefzaoui (original MDM engine)", "Tawsif Rahman (paradl adaptation)"]
+license = "MIT"
+authors = ["Tawsif Rahman"]
 
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }

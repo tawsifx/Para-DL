@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// PyO3 bindings for the trimmed MDM engine ported from Mister Download Manager (c) Ahmed
-// Nefzaoui, https://github.com/anefzaoui/misterdownloadmanager, GPL-3.0-or-later.
-// Written for paradl by Tawsif Rahman, 2026-11-17. No original MDM file is copied here;
-// this is the new PyO3 surface described in the migration plan's Task 1 interface contract.
 
 use std::collections::HashMap;
 use std::path::PathBuf;

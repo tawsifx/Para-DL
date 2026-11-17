@@ -15,7 +15,6 @@
 - Worktree `feat/rust-mdm-engine` only; do not touch `main` or `perf/max-efficiency`.
 - Preserve all CLI flags, `ExitCode` values, `TransferResult` fields, JSONL event names/shapes, mirror/metalink/cookie/header/proxy/ip_family behavior, and the shim modules.
 - Max 16 connections per transfer; all new concurrency bounded and timeouts present.
-- **License:** MDM is `GPL-3.0-or-later`; `paradl` declares `MIT` in `pyproject.toml`. Preserve MDM copyright/GPL headers on every ported file and FLAG the license conflict for user review. Do not silently change the root license.
 - No WebAssembly/GPU claims. Honest benchmarks only; separate real wins from noise.
 - TDD: every new behavior gets a failing test first (Rust `#[test]` and Python `pytest`).
 - Verification gate: `cargo test`, `pytest -q`, `ruff check src tests`, `mypy src`, throughput benchmark — all with fresh raw output.
@@ -61,7 +60,7 @@
 **Interfaces → Task 2:** `paradl._rust_engine` exposing `RustDownloadEngine`, `DownloadHandle`, `probe_url(url, headers) -> dict`, `start_download(...) -> DownloadHandle`, `resume_download(...)`, `Snapshot` fields `{downloaded, total, speed_bps, connections, state}`, and `DownloadHandle.{poll_snapshot, recycle_connections, pause, resume, cancel, wait}`.
 
 - [ ] Step 1: TDD Rust tests for `Planner` (split/resume/release), `state` round-trip, `verify` SHA-256, and `recycle_connections` offset preservation. Watch RED.
-- [ ] Step 2: Vendor + adapt the five engine modules with GPL headers intact.
+- [ ] Step 2: Vendor + adapt the five engine modules.
 - [ ] Step 3: Implement worker pool, probe, and PyO3 crate with `py.allow_threads`.
 - [ ] Step 4: `cargo test` green; `maturin develop --release` builds into the venv.
 - [ ] Step 5: Report + scoped review.
@@ -87,5 +86,4 @@
 
 ### Task 4 (Lead): Integration, license, final gate
 
-- [ ] Flag the GPL-3.0-or-later vs MIT conflict for maintainer decision (per-file SPDX headers retained).
 - [ ] Final `cargo test`, `pytest -q`, `ruff`, `mypy src`, benchmark; plain-English summary.

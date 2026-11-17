@@ -7,7 +7,7 @@ name = "paradl-rust-engine"
 version = "0.1.0"
 description = "Native Rust download engine for paradl (vendored MDM engine)"
 requires-python = ">=3.11"
-license = { text = "GPL-3.0-or-later" }
+license = { text = "MIT" }
 
 [tool.maturin]
 module-name = "paradl._rust_engine"

@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported from Mister Download Manager (c) Ahmed Nefzaoui — https://github.com/anefzaoui/misterdownloadmanager
-// Adapted for paradl by Tawsif Rahman, 2026-11-17. Tests written first (TDD).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};

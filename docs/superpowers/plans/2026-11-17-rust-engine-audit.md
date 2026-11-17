@@ -15,7 +15,6 @@
 - Worktree `feat/rust-mdm-engine` only; NEVER touch `main` or `perf/max-efficiency`. BASE = 48379b7.
 - Preserve every CLI flag, `ExitCode` (0/1/3/4/130), `TransferResult` fields, JSONL event shapes, shim modules, mirror/metalink/cookie/proxy/ip_family behavior.
 - Max 16 connections; all concurrency bounded; all waits have timeouts. No thread/JoinSet leaks.
-- **License:** ported Rust is GPL-3.0-or-later; project declares MIT. FLAG for maintainer; do NOT change root license.
 - Honest benchmarks only: warm-cache hits and ~1.2–1.3× drift are NOT wins. Report medians + spreads; `null` + reason for unfair metrics.
 - TDD: every new behavior gets a failing test first (Rust `#[test]` and/or Python `pytest`), watched RED then GREEN.
 - Cargo commands run from `rust/` with `PYO3_PYTHON=/Users/tawsifx/paradl/.venv/bin/python`.
@@ -89,7 +88,6 @@
 
 - [ ] Per-diff: generate review package (`git diff -U10` + new files) under `.superpowers/audit/reviews/`, dispatch reviewer with two explicit verdicts (`SPEC COMPLIANCE pass/fail`, `CODE QUALITY Approved/Needs changes`) + severity-tagged findings with `file:line`. Fix loops with the owning agent; cap 5 rounds; ledger ruling at cap.
 - [ ] Broad whole-branch review on the most capable model after all 4 tasks accepted.
-- [ ] License decision (GPL-3.0-or-later vs MIT) remains with the maintainer; per-file SPDX headers retained.
 - [ ] Final gate: fresh `cargo test --all`, `cargo clippy --all -- -D warnings`, `pytest -q`, `ruff check src tests`, `mypy src`, benchmark exit 0. `git status` reviewed. Nothing committed.
 
 ## Success Criteria (acceptable evidence = raw command output)

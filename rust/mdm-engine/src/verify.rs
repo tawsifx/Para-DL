@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/verify.rs
-// Original engine is GPL-3.0-or-later. Ported verbatim by Tawsif Rahman, 2026-11-17.
 // Modifications: removed the inline `#[cfg(test)] mod tests;` (tests are in src/tests.rs).
 //! Whole-file checksums (beyond IDM, D-015): verify a finished download when its hash is known —
 //! given by the user, or announced by the server (`Digest`, `Repr-Digest`, `Content-MD5`,

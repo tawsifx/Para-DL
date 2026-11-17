@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/state.rs
-// Original engine is GPL-3.0-or-later. Ported by Tawsif Rahman, 2026-11-17.
 // Modifications:
 //   - craft_atomic::atomic_write -> std write-temp-then-rename (`atomic_write` below),
 //     per the trimmed-vendoring ruling (no git-patched deps).

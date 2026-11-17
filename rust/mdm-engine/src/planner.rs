@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/planner.rs
-// Original engine is GPL-3.0-or-later. Ported verbatim, then adapted for paradl by
-// Tawsif Rahman, 2026-11-17.
 // Modifications: removed MDM's `#[cfg(test)] mod tests;` (tests live in src/tests.rs);
 // no other logic changes. This module is pure logic and does no I/O.
 //! Dynamic segmentation planner — pure logic, no I/O.

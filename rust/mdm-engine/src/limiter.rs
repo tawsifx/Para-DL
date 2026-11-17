@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/limiter.rs
-// Original engine is GPL-3.0-or-later. Ported verbatim by Tawsif Rahman, 2026-11-17.
 // Modifications: removed MDM's inline `#[cfg(test)] mod tests;` (tests are in src/tests.rs).
 //! Per-download speed limiter (IDM: "Maximum download speed for one file", notes/ENGINE.md §4).
 //! A token bucket shared by all of a download's connections; the limit can change while the

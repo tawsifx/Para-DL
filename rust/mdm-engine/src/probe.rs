@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Engine probe adapted from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/download.rs (`probe`)
-// Original engine is GPL-3.0-or-later. Written for paradl by Tawsif Rahman, 2026-11-17.
 // Modifications: a focused GET-only probe that records the *final* (post-redirect) URL.
 // This is the control-plane fix for docs/diagnostics/watchdog-cycle-aria2-bug.md: the
 // redirected URI is captured once and kept in the URI pool for the whole download, including

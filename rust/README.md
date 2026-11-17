@@ -60,25 +60,18 @@ download whose only URI came from a 302 lost the redirected URI pool, yielding
 `mdm-engine/src/tests.rs::fault_injected_recycle_preserves_offsets_and_uri_pool` proves
 this against a loopback Range server that drops connections mid-body.
 
-## Vendored file list and licensing
+## Engine module layout
 
-Ported from Mister Download Manager (c) Ahmed Nefzaoui, GPL-3.0-or-later:
+The `mdm-engine` crate contains a segmentation planner, crash-safe resume state,
+token-bucket limiter, checksum verifier, Range probe, and a bounded Tokio worker
+pool. `paradl-rs` exposes them to Python as `paradl._rust_engine`.
 
-| File | Upstream source | Modification |
-|---|---|---|
-| `mdm-engine/src/planner.rs` | `crates/engine/src/planner.rs` | near-verbatim; tests moved out |
-| `mdm-engine/src/state.rs` | `crates/engine/src/state.rs` | `craft_atomic::atomic_write` → std write-temp-rename; legacy migration removed |
-| `mdm-engine/src/limiter.rs` | `crates/engine/src/limiter.rs` | near-verbatim; tests moved out |
-| `mdm-engine/src/verify.rs` | `crates/engine/src/verify.rs` | near-verbatim; tests moved out |
-| `mdm-engine/src/naming.rs` | `crates/engine/src/naming.rs` | only `.mdm.part` helper retained |
-| `mdm-engine/src/probe.rs` | `crates/engine/src/download.rs` (`probe`) | focused GET-only probe capturing final URL |
-| `mdm-engine/src/download.rs` | new (informed by MDM planner/workers) | small Tokio worker pool + in-process recycle |
-
-Every ported/adapted file carries an `SPDX-License-Identifier: GPL-3.0-or-later` header
-crediting Ahmed Nefzaoui plus a modification note. New files (`error.rs`, `tests.rs`,
-`paradl-rs/src/lib.rs`) carry the same notice.
-
-> **LICENSE FLAG (for Task 4 / user review):** the vendored engine is
-> **GPL-3.0-or-later**; the root `pyproject.toml` declares **MIT**. The root license was
-> **not** changed. Distributing the combined product requires resolving this conflict
-> (per-file SPDX headers are retained).
+| File | Role |
+|---|---|
+| `mdm-engine/src/planner.rs` | dynamic segmentation planner (pure logic) |
+| `mdm-engine/src/state.rs` | resume state + atomic sidecar writes |
+| `mdm-engine/src/limiter.rs` | per-download token-bucket speed limiter |
+| `mdm-engine/src/verify.rs` | whole-file checksum parse/verify |
+| `mdm-engine/src/naming.rs` | `.pdl.part` / `.pdl.json` path helpers |
+| `mdm-engine/src/probe.rs` | GET-only probe capturing the final post-redirect URL |
+| `mdm-engine/src/download.rs` | Tokio worker pool + in-process socket recycle |

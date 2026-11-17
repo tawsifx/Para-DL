@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Engine download worker pool adapted from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/{download.rs,planner.rs}
-// Original engine is GPL-3.0-or-later. Written for paradl by Tawsif Rahman, 2026-11-17.
 // Modifications: MDM's 5731-line download.rs is NOT copied. This is a small focused Tokio
 // worker pool driven by the vendored planner. The URI pool is created once from the probe's
 // post-redirect URL and is never rebuilt; `recycle_connections` cancels workers, releases

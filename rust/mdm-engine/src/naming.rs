@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported/adapted from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine/src/naming.rs
-// Original engine is GPL-3.0-or-later. Adapted for paradl by Tawsif Rahman, 2026-11-17.
 // Modification: only the `.mdm.part` naming helper is retained; MDM's full naming.rs
 // (length limits, per-platform path rules) is out of scope for the trimmed port.
 

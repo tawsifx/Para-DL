@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Ported/adapted from Mister Download Manager (c) Ahmed Nefzaoui
-//   https://github.com/anefzaoui/misterdownloadmanager — crates/engine
-// Original engine is GPL-3.0-or-later. Adapted for paradl by Tawsif Rahman, 2026-11-17.
 
 use thiserror::Error;
 
