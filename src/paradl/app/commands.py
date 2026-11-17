@@ -62,10 +62,18 @@ class PDLApp:
 
     def clean_orphans(self, target_dir: Path) -> int:
         target_dir = Path(target_dir).expanduser().resolve()
-        patterns = ["*.aria2", ".pdl_raw_*", "*.part", "*.ytdl"]
-        found: list[Path] = []
+        patterns = [
+            "*.aria2",  # legacy aria2 control files
+            "*.mdm.part",  # native Rust partial data
+            "*.mdm.json",  # native Rust resume sidecar
+            ".pdl_raw_*",
+            "*.part",
+            "*.ytdl",
+        ]
+        found: dict[Path, None] = {}
         for pat in patterns:
-            found.extend(list(target_dir.glob(pat)))
+            for match in target_dir.glob(pat):
+                found.setdefault(match, None)
 
         if not found:
             print_plain(
@@ -480,6 +488,12 @@ class PDLApp:
         return code
 
     def execute(self, args: argparse.Namespace) -> int:
+        # Engine selection is also applied by the --engine argparse action; set
+        # it here too so programmatic callers and the curl path stay consistent.
+        from paradl.core.config import set_active_engine
+
+        set_active_engine(str(getattr(args, "engine", None) or self.config.engine))
+
         if getattr(args, "hash_file", None):
             from paradl.postproc.checksum import ChecksumEngine
 
@@ -791,6 +805,24 @@ class PDLApp:
             return int(ExitCode.FAILURE)
 
         probed_targets: list[TargetInfo] = probe_targets_parallel(targets)
+        # GitHub source archives are served by codeload without HTTP Range
+        # support, forcing a single slow stream. transparently route them
+        # through a configurable Range-capable mirror so the normal 16-channel
+        # engine applies. The canonical GitHub URL is kept as a failover mirror.
+        from paradl.net.accelerate import accelerate_url
+
+        for t_info in probed_targets:
+            accelerated = accelerate_url(t_info.clean_url or t_info.raw)
+            if accelerated:
+                original = t_info.clean_url or t_info.raw
+                t_info.clean_url = accelerated
+                if original not in t_info.mirrors:
+                    t_info.mirrors.insert(0, original)
+                t_info.accept_ranges = True
+                print_plain(
+                    "  [dim]•[/dim] [white]Range-capable mirror enabled for GitHub "
+                    "archive (16 streams)[/white]"
+                )
         results: list[dict[str, Any]] = []
         total_items = len(probed_targets)
         overall_exit_code = int(ExitCode.OK)
@@ -1118,6 +1150,7 @@ class PDLApp:
                         "audio_format_produced": tx_res.audio_format_produced if tx_res else None,
                         "avg_speed_bps": tx_res.avg_speed_bps if tx_res else 0,
                         "recycle_count": tx_res.recycle_count if tx_res else 0,
+                        "error": tx_res.error if tx_res else None,
                     }
                 )
 
@@ -1159,7 +1192,12 @@ class PDLApp:
                 if res.get("adb"):
                     con.print("    [dim]Sync:[/dim]        [green]Copied to Android device[/green]")
             else:
-                con.print(f"  [bold red]✗ Download failed:[/bold red] [dim]{res['target']}[/dim]")
+                detail = res.get("error")
+                reason = f" — {detail}" if detail else ""
+                con.print(
+                    f"  [bold red]✗ Download failed:[/bold red] "
+                    f"[dim]{res['target']}{reason}[/dim]"
+                )
             con.print()
             return
 
@@ -1195,6 +1233,10 @@ class PDLApp:
         import subprocess
         import sys
         from urllib.parse import urlparse
+
+        from paradl.core.config import set_active_engine
+
+        set_active_engine(str(getattr(args, "engine", None) or self.config.engine))
 
         from paradl.core.models import ExitCode, TargetInfo, TargetType
         from paradl.engines.aria2 import Aria2Engine

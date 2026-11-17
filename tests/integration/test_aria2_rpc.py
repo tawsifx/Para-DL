@@ -93,6 +93,11 @@ def test_one_tell_status_and_get_servers_per_gid_per_tick(tmp_path, monkeypatch)
     def on_progress(downloaded, total, speed, connections):
         snapshots.append((daemon.tell_calls, daemon.server_calls))
 
+    # This test exercises the legacy aria2 control plane (RPC dedup). With the Rust
+    # engine as the default, force the aria2 path so the daemon mocks are used.
+    from paradl.core import config as core_config
+
+    monkeypatch.setattr(core_config, "get_active_engine", lambda: "aria2")
     monkeypatch.setattr(engines.aria2, "TOOLCHAIN", fake_toolchain)
     monkeypatch.setattr(engines.aria2, "get_daemon_pool", lambda: fake_pool)
     monkeypatch.setattr(engines.aria2, "get_clock", _FakeClock)

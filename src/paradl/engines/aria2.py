@@ -53,6 +53,146 @@ from paradl.util.toolchain import TOOLCHAIN
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_progress(
+    *, downloaded: int, total: int, all_complete: bool, has_error: bool
+) -> tuple[int, int]:
+    """Clamp progress so an active/errored GID can never render as 100%.
+
+    aria2 can report ``completedLength == totalLength`` for a GID that then
+    errors (e.g. error 8 "No URI available" after a watchdog-driven
+    pause/unpause on a redirected URL). Feeding those numbers straight into the
+    display produced a false "100% complete" for a truncated transfer.
+    """
+    total = max(int(total or 0), 0)
+    done = max(int(downloaded or 0), 0)
+    if total > 0 and done >= total and not all_complete:
+        done = total - 1
+    if total > 0:
+        done = min(done, total)
+    return done, total
+
+
+def _disk_progress(items: Any, completed_paths: dict[int, Path]) -> int:
+    """Sum real bytes already on disk for the transfer's part/output files.
+
+    aria2's ``completedLength`` can lag the bytes actually written (disk cache,
+    buffering). Using the larger of the two prevents the progress bar from
+    underreporting a nearly-finished download.
+    """
+    written = 0
+    for idx, item in enumerate(items or []):
+        path = completed_paths.get(idx)
+        if path is None:
+            filename = getattr(item, "filename", None)
+            out_dir = getattr(item, "out_dir", None)
+            if filename and out_dir:
+                path = Path(out_dir) / filename
+        if path is None:
+            continue
+        try:
+            written += int(Path(path).stat().st_size)
+        except OSError:
+            continue
+    return written
+
+
+def _restore_uris_after_recycle(
+    daemon: Any, gid_to_idx: dict[str, int], items: list[Any]
+) -> None:
+    """Restore each GID's URI pool after a pause/unpause recycle.
+
+    aria2 consumes the effective URI of a redirected transfer when a download is
+    force-paused and unpaused. Without re-adding it, the next RPC reports
+    ``errorCode=8, "No URI available."`` and the transfer dies. Re-adding the
+    original URI (plus mirrors) makes aria2 re-follow the redirect on fresh
+    connections while keeping committed offsets intact.
+    """
+    for gid, idx in list(gid_to_idx.items()):
+        item = items[idx] if 0 <= idx < len(items) else None
+        if item is None:
+            continue
+        uris = [item.url, *list(getattr(item, "mirrors", None) or [])]
+        if not uris:
+            continue
+        try:
+            daemon.change_uri(gid, uris)
+        except Exception as rpc_err:  # pragma: no cover - defensive around RPC
+            logger.debug("URI restore failed for %s: %s", gid, rpc_err)
+
+
+_LEGACY_ONLY_SUFFIXES = (".meta4", ".metalink")
+
+
+def _is_legacy_only_url(url: str | None) -> bool:
+    """Return True for magnet/metalink URIs (aria2-only protocols in v1)."""
+    if not url:
+        return False
+    lowered = str(url).strip().lower()
+    if lowered.startswith(("magnet:", "metalink:")):
+        return True
+    path = urlparse(lowered).path
+    return path.endswith(_LEGACY_ONLY_SUFFIXES)
+
+
+def _needs_legacy_aria2(
+    *,
+    is_torrent: bool = False,
+    target_info: TargetInfo | None = None,
+    items: list[DownloadItem] | None = None,
+) -> bool:
+    """Detect torrent/metalink/magnet transfers that must stay on aria2.
+
+    Batch callers (hf/github) do not pass ``is_torrent``, so the decision cannot
+    rely on a single flag: it must inspect the actual targets as well.
+    """
+    if is_torrent:
+        return True
+    if target_info is not None:
+        if getattr(target_info, "target_type", None) == TargetType.TORRENT:
+            return True
+        if getattr(target_info, "metalink_path", None):
+            return True
+        if _is_legacy_only_url(getattr(target_info, "clean_url", None)):
+            return True
+        if _is_legacy_only_url(getattr(target_info, "raw", None)):
+            return True
+        if any(_is_legacy_only_url(mirror) for mirror in getattr(target_info, "mirrors", []) or []):
+            return True
+    for item in items or []:
+        if getattr(item, "metalink_path", None):
+            return True
+        if _is_legacy_only_url(getattr(item, "url", None)):
+            return True
+        if any(_is_legacy_only_url(mirror) for mirror in getattr(item, "mirrors", []) or []):
+            return True
+    return False
+
+
+def _use_rust_for(
+    is_torrent: bool,
+    *,
+    target_info: TargetInfo | None = None,
+    items: list[DownloadItem] | None = None,
+) -> bool:
+    """Return True when a transfer should use the native Rust engine.
+
+    Torrent/magnet/metalink stay on aria2 in v1 regardless of the selection.
+    """
+    if _needs_legacy_aria2(is_torrent=is_torrent, target_info=target_info, items=items):
+        return False
+    from paradl.core.config import get_active_engine
+
+    if get_active_engine() != "rust":
+        return False
+    # Graceful degradation: without a compiled extension the legacy aria2
+    # backend remains the working fallback (that is why it is retained).
+    from paradl import _rust_engine
+
+    probe = getattr(_rust_engine, "is_available", None)
+    return bool(probe()) if callable(probe) else False
+
+
 _ACTIVE_PROCESSES: set[subprocess.Popen[Any]] = set()
 _ACTIVE_TEMP_FILES: set[Path] = set()
 
@@ -462,6 +602,15 @@ class Aria2RpcDaemon:
     def change_option(self, gid: str, options: dict[str, Any]) -> str:
         return str(self.call("aria2.changeOption", gid, options))
 
+    def change_uri(self, gid: str, uris: list[str], file_index: int = 1) -> str:
+        """Re-add URIs to a download whose pool was consumed by pause/unpause.
+
+        aria2 RPC signature (context7 / aria2 manual):
+        ``changeUri(gid, fileIndex, delUris, addUris, position?)`` — fileIndex is
+        1-based; delUris runs before addUris.
+        """
+        return str(self.call("aria2.changeUri", gid, file_index, [], uris))
+
     def save_session(self) -> None:
         try:
             self.call("aria2.saveSession")
@@ -557,6 +706,30 @@ class Aria2Engine:
         cls,
         target_info: TargetInfo,
         out_dir: Path,
+        *args: Any,
+        **kwargs: Any,
+    ) -> TransferResult:
+        """Select the HTTP(S) backend for this transfer (Rust by default).
+
+        Torrent/magnet/metalink transfers always stay on the legacy aria2 path;
+        every other call is routed to :class:`RustEngine` when the active engine
+        is ``rust``.  ``--engine aria2`` keeps the original behaviour.  This is
+        the single delegation point used by hf/github/ipsw/media/brew/pypi.
+        """
+        if _use_rust_for(
+            getattr(target_info, "target_type", None) == TargetType.TORRENT,
+            target_info=target_info,
+        ):
+            from paradl.engines.rust_engine import RustEngine
+
+            return RustEngine.download(target_info, out_dir, *args, **kwargs)
+        return cls._legacy_download(target_info, out_dir, *args, **kwargs)
+
+    @classmethod
+    def _legacy_download(
+        cls,
+        target_info: TargetInfo,
+        out_dir: Path,
         connections: int = 16,
         limit_rate: str | None = None,
         anti_throttle: str | None = "4MBps",
@@ -602,7 +775,7 @@ class Aria2Engine:
             referer=target_info.referer,
             user_agent=target_info.user_agent,
         )
-        return cls.download_batch(
+        return cls._legacy_download_batch(
             items=[item],
             out_dir=out_dir,
             connections=connections,
@@ -634,6 +807,21 @@ class Aria2Engine:
 
     @classmethod
     def download_batch(
+        cls,
+        items: list[DownloadItem],
+        out_dir: Path,
+        *args: Any,
+        **kwargs: Any,
+    ) -> TransferResult:
+        """Backend-selecting shim for batched downloads (see :meth:`download`)."""
+        if _use_rust_for(bool(kwargs.get("is_torrent", False)), items=items):
+            from paradl.engines.rust_engine import RustEngine
+
+            return RustEngine.download_batch(items, out_dir, *args, **kwargs)
+        return cls._legacy_download_batch(items, out_dir, *args, **kwargs)
+
+    @classmethod
+    def _legacy_download_batch(
         cls,
         items: list[DownloadItem],
         out_dir: Path,
@@ -1117,11 +1305,21 @@ class Aria2Engine:
                             except Exception:
                                 pass
 
+                        # Use the larger of aria2's committed count and the real
+                        # on-disk bytes, then clamp: an active/errored GID must
+                        # never render as a false 100%.
+                        display_done = max(total_done, _disk_progress(items, completed_paths))
+                        display_done, display_total = _safe_progress(
+                            downloaded=display_done,
+                            total=total_len,
+                            all_complete=not gid_to_idx,
+                            has_error=False,
+                        )
                         # Only show per-file sub-bars for multi-file transfers
                         show_file_rows = len(all_file_progress) > 1 or len(items) > 1
                         live.update(
-                            downloaded_bytes=total_done,
-                            total_bytes=total_len,
+                            downloaded_bytes=display_done,
+                            total_bytes=display_total,
                             speed_bps=global_speed,
                             connections=total_conns or per_file_conn,
                             watchdog_state=watchdog.status_label(),
@@ -1310,6 +1508,7 @@ class Aria2Engine:
                                             daemon.unpause(active_gid)
                                         except Exception as rpc_err:
                                             logger.debug("Resilience unpause failed: %s", rpc_err)
+                                    _restore_uris_after_recycle(daemon, gid_to_idx, items)
 
                                 elif decision.action in (
                                     WatchdogActionType.PAUSE_UNPAUSE,
@@ -1342,6 +1541,7 @@ class Aria2Engine:
                                             daemon.unpause(active_gid)
                                         except Exception as rpc_err:
                                             logger.debug("Unpause failed: %s", rpc_err)
+                                    _restore_uris_after_recycle(daemon, gid_to_idx, items)
                                     ev_src.reset_progress_timer(total_done)
                                 else:
                                     # Tier 3 process restart / IP family switch / single-stream fallback

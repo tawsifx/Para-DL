@@ -75,6 +75,41 @@ class Toolchain:
         return None
 
     @property
+    def rust_engine_available(self) -> bool:
+        """Whether a compiled native Rust engine module can be imported."""
+        if "rust_engine_available" not in self._cache:
+            try:
+                from paradl import _rust_engine
+
+                probe = getattr(_rust_engine, "is_available", None)
+                available = bool(probe()) if callable(probe) else False
+            except Exception as exc:  # pragma: no cover - defensive import
+                logger.debug("Native Rust engine import failed: %s", exc)
+                available = False
+            self._cache["rust_engine_available"] = "1" if available else "0"
+        return self._cache["rust_engine_available"] == "1"
+
+    @property
+    def rust_engine_version(self) -> str | None:
+        """Version string of the compiled native Rust engine, or None."""
+        if not self.rust_engine_available:
+            return None
+        if "rust_engine_version" not in self._cache:
+            try:
+                from paradl import _rust_engine
+
+                getter = getattr(_rust_engine, "version", None)
+                version_value = getter() if callable(getter) else getattr(_rust_engine, "__version__", None)
+                self._cache["rust_engine_version"] = (
+                    str(version_value) if version_value else None
+                )
+            except Exception as exc:  # pragma: no cover - defensive import
+                logger.debug("Native Rust engine version lookup failed: %s", exc)
+                self._cache["rust_engine_version"] = None
+        value = self._cache["rust_engine_version"]
+        return str(value) if value else None
+
+    @property
     def aria2c(self) -> str | None:
         if "aria2c" not in self._cache:
             self._cache["aria2c"] = self._find_bin(

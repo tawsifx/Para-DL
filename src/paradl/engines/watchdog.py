@@ -6,6 +6,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 from paradl import platform
 from paradl.core.clock import get_clock
@@ -36,6 +37,34 @@ class WatchdogDecision:
     rolling_p90_bps: float = 0.0
     cycle: int = 0
     event_type: str | None = None
+
+
+# Actions that reset per-flow sockets.  In the in-process Rust engine these all
+# map to a single ``DownloadHandle.recycle_connections()`` call (committed byte
+# offsets are preserved by the native planner) instead of an aria2
+# pause/unpause of a daemon-held URI list.
+RECYCLE_ACTIONS: frozenset[WatchdogActionType] = frozenset(
+    {
+        WatchdogActionType.RESILIENCE_RECYCLE,
+        WatchdogActionType.PAUSE_UNPAUSE,
+        WatchdogActionType.ADJUST_CONNECTIONS,
+    }
+)
+
+
+def apply_recycle_decision(decision: WatchdogDecision, handle: Any) -> bool:
+    """Apply a watchdog recycle decision to a native download handle.
+
+    Returns True when the handle was recycled.  A decision triggers at most one
+    ``recycle_connections()`` call: the native planner reassigns segments at
+    their committed offsets, so no daemon pause/unpause is involved.  The
+    watchdog state machine and status labels are unaffected — those are owned
+    by :class:`WatchdogController.step`.
+    """
+    if decision.action not in RECYCLE_ACTIONS:
+        return False
+    handle.recycle_connections()
+    return True
 
 
 def compute_percentile(samples: list[float], pct: float) -> float:
@@ -222,9 +251,20 @@ class WatchdogController:
         """Handle a WAKE, NET_CHANGE, or STALL event from ResilienceEventSource.
 
         Every event triggers the same action: recycle all connections, re-resolve DNS,
-        reset the speed baseline, and log the reason (unless Range is unsupported,
-        since forcePause/unpause on a 200-only server fails with CANNOT_RESUME).
+        reset the speed baseline, and log the reason. Events are ignored while the
+        watchdog is inactive (OFF/exhausted) and are rate-limited by the same
+        cooldown as speed-based recycles — back-to-back NET_CHANGE notifications
+        from `scutil` otherwise cause a cycle storm that amplifies throttling.
         """
+        if not self.is_active:
+            return WatchdogDecision(action=WatchdogActionType.NONE)
+        if elapsed_sec - self.last_recycle_elapsed < self.min_cooldown_sec:
+            logger.debug(
+                "Watchdog resilience event ignored: cooldown %.1fs (last recycle %.1fs)",
+                self.min_cooldown_sec,
+                self.last_recycle_elapsed,
+            )
+            return WatchdogDecision(action=WatchdogActionType.NONE)
         self.reset_speed_baseline()
         if not self.supports_range:
             logger.info(

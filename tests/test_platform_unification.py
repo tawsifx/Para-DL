@@ -8,7 +8,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from paradl import auth, doctor, paths
+from paradl import doctor, paths
+from paradl.auth import manager as auth_manager
+from paradl.resilience import hooks
 
 
 class TestPlatformUnification(unittest.TestCase):
@@ -26,33 +28,22 @@ class TestPlatformUnification(unittest.TestCase):
     def test_auth_status_windows_source_name(self) -> None:
         """Verify auth status reports 'credential_manager' on Windows when configured."""
         with (
-            patch.dict(
-                os.environ,
-                {
-                    "HF_TOKEN": "",
-                    "HUGGING_FACE_HUB_TOKEN": "",
-                    "GITHUB_TOKEN": "",
-                    "GH_TOKEN": "",
-                },
-            ),
             patch("paradl.auth.manager.is_windows", return_value=True),
             patch(
                 "paradl.auth.manager.has_keychain_token",
                 side_effect=lambda srv: srv == "hf",
             ),
         ):
-            status = auth.get_auth_status()
+            status = auth_manager.get_auth_status()
             self.assertTrue(status["hf"]["configured"])
             self.assertEqual(status["hf"]["source"], "credential_manager")
 
     def test_hooks_notify_calls_platform_notification(self) -> None:
         """Verify hooks dispatch to platform display_notification."""
-        from paradl.resilience import hooks as resilience_hooks
-
         with patch(
             "paradl.resilience.hooks.display_notification", return_value=True
         ) as mock_notify:
-            resilience_hooks.notify_download_complete(
+            hooks.notify_download_complete(
                 "https://example.com/file.zip", Path("/tmp/file.zip"), 1024
             )
             self.assertTrue(mock_notify.called)

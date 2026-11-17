@@ -112,9 +112,34 @@ def run_doctor() -> int:
     else:
         core_items.append(ToolCheck("Hugging Face Hub Engine", "missing", "httpx required"))
 
-    # aria2c
+    # Native Rust engine (default HTTP(S) backend)
+    if TOOLCHAIN.rust_engine_available:
+        rust_ver = TOOLCHAIN.rust_engine_version
+        core_items.append(
+            ToolCheck(
+                "Rust Engine (native mdm-engine)",
+                "ready",
+                f"v{rust_ver}" if rust_ver else "available",
+            )
+        )
+    else:
+        fix = "maturin develop --release  # build rust/paradl-rs into this venv"
+        fixes.append(fix)
+        core_items.append(
+            ToolCheck(
+                "Rust Engine (native mdm-engine)",
+                "optional_missing",
+                "not built (HTTP(S) falls back to --engine aria2)",
+                fix=fix,
+                required=False,
+            )
+        )
+
+    # aria2c (legacy opt-in fallback; no longer a hard requirement)
     if TOOLCHAIN.aria2c:
-        core_items.append(ToolCheck("aria2c (JSON-RPC 2.0)", "ready", TOOLCHAIN.aria2c))
+        core_items.append(
+            ToolCheck("aria2c (legacy JSON-RPC fallback)", "ready", TOOLCHAIN.aria2c, required=False)
+        )
     else:
         fix = (
             "winget install aria2.aria2  # or: scoop install aria2"
@@ -123,7 +148,13 @@ def run_doctor() -> int:
         )
         fixes.append(fix)
         core_items.append(
-            ToolCheck("aria2c (JSON-RPC 2.0)", "missing", "not found", fix=fix, required=True)
+            ToolCheck(
+                "aria2c (legacy JSON-RPC fallback)",
+                "optional_missing",
+                "not found (only needed with --engine aria2)",
+                fix=fix,
+                required=False,
+            )
         )
 
     # yt-dlp
@@ -322,6 +353,10 @@ def run_doctor() -> int:
                 "path": TOOLCHAIN.ytdlp,
             },
             "ytdlp_ejs": {"version": ejs_ver},
+            "rust_engine": {
+                "available": TOOLCHAIN.rust_engine_available,
+                "version": TOOLCHAIN.rust_engine_version,
+            },
             "npm": {
                 "version": npm_ver,
                 "path": npm_bin,
