@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
 import tarfile
-import time
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -13,26 +10,17 @@ import pytest
 from paradl.cli import build_parser
 from paradl.config import PDLConfig
 from paradl.curl_parser import parse_curl_command
-from paradl.engines import aria2 as aria2_mod
-from paradl.engines.aria2 import Aria2Engine
 from paradl.engines.github import GitHubEngine
 from paradl.engines.hf import HuggingFaceEngine
 from paradl.engines.media import MediaEngine
 from paradl.engines.pypi import PyPIEngine
 from paradl.history import compute_hour_bucket
-from paradl.mirrors import MirrorResolution, parse_metalink_bytes
-from paradl.models import DownloadItem, WatchdogMode, format_size, sanitize_filename
+from paradl.mirrors import parse_metalink_bytes
+from paradl.models import format_size, sanitize_filename
 from paradl.net import detect_isp, probe_http_url, probe_range_support, reset_isp_detector
 from paradl.platform.windows import unquarantine_zone_identifier_text
 from paradl.postproc.archive import ArchiveExtractor, ArchiveSecurityError
 from paradl.ui import UI
-
-
-@pytest.fixture
-def force_legacy_aria2(monkeypatch):
-    """These tests patch aria2 internals; force the legacy backend so the
-    delegation shim does not route them to the native Rust engine."""
-    monkeypatch.setattr("paradl.core.config.get_active_engine", lambda: "aria2")
 
 
 # ---------------------------------------------------------------------------
@@ -105,93 +93,6 @@ def test_h3_media_codec_args():
     src = inspect.getsource(MediaEngine._convert_coreaudio_or_ffmpeg)
     assert '"flac": ["-vn", "-c:a", "flac"]' in src
     assert '"wav": ["-vn", "-c:a", "pcm_s16le"]' in src
-
-
-# ---------------------------------------------------------------------------
-# H4: aria2 final file resolution does not pick unrelated pre-existing files
-# ---------------------------------------------------------------------------
-@pytest.mark.usefixtures("force_legacy_aria2")
-def test_h4_aria2_final_file_resolution(tmp_path):
-    UI.quiet = True
-    actual = tmp_path / "payload.bin"
-    actual.write_bytes(b"P" * 1024)
-
-    unrelated = tmp_path / "unrelated.bin"
-    unrelated.write_bytes(b"X" * 1024)
-    future = time.time() + 10 * 365 * 86400
-    os.utime(unrelated, (future, future))
-
-    class FakeDaemon:
-        def __init__(self, **kwargs):
-            self._proc = None
-
-        def start(self):
-            pass
-
-        def add_uri(self, uris, options):
-            return "gid1"
-
-        def add_metalink(self, raw, options):
-            return ["gid1"]
-
-        def get_global_stat(self):
-            return {"downloadSpeed": "0"}
-
-        def tell_status(self, gid):
-            return {
-                "status": "complete",
-                "completedLength": str(len(actual.read_bytes())),
-                "totalLength": str(len(actual.read_bytes())),
-                "files": [{"path": str(actual)}],
-            }
-
-        def get_servers(self, gid):
-            return []
-
-        def force_pause(self, gid):
-            pass
-
-        def unpause(self, gid):
-            pass
-
-        def change_option(self, gid, options):
-            pass
-
-        def stop(self, *, graceful: bool = True):
-            pass
-
-    item = DownloadItem(
-        url="http://127.0.0.1:9/payload.bin",
-        out_dir=tmp_path,
-        filename="expected-name.bin",
-    )
-    resolution = MirrorResolution(
-        active_uris=[item.url],
-        expected_length=len(actual.read_bytes()),
-        accept_ranges=True,
-        filename=None,
-    )
-    with (
-        mock.patch.object(aria2_mod, "Aria2RpcDaemon", FakeDaemon),
-        mock.patch.object(aria2_mod.MirrorManager, "resolve_and_validate", return_value=resolution),
-    ):
-        res = Aria2Engine.download_batch(
-            [item],
-            tmp_path,
-            connections=4,
-            anti_throttle=None,
-            accept_ranges_hint=True,
-            poll_interval=0.01,
-            min_cooldown_sec=0.1,
-            watchdog_mode=WatchdogMode.OFF,
-            caffeinate=False,
-            net_watch=False,
-            write_xattr=False,
-        )
-
-    assert res.success
-    assert Path(res.file_path).name == "payload.bin"
-    assert "unrelated.bin" not in [p.name for p in res.files]
 
 
 # ---------------------------------------------------------------------------
@@ -281,69 +182,6 @@ def test_m5_sanitize_filename_traversal():
 def test_m6_compute_hour_bucket():
     for h in range(24):
         assert compute_hour_bucket(h) == h // 4
-
-
-# ---------------------------------------------------------------------------
-# M7: Batch downloads checksum status
-# ---------------------------------------------------------------------------
-@pytest.mark.usefixtures("force_legacy_aria2")
-def test_m7_batch_checksum_aggregation(tmp_path):
-    UI.quiet = True
-    f1 = tmp_path / "f1.bin"
-    f1.write_bytes(b"file1")
-    f2 = tmp_path / "f2.bin"
-    f2.write_bytes(b"file2")
-
-    it1 = DownloadItem(
-        url="http://x/f1.bin",
-        out_dir=tmp_path,
-        filename="f1.bin",
-        expected_digest="sha256:4b4869...dummy",
-    )
-    it2 = DownloadItem(
-        url="http://x/f2.bin", out_dir=tmp_path, filename="f2.bin"
-    )  # No expected digest
-
-    # When it1 is verified but it2 has no digest hint, the batch is not claimed fully verified
-    with (
-        mock.patch(
-            "paradl.engines.aria2.ChecksumEngine.verify", return_value=(True, "sha256", "abc")
-        ),
-        mock.patch.object(
-            aria2_mod.MirrorManager,
-            "resolve_and_validate",
-            return_value=MirrorResolution(
-                active_uris=["http://x/f1.bin"],
-                expected_length=5,
-                accept_ranges=True,
-                filename=None,
-            ),
-        ),
-        mock.patch.object(aria2_mod, "Aria2RpcDaemon") as mock_d_cls,
-    ):
-        mock_d = mock_d_cls.return_value
-        mock_d.add_uri.return_value = "gid1"
-        mock_d.get_global_stat.return_value = {"downloadSpeed": "0"}
-        mock_d.tell_status.return_value = {
-            "status": "complete",
-            "completedLength": "5",
-            "totalLength": "5",
-            "files": [],
-        }
-        mock_d.get_servers.return_value = []
-
-        res = Aria2Engine.download_batch(
-            [it1, it2],
-            tmp_path,
-            connections=2,
-            watchdog_mode=WatchdogMode.OFF,
-            caffeinate=False,
-            net_watch=False,
-            write_xattr=False,
-        )
-        assert res.success
-        # Aggregate checksum_verified is False because not all items were verified
-        assert res.checksum_verified is False
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +300,7 @@ def test_r1_probe_requests_identity_encoding():
 # CLI Progress Bar Display
 # ---------------------------------------------------------------------------
 def test_progress_bar_display(capsys):
-    from paradl.ui import UI, LiveTransferDisplay
+    from paradl.ui import LiveTransferDisplay
 
     UI.quiet = False
     UI.json_mode = False

@@ -42,25 +42,6 @@ def mock_httpx_client():
 
 
 @pytest.fixture
-def mock_aria2_daemon():
-    """Provide a mock Aria2RpcDaemon for engine tests."""
-    with patch("paradl.engines.aria2.Aria2RpcDaemon") as mock:
-        daemon = MagicMock()
-        mock.return_value = daemon
-        daemon.__enter__.return_value = daemon
-        daemon.__exit__.return_value = None
-        daemon.call.return_value = {"result": "ok"}
-        daemon.tell_status.return_value = {
-            "status": "complete",
-            "completedLength": 100,
-            "totalLength": 100,
-        }
-        daemon.get_global_stat.return_value = {"downloadSpeed": 1024}
-        daemon.get_servers.return_value = []
-        yield daemon
-
-
-@pytest.fixture
 def sample_target_info():
     """Provide a sample TargetInfo for direct download tests."""
     from paradl.models import TargetInfo, TargetType
