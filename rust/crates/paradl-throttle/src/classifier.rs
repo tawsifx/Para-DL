@@ -301,7 +301,7 @@ fn evaluate_time_of_day(samples: &[SampleRecord]) -> TimeOfDayOutcome {
                     slow_list.len()
                 ),
                 format!(
-                    "Mann-Whitney U={u_stat}, two-sided p={p_val:.4} (effect size {:.0}% drop)",
+                    "Mann-Whitney U={u_stat:?}, two-sided p={p_val:.4} (effect size {:.0}% drop)",
                     (1.0 - drop_ratio) * 100.0
                 ),
             ],

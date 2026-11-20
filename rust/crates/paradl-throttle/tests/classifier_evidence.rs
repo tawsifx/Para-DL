@@ -56,6 +56,66 @@ fn evidence_for(slow_median_bps: f64) -> String {
     verdict.evidence[2].clone()
 }
 
+/// Evidence with the exact Mann-Whitney U rendering from the Python oracle.
+///
+/// Python interpolates `u_stat` (a float) with `str()`, so integral values
+/// keep their `.0`. Rust's `Display` for `f64` would print `0` instead of
+/// `0.0`; `{:?}` reproduces Python's rendering for these values.
+fn evidence_with_counts(fast: &[f64], slow: &[f64]) -> String {
+    let samples: Vec<SampleRecord> = fast
+        .iter()
+        .enumerate()
+        .map(|(i, bps)| sample(i as i32, *bps))
+        .chain(
+            slow.iter()
+                .enumerate()
+                .map(|(i, bps)| sample(18 + i as i32, *bps)),
+        )
+        .collect();
+    let dataset = MeasurementDataset {
+        m8_time_volume_upload: TimeVolumeUploadResult {
+            samples,
+            ..TimeVolumeUploadResult::default()
+        },
+        ..MeasurementDataset::default()
+    };
+    let result = classify_dataset(&dataset);
+    result
+        .verdicts
+        .iter()
+        .find(|v| v.verdict_class == "time-of-day congestion")
+        .expect("time-of-day congestion verdict")
+        .evidence[2]
+        .clone()
+}
+
+#[test]
+fn mann_whitney_u_renders_like_python_str() {
+    // Oracle: U=0.0, p=0.0284, effect 35.5 -> `:.0f` = 36.
+    assert_eq!(
+        evidence_with_counts(
+            &[90_000_000.0, 100_000_000.0, 100_000_000.0, 110_000_000.0],
+            &[60_000_000.0, 64_500_000.0, 64_500_000.0, 69_000_000.0]
+        ),
+        "Mann-Whitney U=0.0, two-sided p=0.0284 (effect size 36% drop)"
+    );
+    // Oracle: a tied 65e6 sample in each window yields non-integral U=2.5,
+    // p=0.0369, effect 35% -> "2.5" must keep its fractional part.
+    assert_eq!(
+        evidence_with_counts(
+            &[100_000_000.0, 100_000_000.0, 100_000_000.0, 65_000_000.0],
+            &[
+                65_000_000.0,
+                65_000_000.0,
+                65_000_000.0,
+                65_000_000.0,
+                65_000_000.0
+            ]
+        ),
+        "Mann-Whitney U=2.5, two-sided p=0.0369 (effect size 35% drop)"
+    );
+}
+
 #[test]
 fn fractional_effect_size_rounds_like_python_not_truncates() {
     // drop_ratio = 0.645 -> effect 35.5 -> Python `:.0f` = 36, `as i64` = 35.
