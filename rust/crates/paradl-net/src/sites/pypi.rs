@@ -229,45 +229,174 @@ pub fn score_wheel(filename: &str, packagetype: &str, target: &WheelTarget) -> i
     score
 }
 
-fn parse_version(value: &str) -> Vec<u64> {
-    value
-        .split(['.', '-', '+'])
-        .map(|part| {
-            part.chars()
-                .take_while(|c| c.is_ascii_digit())
-                .collect::<String>()
-                .parse::<u64>()
-                .unwrap_or(0)
-        })
-        .collect()
+static PEP440_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(concat!(
+        r"(?ix)^v?(?:(?P<epoch>\d+)!)?(?P<release>\d+(?:\.\d+)*)",
+        r"(?:(?P<pre>alpha|beta|preview|pre|rc|a|b|c)[-_.]?(?P<pre_n>\d*))?",
+        r"(?:(?:-(?P<post_dash>\d+)|\.?(?P<post>post|rev|r)[-_.]?(?P<post_n>\d*)))?",
+        r"(?:\.?(?P<dev>dev)[-_.]?(?P<dev_n>\d*))?",
+        r"(?:\+[A-Za-z0-9_.-]+)?$"
+    ))
+    .expect("PEP 440 regex must compile")
+});
+
+/// Minimal PEP 440 version model for PyPI specifier filtering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PepVersion {
+    raw: String,
+    epoch: u64,
+    release: Vec<u64>,
+    pre: Option<(String, u64)>,
+    post: Option<u64>,
+    dev: Option<u64>,
 }
 
-fn compare_versions(left: &[u64], right: &[u64]) -> Ordering {
-    let width = left.len().max(right.len());
-    for index in 0..width {
-        let a = left.get(index).copied().unwrap_or(0);
-        let b = right.get(index).copied().unwrap_or(0);
-        match a.cmp(&b) {
-            Ordering::Equal => continue,
-            other => return other,
+/// Total ordering key matching PEP 440's release/pre/post/dev precedence.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct VersionKey {
+    epoch: u64,
+    release: Vec<u64>,
+    pre_rank: i32,
+    pre_num: u64,
+    post_num: u64,
+    dev_num: u64,
+}
+
+impl PepVersion {
+    fn parse(raw: &str) -> Option<Self> {
+        let trimmed = raw.trim();
+        let caps = PEP440_RE.captures(trimmed)?;
+        let release = caps
+            .name("release")?
+            .as_str()
+            .split('.')
+            .map(|part| part.parse::<u64>().ok())
+            .collect::<Option<Vec<_>>>()?;
+        let number = |name: &str| {
+            caps.name(name).map_or(0, |group| {
+                let value = group.as_str();
+                if value.is_empty() {
+                    0
+                } else {
+                    value.parse::<u64>().unwrap_or(0)
+                }
+            })
+        };
+        let pre = caps.name("pre").map(|group| {
+            let token = group.as_str().to_ascii_lowercase();
+            let normalized = match token.as_str() {
+                "alpha" => "a",
+                "beta" => "b",
+                "c" | "pre" | "preview" => "rc",
+                other => other,
+            };
+            (normalized.to_owned(), number("pre_n"))
+        });
+        let post = if caps.name("post_dash").is_some() {
+            Some(number("post_dash"))
+        } else if caps.name("post").is_some() {
+            Some(number("post_n"))
+        } else {
+            None
+        };
+        let dev = caps.name("dev").map(|_| number("dev_n"));
+        Some(Self {
+            raw: trimmed.to_owned(),
+            epoch: caps
+                .name("epoch")
+                .and_then(|group| group.as_str().parse::<u64>().ok())
+                .unwrap_or(0),
+            release,
+            pre,
+            post,
+            dev,
+        })
+    }
+
+    /// PEP 440 `Version.is_prerelease`: alpha/beta/rc **or** dev segment.
+    /// A post-release (`1.3.0.post1`) is stable and must not be filtered out.
+    fn is_prerelease(&self) -> bool {
+        self.pre.is_some() || self.dev.is_some()
+    }
+
+    fn key(&self) -> VersionKey {
+        let mut release = self.release.clone();
+        release.resize(8, 0);
+        let (pre_rank, pre_num) = match (&self.pre, self.dev, self.post) {
+            (Some((kind, number)), _, _) => (
+                match kind.as_str() {
+                    "a" => -2,
+                    "b" => -1,
+                    _ => 0,
+                },
+                *number,
+            ),
+            (None, Some(_), _) => (-3, 0),
+            (None, None, Some(_)) => (2, 0),
+            (None, None, None) => (1, 0),
+        };
+        VersionKey {
+            epoch: self.epoch,
+            release,
+            pre_rank,
+            pre_num,
+            post_num: self.post.unwrap_or(0),
+            dev_num: self.dev.unwrap_or(0),
         }
     }
-    Ordering::Equal
 }
 
-fn satisfies(constraint: &str, version: &[u64]) -> bool {
+fn compare_versions(left: &PepVersion, right: &PepVersion) -> Ordering {
+    left.key().cmp(&right.key())
+}
+
+fn release_starts_with(version: &PepVersion, prefix: &[u64]) -> bool {
+    prefix
+        .iter()
+        .enumerate()
+        .all(|(index, part)| version.release.get(index) == Some(part))
+}
+
+/// Evaluate one PEP 440 specifier (including compatible-release `~=` and
+/// wildcard `==`/`!=`) against a parsed version.
+fn satisfies(constraint: &str, version: &PepVersion) -> bool {
     let constraint = constraint.trim();
+    if let Some(raw) = constraint.strip_prefix("===") {
+        return raw.trim() == version.raw;
+    }
+    // ~=X.Y       -> >=X.Y, ==X.*
+    // ~=X.Y.Z     -> >=X.Y.Z, ==X.Y.*
+    if let Some(raw) = constraint.strip_prefix("~=") {
+        let Some(lower) = PepVersion::parse(raw) else {
+            return false;
+        };
+        if lower.release.len() < 2 {
+            return false;
+        }
+        let prefix = &lower.release[..lower.release.len() - 1];
+        return compare_versions(version, &lower) != Ordering::Less
+            && release_starts_with(version, prefix);
+    }
     for (op, operand) in [
         ("==", constraint.strip_prefix("==")),
         ("!=", constraint.strip_prefix("!=")),
         (">=", constraint.strip_prefix(">=")),
         ("<=", constraint.strip_prefix("<=")),
-        ("~=", constraint.strip_prefix("~=")),
         (">", constraint.strip_prefix(">")),
         ("<", constraint.strip_prefix("<")),
     ] {
         if let Some(raw) = operand {
-            let expected = parse_version(raw);
+            let raw = raw.trim();
+            if let Some(prefix) = raw.strip_suffix(".*") {
+                let Some(lower) = PepVersion::parse(prefix) else {
+                    return false;
+                };
+                let matches = release_starts_with(version, &lower.release);
+                return if op == "!=" { !matches } else { matches };
+            }
+            let Some(expected) = PepVersion::parse(raw) else {
+                return false;
+            };
             return match op {
                 "==" => compare_versions(version, &expected) == Ordering::Equal,
                 "!=" => compare_versions(version, &expected) != Ordering::Equal,
@@ -282,10 +411,9 @@ fn satisfies(constraint: &str, version: &[u64]) -> bool {
     true
 }
 
-fn is_stable_version(value: &str) -> bool {
-    !value.chars().any(|c| c.is_ascii_alphabetic())
-}
-
+/// Select the release whose files should be used for a specifier target.
+/// Mirrors `pypi.py:261-288`, including the `info.version` short-circuit and
+/// the exclusion of PEP 440 prereleases from the fallback search.
 fn apply_specifiers(target: &str, body: &Value, urls: &mut Vec<Value>, version: &mut String) {
     let t = target.trim();
     let lower = t.to_ascii_lowercase();
@@ -302,28 +430,51 @@ fn apply_specifiers(target: &str, body: &Value, urls: &mut Vec<Value>, version: 
         .take_while(|c| is_name_char(*c))
         .map(char::len_utf8)
         .sum::<usize>();
-    let spec_text = spec_text[name_len..].trim();
-    if spec_text.is_empty() {
+    let constraints: Vec<&str> = spec_text[name_len..]
+        .trim()
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+    if constraints.is_empty() {
         return;
     }
+
+    // Oracle short-circuit: the base API response already links the newest
+    // version; keep those files when that version satisfies the specifier.
+    let current = body
+        .get("info")
+        .and_then(|info| info.get("version"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if let Some(current_version) = PepVersion::parse(current)
+        && constraints
+            .iter()
+            .all(|constraint| satisfies(constraint, &current_version))
+    {
+        return;
+    }
+
     let Some(releases) = body.get("releases").and_then(Value::as_object) else {
         return;
     };
-    let constraints: Vec<&str> = spec_text.split(',').map(str::trim).collect();
-    let mut matched: Vec<(Vec<u64>, String)> = Vec::new();
+    let mut matched: Vec<(VersionKey, String)> = Vec::new();
     for (version_string, files) in releases {
-        if !is_stable_version(version_string) {
+        let Some(parsed) = PepVersion::parse(version_string) else {
             continue;
-        }
-        let parsed = parse_version(version_string);
-        if !constraints.iter().all(|constraint| satisfies(constraint, &parsed)) {
+        };
+        if parsed.is_prerelease()
+            || !constraints
+                .iter()
+                .all(|constraint| satisfies(constraint, &parsed))
+        {
             continue;
         }
         if files.as_array().is_some_and(|files| !files.is_empty()) {
-            matched.push((parsed, version_string.clone()));
+            matched.push((parsed.key(), version_string.clone()));
         }
     }
-    matched.sort_by(|left, right| compare_versions(&left.0, &right.0));
+    matched.sort_by(|left, right| left.0.cmp(&right.0));
     if let Some((_, chosen)) = matched.last() {
         if let Some(files) = releases.get(chosen).and_then(Value::as_array) {
             *urls = files.clone();

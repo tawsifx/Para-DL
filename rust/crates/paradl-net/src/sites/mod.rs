@@ -340,29 +340,134 @@ pub use accelerate::{accelerate_url, accelerate_url_with_mirror, is_github_archi
 pub(crate) fn matches_pattern(name: &str, pattern: &str) -> bool {
     let lower_name = name.to_ascii_lowercase();
     let lower_pattern = pattern.to_ascii_lowercase();
-    if glob_match(&lower_name, &lower_pattern) || lower_pattern.len() <= lower_name.len()
-        && lower_name.contains(&lower_pattern)
+    if glob_match(&lower_name, &lower_pattern)
+        || (lower_pattern.len() <= lower_name.len() && lower_name.contains(&lower_pattern))
     {
         return true;
     }
+    // The third Python check is `re.search(pattern, name)`. Keep the raw
+    // pattern here (do NOT rewrite `[!...]` to `[^...]`): fnmatch classes are
+    // already handled by `glob_match`, and the raw regex is what the oracle's
+    // `_matches_pattern` actually evaluates when the glob/substring checks fail.
     regex::Regex::new(pattern).is_ok_and(|re| re.is_match(name))
 }
 
-fn glob_match(name: &str, pattern: &str) -> bool {
+#[derive(Clone)]
+enum ClassItem {
+    Char(char),
+    Range(char, char),
+}
+
+#[derive(Clone)]
+enum GlobToken {
+    Star,
+    Any,
+    Literal(char),
+    Class {
+        negate: bool,
+        items: Vec<ClassItem>,
+    },
+}
+
+fn parse_class(chars: &[char], open: usize) -> Option<(GlobToken, usize)> {
+    // Mirror fnmatch.translate's closing-bracket scan: a leading `!` and a
+    // leading `]` are class members, not the terminator.
+    let mut close = open + 1;
+    if chars.get(close) == Some(&'!') {
+        close += 1;
+    }
+    if chars.get(close) == Some(&']') {
+        close += 1;
+    }
+    while close < chars.len() && chars[close] != ']' {
+        close += 1;
+    }
+    if close >= chars.len() {
+        return None;
+    }
+    let mut content = &chars[open + 1..close];
+    let negate = content.first() == Some(&'!');
+    if negate {
+        content = &content[1..];
+    }
+    let mut items = Vec::new();
+    let mut index = 0;
+    while index < content.len() {
+        if index + 2 < content.len() && content[index + 1] == '-' {
+            items.push(ClassItem::Range(content[index], content[index + 2]));
+            index += 3;
+        } else {
+            items.push(ClassItem::Char(content[index]));
+            index += 1;
+        }
+    }
+    Some((GlobToken::Class { negate, items }, close + 1))
+}
+
+fn token_matches(token: &GlobToken, value: char) -> bool {
+    match token {
+        GlobToken::Any => true,
+        GlobToken::Literal(expected) => *expected == value,
+        GlobToken::Class { negate, items } => {
+            let matched = items.iter().any(|item| match item {
+                ClassItem::Char(expected) => *expected == value,
+                ClassItem::Range(start, end) => *start <= value && value <= *end,
+            });
+            matched != *negate
+        }
+        GlobToken::Star => true,
+    }
+}
+
+/// Python `fnmatch` glob matcher (case-sensitive; callers lower-case inputs).
+///
+/// Supports `*`, `?`, and character classes `[abc]`, `[a-z]` and `[!abc]`
+/// (negation), matching `fnmatch.fnmatchcase` including ranges and literal
+/// `]` members. An unmatched `[` is treated as a literal character.
+pub fn glob_match(name: &str, pattern: &str) -> bool {
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut tokens = Vec::new();
+    let mut index = 0;
+    while index < chars.len() {
+        match chars[index] {
+            '*' => {
+                tokens.push(GlobToken::Star);
+                index += 1;
+            }
+            '?' => {
+                tokens.push(GlobToken::Any);
+                index += 1;
+            }
+            '[' => match parse_class(&chars, index) {
+                Some((token, next)) => {
+                    tokens.push(token);
+                    index = next;
+                }
+                None => {
+                    tokens.push(GlobToken::Literal('['));
+                    index += 1;
+                }
+            },
+            other => {
+                tokens.push(GlobToken::Literal(other));
+                index += 1;
+            }
+        }
+    }
+
     let name: Vec<char> = name.chars().collect();
-    let pattern: Vec<char> = pattern.chars().collect();
     let mut previous = vec![false; name.len() + 1];
     previous[0] = true;
-    for ch in &pattern {
+    for token in &tokens {
         let mut current = vec![false; name.len() + 1];
-        if *ch == '*' {
+        if matches!(token, GlobToken::Star) {
             current[0] = previous[0];
-            for i in 1..=name.len() {
-                current[i] = previous[i] || current[i - 1];
+            for position in 1..=name.len() {
+                current[position] = previous[position] || current[position - 1];
             }
         } else {
-            for i in 1..=name.len() {
-                current[i] = previous[i - 1] && (*ch == '?' || *ch == name[i - 1]);
+            for position in 1..=name.len() {
+                current[position] = previous[position - 1] && token_matches(token, name[position - 1]);
             }
         }
         previous = current;

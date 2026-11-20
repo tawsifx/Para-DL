@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use paradl_core::TargetType;
-use paradl_net::routing::{ResolveContext, TargetResolver};
+use paradl_net::routing::{ResolveContext, ResolvedAsset, TargetResolver};
 use paradl_net::sites::brew::{BrewResolver, fallback_bottle_tags};
 use paradl_net::sites::cloud::{CloudResolver, resolve_cloud_url};
 use paradl_net::sites::github::{
@@ -29,7 +29,7 @@ use paradl_net::sites::pypi::{
 };
 use paradl_net::sites::token::{EnvSecretProvider, Keychain, SecretProvider, SiteHeaders, SiteService};
 use paradl_net::sites::{
-    JsonResponse, RedirectInfo, SiteHttp, SiteRouter, accelerate::{
+    JsonResponse, RedirectInfo, SiteHttp, SiteRouter, glob_match, accelerate::{
         accelerate_url_with_mirror, is_github_archive,
     },
 };
@@ -702,4 +702,97 @@ fn site_router_recognizes_all_shortcut_prefixes() {
     assert_eq!(router.kind_of("ipsw:iphone 16"), Some("ipsw"));
     assert_eq!(router.kind_of("https://pastebin.com/AbC123"), Some("cloud"));
     assert_eq!(router.kind_of("https://example.com/file.zip"), None);
+}
+
+// ===========================================================================
+// Review round 1 — specifier resolution (values captured from PyPIEngine.resolve)
+// ===========================================================================
+
+/// Load the shared fixture and run PyPI resolution through the scripted REST
+/// seam, mirroring the Python oracle's `fetch_json_with_etag` monkeypatch.
+async fn resolve_pypi_fixture_case(name: &str) -> ResolvedAsset {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/pypi_specifiers.json")).unwrap();
+    let case = fixture
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["name"] == name)
+        .unwrap_or_else(|| panic!("fixture case {name} missing"));
+    let target = case["target"].as_str().unwrap().to_owned();
+    let api_url = case["url"].as_str().unwrap().to_owned();
+    let body = case["body"].clone();
+    let http = Scripted::new().json(&api_url, 200, body);
+    let secrets = Arc::new(EnvSecretProvider::with_env(HashMap::new(), None::<Arc<dyn Keychain>>));
+    PyPIResolver::new(http, secrets)
+        .with_target(WheelTarget::new((3, 12), "linux", "x86_64"))
+        .resolve(&target, &context())
+        .await
+        .unwrap()
+        .remove(0)
+}
+
+#[tokio::test]
+async fn pypi_llvmlite_complex_specifier_resolution_matches_oracle() {
+    let asset = resolve_pypi_fixture_case("llvmlite").await;
+    assert_eq!(asset.url, "https://files.invalid/llvmlite-0.50.1-py3-none-any.whl");
+    assert_eq!(asset.filename.as_deref(), Some("llvmlite-0.50.1-py3-none-any.whl"));
+    assert_eq!(asset.content_length, Some(501));
+    assert_eq!(asset.digest.as_deref(), Some("sha256:00501"));
+}
+
+#[tokio::test]
+async fn pypi_mpmath_complex_specifier_resolution_matches_oracle() {
+    let asset = resolve_pypi_fixture_case("mpmath").await;
+    assert_eq!(asset.url, "https://files.invalid/mpmath-1.3.0.post1-py3-none-any.whl");
+    assert_eq!(asset.filename.as_deref(), Some("mpmath-1.3.0.post1-py3-none-any.whl"));
+    assert_eq!(asset.content_length, Some(131));
+    assert_eq!(asset.digest.as_deref(), Some("sha256:0130post1"));
+}
+
+#[tokio::test]
+async fn pypi_compatible_release_rejects_non_matching_higher_major() {
+    let asset = resolve_pypi_fixture_case("compatible").await;
+    assert_eq!(asset.url, "https://files.invalid/pkg-1.9.9-py3-none-any.whl");
+    assert!(!asset.url.contains("2.0.0"), "~=1.4 must not accept pkg 2.0.0");
+    assert_eq!(asset.digest.as_deref(), Some("sha256:0199"));
+}
+
+#[tokio::test]
+async fn pypi_satisfying_info_version_short_circuits_release_search() {
+    let asset = resolve_pypi_fixture_case("shortcircuit").await;
+    assert_eq!(asset.url, "https://files.invalid/short-1.4.0-BASE.whl");
+    assert_eq!(asset.digest.as_deref(), Some("sha256:0140base"));
+}
+
+// ===========================================================================
+// Review round 1 — fnmatch character classes (values from Python fnmatchcase)
+// ===========================================================================
+
+#[test]
+fn fnmatch_character_classes_match_python() {
+    assert!(glob_match("tool-aarch64.tar.gz", "tool-[ab]arch64*.tar.gz"));
+    assert!(!glob_match("tool-carch64.tar.gz", "tool-[ab]arch64*.tar.gz"));
+    assert!(glob_match("tool-carch64.tar.gz", "tool-[!ab]arch64*.tar.gz"));
+    assert!(!glob_match("tool-aarch64.tar.gz", "tool-[!ab]arch64*.tar.gz"));
+    assert!(glob_match("v1.zip", "v[0-9].zip"));
+    assert!(!glob_match("vx.zip", "v[0-9].zip"));
+}
+
+#[tokio::test]
+async fn github_asset_pattern_character_class_matches_oracle_fnmatch() {
+    let release = serde_json::json!({
+        "tag_name": "v1.0.0",
+        "assets": [
+            {"name": "tool-aarch64-macos.tar.gz", "browser_download_url": "https://github.com/o/r/releases/download/v1.0.0/tool-aarch64.tar.gz", "size": 10},
+            {"name": "tool-carch64-macos.tar.gz", "browser_download_url": "https://github.com/o/r/releases/download/v1.0.0/tool-carch64.tar.gz", "size": 20}
+        ]
+    });
+    let api = "https://api.github.com/repos/o/r/releases/latest";
+    let http = Scripted::new().json(api, 200, release);
+    let secrets = Arc::new(EnvSecretProvider::with_env(HashMap::new(), None::<Arc<dyn Keychain>>));
+    let resolver = GithubResolver::new(http, secrets).with_asset_pattern("tool-[!ab]arch64*.tar.gz");
+    let assets = resolver.resolve("gh:o/r", &context()).await.unwrap();
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].url, "https://github.com/o/r/releases/download/v1.0.0/tool-carch64.tar.gz");
 }
