@@ -15,13 +15,20 @@
 //! # }
 //! ```
 
-use std::io::Write;
+use std::io::{self, Read, Write};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::{Arc, Mutex, mpsc};
+use std::time::Duration;
 
 use paradl_core::Error;
 
 use crate::{Platform, Result};
+
+/// Timeout for `security -i` keychain operations (`macos.py:672/718/755`).
+const SECURITY_TIMEOUT: Duration = Duration::from_secs(5);
+/// Timeout for `xattr -w -x` metadata writes (`macos.py:820/845`).
+const XATTR_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// `com.apple.metadata:kMDItemWhereFroms` xattr name (parity row L32).
 pub const WHERE_FROMS_ATTR: &str = "com.apple.metadata:kMDItemWhereFroms";
@@ -254,26 +261,145 @@ fn tool_path(name: &str, absolute: &str) -> String {
     }
 }
 
+/// Wait for `child` for at most `timeout`, killing it on expiry.
+///
+/// A status-waiter thread polls `Child::try_wait` in short intervals while the
+/// caller uses `mpsc::recv_timeout`. Releasing the mutex between polls lets the
+/// caller kill the child promptly on expiry. stdout/stderr are drained in their
+/// own threads so a chatty child cannot deadlock on a full pipe.
+fn wait_with_timeout(child: Child, timeout: Duration) -> io::Result<Output> {
+    let mut child = child;
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    drop(child.stdin.take());
+
+    let stdout_reader = stdout.map(|mut pipe| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            pipe.read_to_end(&mut bytes).map(|_| bytes)
+        })
+    });
+    let stderr_reader = stderr.map(|mut pipe| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            pipe.read_to_end(&mut bytes).map(|_| bytes)
+        })
+    });
+
+    let shared = Arc::new(Mutex::new(child));
+    let (sender, receiver) = mpsc::channel();
+    let waiter_shared = Arc::clone(&shared);
+    std::thread::spawn(move || {
+        loop {
+            let polled = match waiter_shared.lock() {
+                Ok(mut guard) => guard.try_wait(),
+                Err(_) => Err(io::Error::other("child mutex poisoned")),
+            };
+            match polled {
+                Ok(Some(status)) => {
+                    let _ = sender.send(Ok(status));
+                    return;
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                    return;
+                }
+            }
+        }
+    });
+
+    let status = match receiver.recv_timeout(timeout) {
+        Ok(result) => result?,
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            if let Ok(mut guard) = shared.lock() {
+                let _ = guard.kill();
+                let _ = guard.wait();
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!("subprocess timed out after {} ms", timeout.as_millis()),
+            ));
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            return Err(io::Error::other("subprocess status channel closed"));
+        }
+    };
+
+    let stdout = stdout_reader
+        .map(|handle| {
+            handle
+                .join()
+                .unwrap_or(Err(io::Error::other("stdout reader panicked")))
+        })
+        .transpose()?
+        .unwrap_or_default();
+    let stderr = stderr_reader
+        .map(|handle| {
+            handle
+                .join()
+                .unwrap_or(Err(io::Error::other("stderr reader panicked")))
+        })
+        .transpose()?
+        .unwrap_or_default();
+    Ok(Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+/// Why a `security -i` invocation did not yield a token.
+#[derive(Debug)]
+enum SecurityFailure {
+    Io(io::Error),
+    Timeout(Duration),
+    NonZero(String),
+}
+
+impl From<SecurityFailure> for Error {
+    fn from(failure: SecurityFailure) -> Self {
+        match failure {
+            SecurityFailure::Io(error) => Error::Io(error),
+            SecurityFailure::Timeout(timeout) => Error::failure(format!(
+                "security -i timed out after {}s",
+                timeout.as_secs()
+            )),
+            SecurityFailure::NonZero(stderr) => {
+                Error::failure(format!("security -i failed: {stderr}"))
+            }
+        }
+    }
+}
+
 /// Run `security -i` with `command` on stdin; return its trimmed stdout.
-fn run_security(command: &str) -> Result<String> {
+fn run_security_raw(command: &str) -> std::result::Result<String, SecurityFailure> {
     let binary = tool_path("security", "/usr/bin/security");
     let mut child = Command::new(binary)
         .arg("-i")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()?;
+        .spawn()
+        .map_err(SecurityFailure::Io)?;
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(command.as_bytes())?;
+        stdin
+            .write_all(command.as_bytes())
+            .map_err(SecurityFailure::Io)?;
     }
-    let output = child.wait_with_output()?;
+    let output = wait_with_timeout(child, SECURITY_TIMEOUT)
+        .map_err(|_| SecurityFailure::Timeout(SECURITY_TIMEOUT))?;
     if !output.status.success() {
-        return Err(Error::failure(format!(
-            "security -i failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
+        return Err(SecurityFailure::NonZero(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// Run `security -i`, mapping every failure to `paradl_core::Error`.
+fn run_security(command: &str) -> Result<String> {
+    run_security_raw(command).map_err(Error::from)
 }
 
 /// macOS [`Platform`] implementation using only external processes.
@@ -290,7 +416,19 @@ impl Platform for MacOSPlatform {
         }
         let binary = tool_path("xattr", "/usr/bin/xattr");
         let args = where_froms_xattr_args(path, urls);
-        let status = Command::new(binary).args(args).output()?.status;
+        let child = Command::new(binary)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        let output = wait_with_timeout(child, XATTR_TIMEOUT).map_err(|error| {
+            Error::failure(format!(
+                "xattr -w -x {WHERE_FROMS_ATTR} timed out after {}s: {error}",
+                XATTR_TIMEOUT.as_secs()
+            ))
+        })?;
+        let status = output.status;
         if status.success() {
             Ok(())
         } else {
@@ -319,9 +457,13 @@ impl Platform for MacOSPlatform {
             return Ok(None);
         }
         let command = keychain_find_command(service, account, self.keychain.as_deref());
-        match run_security(&command) {
-            Ok(value) if !value.is_empty() => Ok(Some(value)),
-            Ok(_) => Ok(None),
+        match run_security_raw(&command) {
+            Ok(value) => Ok((!value.is_empty()).then_some(value)),
+            // A missing keychain item is a normal "not found"; a timeout is a
+            // real failure and must not silently report `None`.
+            Err(SecurityFailure::Timeout(timeout)) => {
+                Err(Error::from(SecurityFailure::Timeout(timeout)))
+            }
             Err(_) => Ok(None),
         }
     }
@@ -330,6 +472,7 @@ impl Platform for MacOSPlatform {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn int_byte_width_matches_plistlib() {
@@ -351,5 +494,40 @@ mod tests {
             codesign_adhoc_sign_args(path),
             vec!["--force", "--sign", "-", "/Applications/App.app"]
         );
+    }
+
+    #[test]
+    fn oracle_timeout_constants_are_exact() {
+        assert_eq!(SECURITY_TIMEOUT, Duration::from_secs(5));
+        assert_eq!(XATTR_TIMEOUT, Duration::from_secs(3));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_with_timeout_kills_a_hanging_child() {
+        let child = Command::new("/bin/sh")
+            .args(["-c", "sleep 10"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let started = Instant::now();
+        let error = wait_with_timeout(child, Duration::from_millis(200)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(3));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_with_timeout_captures_fast_output() {
+        let child = Command::new("/bin/sh")
+            .args(["-c", "printf hello"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let output = wait_with_timeout(child, Duration::from_secs(2)).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"hello");
     }
 }

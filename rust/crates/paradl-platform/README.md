@@ -14,6 +14,9 @@ the paraDL framework. External tools (`xattr`, `security`, `codesign`, `spctl`,
 - Feature `platform-macos` → `macos` module with `MacOSPlatform` plus pure
   byte-exact helpers (`binary_plist_string_array`, `where_froms_xattr_args`,
   `keychain_add_command`, `keychain_find_command`, codesign arg builders).
+  `security -i` calls are bounded to 5 s and `xattr` writes to 3 s, matching
+  `macos.py:672/718/755` and `:820/845`; a timeout kills the child and returns
+  a failure (exit code `1`), never a silent success.
 - Feature `platform-windows` → `windows` module with `WindowsPlatform` plus pure
   helpers (`format_zone_identifier_text`, `parse_zone_identifier_text`,
   `unquarantine_zone_identifier_text`, `ads_path`).

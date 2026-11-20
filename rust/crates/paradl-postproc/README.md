@@ -15,8 +15,9 @@ Python is ever spawned.
 - `archive` module: `is_archive`, `validate_member_path`, `validate_link_target`,
   `validate_zip`, `validate_tar`, `extract`, `sanitize_dmg_item`,
   `ArchiveSecurityError`.
-- `adb` module: `Device`, `parse_devices`, `connected_devices`, `push_file`,
-  `DEFAULT_MUSIC_DIR`, `DEFAULT_DOWNLOAD_DIR`.
+- `adb` module: `Device`, `parse_devices`, `connected_devices() -> Result<Vec<Device>>`,
+  `push_file(...) -> Result<bool>`, `ADB_TIMEOUT`, `DEFAULT_MUSIC_DIR`,
+  `DEFAULT_DOWNLOAD_DIR`.
 - Types: `Verification`, `ChecksumSource`, `PostContext`, `PostResult`.
 
 ## Feature flags
@@ -28,7 +29,9 @@ None. All functionality is available in the default build. External tools
 
 A checksum mismatch, unsupported algorithm, or archive security violation maps
 to `paradl_core::Error::VerificationFailed` → exit code `3`. Missing files and
-I/O failures map to exit code `1`.
+I/O failures map to exit code `1`. Every external `adb` call is bounded to 5 s
+(oracle `adb.py:25`); a timeout kills the child and returns a failure (exit `1`)
+rather than silently reporting "no devices".
 
 ## Security contract
 

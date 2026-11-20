@@ -159,7 +159,7 @@ impl PostProcessor for DefaultPostProcessor {
                 ctx.adb_target_dir
                     .as_deref()
                     .unwrap_or(adb::DEFAULT_MUSIC_DIR),
-            );
+            )?;
         }
         Ok(result)
     }
