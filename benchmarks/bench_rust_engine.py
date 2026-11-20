@@ -91,6 +91,29 @@ RECYCLE_ARIA2_REASON = (
     "this path, but it is not reproduced here, so the value is null by design."
 )
 
+# W4-3 framework lane notes. These are NEW fields; the original honesty block
+# above/below is preserved verbatim and is never edited or weakened.
+FRAMEWORK_TRANSFER_REASON = (
+    "Rust framework binary is a Wave-0 placeholder: it implements only "
+    "--version, doctor and --help; the download/transfer path is wired in W4-1 "
+    "via paradl-app. Comparing the working Python downloader against a binary "
+    "that cannot download is not an apples-to-apples engine comparison, so the "
+    "Rust transfer value is null by design. Re-run after W4-1 lands."
+)
+MEDIA_BOUNDARY_REASON = (
+    "Media process-startup (python -m paradl_media) is deliberately NOT measured "
+    "here. Per the W4-3 charter it is measured only on the W4-2 media lane "
+    "(golden-replay boundary harness), never on the non-media framework bench."
+)
+FRAMEWORK_COLD_START_SCOPE = (
+    "Cold process startup of each CLI's --version path in a fresh subprocess: "
+    "Python console script (interpreter init + paradl package import) vs the "
+    "native Rust binary. Identical argv shape [bin, --version] and identical "
+    "environment; the loopback corpus URL is the same server used by the "
+    "throughput lanes, but --version is intentionally URL-free so the metric "
+    "isolates startup cost only."
+)
+
 
 # ---------------------------------------------------------------------------
 # Loopback HTTP server (self-contained; no pytest dependency)
@@ -793,6 +816,156 @@ def bench_checksum(root: Path) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# W4-3 framework lane: Python CLI vs native Rust framework binary
+# ---------------------------------------------------------------------------
+
+
+def python_cli_cmd() -> list[str]:
+    """Console script for the Python oracle, overridable for CI."""
+    override = os.environ.get("BENCH_PYTHON_CLI")
+    if override:
+        return [override]
+    exe = "paradl.exe" if os.name == "nt" else "paradl"
+    # Prefer the worktree venv script: sys.executable may resolve through a
+    # symlink to the uv-managed interpreter, whose bin/ has no console scripts.
+    venv_bin = REPO_ROOT / ".venv" / ("Scripts" if os.name == "nt" else "bin")
+    candidate = venv_bin / exe
+    if candidate.is_file():
+        return [str(candidate)]
+    return [str(Path(sys.executable).resolve().parent / exe)]
+
+
+def rust_binary_path() -> str | None:
+    """Built native `paradl` binary (debug preferred, release fallback)."""
+    override = os.environ.get("BENCH_RUST_BINARY")
+    if override:
+        return override if Path(override).is_file() else None
+    for profile in ("debug", "release"):
+        candidate = REPO_ROOT / "rust" / "target" / profile / "paradl"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def bench_framework(server: Loopback, root: Path) -> dict[str, Any]:
+    """Compare the Python oracle CLI to the native framework binary.
+
+    Both lanes run on the same loopback corpus URL. Cold-start uses an
+    identical ``[bin, --version]`` argv; the transfer lane is real for Python
+    and null+reason for Rust (W0 placeholder, no download path until W4-1).
+    Media process-startup is explicitly out of scope (W4-2 media lane).
+    """
+    url = server.url()
+    py_cmd = python_cli_cmd()
+    rust_bin = rust_binary_path()
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "src"))
+
+    def cold_start(cmd: list[str]) -> dict[str, Any]:
+        wall: list[float] = []
+        cpu0 = _cpu_seconds()
+        for _ in range(REPS):
+            t0 = time.perf_counter()
+            proc = subprocess.run(
+                cmd + ["--version"],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=60,
+                check=False,
+            )
+            wall.append(time.perf_counter() - t0)
+            if proc.returncode != 0:
+                return _unmeasurable(
+                    f"cold-start command failed (rc={proc.returncode}): "
+                    f"{proc.stderr.strip()[-300:]}"
+                )
+        cpu = _cpu_seconds() - cpu0
+        return {
+            "argv": cmd + ["--version"],
+            "cold_wall_ms_samples": [round(v * 1000, 3) for v in wall],
+            "cold_wall_median_ms": round(_median(wall) * 1000, 3),
+            "cold_wall_spread_ms": _spread([v * 1000 for v in wall]),
+            "cpu_seconds_total": round(cpu, 4),
+            "cpu_seconds_per_invocation": round(cpu / REPS, 4),
+            "cpu_scope": "getrusage(self + reaped children) CPU delta over all cold-start reps",
+            "peak_rss": _unmeasurable(
+                "RUSAGE_CHILDREN.ru_maxrss is a cumulative max across all reaped "
+                "children, not a per-invocation peak; not reported per lane"
+            ),
+        }
+
+    cold: dict[str, Any] = {
+        "scope": FRAMEWORK_COLD_START_SCOPE,
+        "python_cli": (
+            cold_start(py_cmd)
+            if Path(py_cmd[0]).is_file()
+            else _unmeasurable(f"python CLI not found: {py_cmd[0]}")
+        ),
+        "rust_binary": (
+            cold_start([rust_bin])
+            if rust_bin is not None
+            else _unmeasurable(
+                "no built paradl binary under rust/target/{debug,release}; "
+                "build with `cargo build -p paradl` or set BENCH_RUST_BINARY"
+            )
+        ),
+    }
+
+    # Transfer on the *identical* loopback URL. Python is real; Rust is null
+    # + reason (W0 placeholder). CPU/RSS for the Python CLI are null+reason:
+    # aria2c is a grandchild and not attributable via the harness' rusage.
+    transfer: dict[str, Any] = {"identical_url": url, "connections": 4}
+    samples: list[float] = []
+    failed: str | None = None
+    for i in range(REPS):
+        d = root / f"framework_pycli_{i}"
+        shutil.rmtree(d, ignore_errors=True)
+        d.mkdir(parents=True, exist_ok=True)
+        run_env = dict(env, PARADL_HOME=str(d / "home"))
+        t0 = time.perf_counter()
+        proc = subprocess.run(
+            py_cmd
+            + [url, "-o", str(d), "--non-interactive", "--json", "-c", "4"],
+            capture_output=True,
+            text=True,
+            env=run_env,
+            timeout=180,
+            check=False,
+        )
+        samples.append(time.perf_counter() - t0)
+        if proc.returncode != 0 or '"success": true' not in proc.stdout:
+            failed = (
+                f"python CLI transfer failed (rc={proc.returncode}): "
+                f"{(proc.stderr.strip() or proc.stdout.strip())[-300:]}"
+            )
+            break
+    if failed is not None:
+        transfer["python_cli"] = _unmeasurable(failed)
+    else:
+        transfer["python_cli"] = {
+            "bytes": len(server.payload),
+            "cold_wall_seconds_samples": [round(v, 4) for v in samples],
+            "cold_wall_median_seconds": round(_median(samples), 4),
+            "cold_wall_spread_seconds": _spread(samples),
+            "cpu_usage": _unmeasurable(
+                "aria2c is a grandchild of the harness; its CPU is not "
+                "attributable via RUSAGE_CHILDREN of this process"
+            ),
+            "peak_rss": _unmeasurable(
+                "aria2c is a grandchild of the harness; its RSS is not "
+                "attributable via RUSAGE_CHILDREN of this process"
+            ),
+        }
+    transfer["rust_binary"] = _unmeasurable(FRAMEWORK_TRANSFER_REASON)
+
+    return {
+        "cold_start": cold,
+        "transfer": transfer,
+        "media_process_startup": _unmeasurable(MEDIA_BOUNDARY_REASON),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Suite assembly + variance
 # ---------------------------------------------------------------------------
 
@@ -810,6 +983,9 @@ VARIANCE_PATHS = [
     ("peak_rss", "aria2", "peak_rss_mb"),
     ("peak_rss", "native", "peak_rss_mb"),
     ("checksum_large_file", "median_seconds"),
+    ("framework_comparison", "cold_start", "python_cli", "cold_wall_median_ms"),
+    ("framework_comparison", "cold_start", "rust_binary", "cold_wall_median_ms"),
+    ("framework_comparison", "transfer", "python_cli", "cold_wall_median_seconds"),
 ]
 
 
@@ -852,6 +1028,7 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
     srv.start()
     try:
         tm = bench_transfer_metrics(srv, root)
+        framework = bench_framework(srv, root)
     finally:
         srv.close()
 
@@ -907,6 +1084,12 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
             "cpu_usage": "getrusage(self + reaped children) CPU seconds for one cold transfer",
             "peak_rss": "ru_maxrss of isolated worker; aria2 daemon child reported separately",
             "checksum": "shared ChecksumEngine.verify SHA-256 on a 256 MiB mmap file",
+            "framework": (
+                "Python oracle CLI vs native Rust framework binary on the same "
+                "loopback corpus: cold --version process startup (>=3 fresh "
+                "subprocesses, medians + spreads) plus a transfer lane on the "
+                "identical URL (Python real, Rust null+reason: W0 placeholder)."
+            ),
         },
         "honesty": {
             "codeload": _unmeasurable(CODELOAD_REASON),
@@ -923,6 +1106,17 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
                 "{'value': null, 'reason': '...'} and never invented."
             ),
         },
+        # NEW top-level field: the original `honesty` block above is kept
+        # byte-for-byte verbatim; framework caveats are additive only.
+        "framework_honesty": {
+            "framework_transfer": _unmeasurable(FRAMEWORK_TRANSFER_REASON),
+            "media_process_startup": _unmeasurable(MEDIA_BOUNDARY_REASON),
+            "cold_start": FRAMEWORK_COLD_START_SCOPE,
+            "drift": (
+                "Differences within ~1.2-1.3x are measurement drift, not wins; "
+                "warm-cache effects are never presented as speedups."
+            ),
+        },
         "engine_pinning": pinning,
         "benchmarks": {
             "startup_overhead": bench_startup(),
@@ -931,6 +1125,7 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
             "cpu_usage": tm["cpu_usage"],
             "peak_rss": tm["peak_rss"],
             "checksum_large_file": bench_checksum(root),
+            "framework_comparison": framework,
         },
     }
 
