@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paradl-media"
+version = "0.1.0"
+description = "Standalone one-shot Python media worker for the paraDL Rust framework (paradl-media/1)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Tawsif Rahman" }]
+requires-python = ">=3.11"
+dependencies = [
+    "yt-dlp[default]>=2026.6.9",
+    "mutagen>=1.47",
+]
+
+[project.optional-dependencies]
+ejs = ["yt-dlp-ejs"]
+
+# Intentionally NO console-script entry point: this package is invoked only as
+#   <python> -m paradl_media
+# It is NOT a console script, NOT a long-lived sidecar, NOT PyO3.
+
+[tool.hatch.build.targets.wheel]
+packages = ["paradl_media"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
