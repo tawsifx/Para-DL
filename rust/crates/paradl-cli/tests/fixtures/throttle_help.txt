@@ -1,0 +1,63 @@
+usage: pdl throttle [-h] [--targets TARGETS_FILE] [--domestic DOMESTIC_URLS]
+                    [--plan-mbps PLAN_MBPS] [--isp ISP]
+                    [--via-proxy VIA_PROXY] [--interface INTERFACE]
+                    [--ipv4 | --ipv6] [--data-budget DATA_BUDGET]
+                    [-o OUTPUT_DIR] [--html] [--run-id RUN_ID] [--force]
+                    [--allow-32] [--seed SEED] [--host SERVER_HOST]
+                    [--port SERVER_PORT] [--udp-port SERVER_UDP_PORT]
+                    [--duration SERVER_DURATION] [--json] [-y]
+                    [--non-interactive]
+                    [{quick,full,sample,coverage,launchd-plist,report,server,targets}]
+                    [extra_args ...]
+
+ISP Throttling & Traffic Differentiation Diagnostic Suite.
+
+positional arguments:
+  {quick,full,sample,coverage,launchd-plist,report,server,targets}
+                        Diagnostic subcommand to run.
+  extra_args            Optional positional arguments (e.g. output path or
+                        run_id).
+
+options:
+  -h, --help            show this help message and exit
+  --targets TARGETS_FILE
+                        Path to custom targets.toml file.
+  --domestic DOMESTIC_URLS
+                        Domestic (in-country / BDIX / local peering) host or
+                        URL (repeatable).
+  --plan-mbps PLAN_MBPS
+                        Subscribed ISP plan speed in Mbps (e.g. 50).
+  --isp ISP             ISP display name for headers and evidence summary
+                        (default: auto-detected from network).
+  --via-proxy VIA_PROXY
+                        Optional HTTP or SOCKS5 proxy URL for paired M9
+                        comparison (secrets redacted in logs/reports).
+  --interface INTERFACE
+                        Preferred network interface name (e.g. en0).
+  --ipv4                Force IPv4 target resolution.
+  --ipv6                Force IPv6 target resolution.
+  --data-budget DATA_BUDGET
+                        Hard total data budget (e.g. 300MB, 3GB).
+  -o OUTPUT_DIR, --output OUTPUT_DIR
+                        Directory to write report files or LaunchAgent plist.
+  --html                Generate self-contained HTML report with inline SVG
+                        charts (default: True).
+  --run-id RUN_ID       Specific stored run ID to rebuild with `pdl throttle
+                        report`.
+  --force               Bypass 45-minute sample idempotency window or battery
+                        skip.
+  --allow-32            Allow 32-stream probe in M3 flow scaling (default cap
+                        is 16).
+  --seed SEED           RNG seed for deterministic jitter and test ordering.
+  --host SERVER_HOST    Bind address for `pdl throttle server` (default:
+                        127.0.0.1).
+  --port SERVER_PORT    TCP port for `pdl throttle server` (default: 8765).
+  --udp-port SERVER_UDP_PORT
+                        UDP echo port for `pdl throttle server` (default:
+                        8766).
+  --duration SERVER_DURATION
+                        Optional duration in seconds for `pdl throttle
+                        server`.
+  --json                Emit structured JSON output to stdout.
+  -y, --yes             Automatic confirmation for non-interactive runs.
+  --non-interactive     Run without interactive prompts.

@@ -8,3 +8,5 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+clap.workspace = true
+paradl-core = { path = "../paradl-core" }
