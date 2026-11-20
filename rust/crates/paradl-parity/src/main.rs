@@ -15,7 +15,8 @@
 use std::path::PathBuf;
 
 use paradl_parity::{
-    BoundaryCase, DiffReport, run_boundary_case, run_media_replay, run_nonmedia_case,
+    BoundaryCase, DiffReport, boundary_process_exit_code, run_boundary_case, run_media_replay,
+    run_nonmedia_case,
 };
 use paradl_parity::diff::Difference;
 use paradl_parity::media::find_media_python;
@@ -84,8 +85,9 @@ fn run_boundary(args: &[String]) -> i32 {
             }
             report.note(format!("mapped exit code={}; diagnostic={:?}", outcome.exit_code, outcome.diagnostic));
             print!("{}", report.render());
-            // The CI negative test asserts the mapped exit code, not a pass/fail.
-            outcome.exit_code
+            // Any difference wins: never print DIFF and exit 0. Only a clean
+            // version-mismatch returns 4 for CI's `test -eq 4` assertion.
+            boundary_process_exit_code(case, !report.is_clean())
         }
         Err(error) => {
             eprintln!("boundary lane error: {error}");

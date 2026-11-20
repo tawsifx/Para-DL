@@ -10,8 +10,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use paradl_parity::{
-    BoundaryCase, LoopbackServer, PythonGuard, diff_bytes, diff_snapshots, run_boundary_case,
-    run_media_replay,
+    BoundaryCase, DiffReport, LoopbackServer, PythonGuard, boundary_process_exit_code, diff_bytes,
+    diff_snapshots, run_boundary_case, run_media_replay,
 };
 use serde_json::Value;
 
@@ -100,6 +100,48 @@ fn boundary_version_mismatch_fails_closed_to_exit_4() {
         outcome.diagnostic.contains("protocol"),
         "{}",
         outcome.diagnostic
+    );
+}
+
+#[test]
+fn boundary_diff_with_zero_mapped_code_still_exits_1() {
+    // Review round 1 (critical): the harness must never print DIFF and exit 0.
+    // Take a genuinely clean `ok` case (mapped code 0) and record one synthetic
+    // difference; the process decision must become 1.
+    let outcome = run_boundary_case(BoundaryCase::Ok, &python(), None).unwrap();
+    assert_eq!(outcome.exit_code, 0);
+    let mut report = DiffReport::new("boundary", BoundaryCase::Ok.as_str());
+    assert!(report.is_clean());
+    assert_eq!(boundary_process_exit_code(outcome.case, !report.is_clean()), 0);
+    report.compare("synthetic:data", b"expected", b"actual");
+    assert!(!report.is_clean());
+    assert_eq!(boundary_process_exit_code(outcome.case, !report.is_clean()), 1);
+}
+
+#[test]
+fn boundary_process_exit_matrix() {
+    // Any difference wins for every case, including version-mismatch.
+    for case in [
+        BoundaryCase::Ok,
+        BoundaryCase::Error,
+        BoundaryCase::Unsupported,
+        BoundaryCase::Malformed,
+        BoundaryCase::VersionMismatch,
+    ] {
+        assert_eq!(boundary_process_exit_code(case, true), 1, "{case:?}");
+    }
+    // Clean cases: 4 only for `version-mismatch`, 0 for the rest.
+    for case in [
+        BoundaryCase::Ok,
+        BoundaryCase::Error,
+        BoundaryCase::Unsupported,
+        BoundaryCase::Malformed,
+    ] {
+        assert_eq!(boundary_process_exit_code(case, false), 0, "{case:?}");
+    }
+    assert_eq!(
+        boundary_process_exit_code(BoundaryCase::VersionMismatch, false),
+        4
     );
 }
 

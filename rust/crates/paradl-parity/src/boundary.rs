@@ -283,3 +283,28 @@ pub fn parse_frame_exit_code(line: &str, request_id: &str) -> i32 {
 pub fn decode_media_data(value: &Value) -> Result<MediaData, Error> {
     MediaData::from_value(value)
 }
+
+/// Decide the **process** exit code of the boundary lane.
+///
+/// A harness must never report `DIFF` and still exit successfully: any
+/// recorded difference wins and yields `1`. Only a **clean** `version-mismatch`
+/// case returns `4` (the value CI's protocol-mismatch negative test asserts);
+/// every other clean case returns `0`. This is deliberately distinct from the
+/// mapped *application* exit code inside [`BoundaryOutcome::exit_code`].
+///
+/// ```
+/// use paradl_parity::{BoundaryCase, boundary_process_exit_code};
+/// // A wrong mapping that still yields zero must fail the harness.
+/// assert_eq!(boundary_process_exit_code(BoundaryCase::Ok, true), 1);
+/// assert_eq!(boundary_process_exit_code(BoundaryCase::Ok, false), 0);
+/// assert_eq!(boundary_process_exit_code(BoundaryCase::VersionMismatch, false), 4);
+/// ```
+pub fn boundary_process_exit_code(case: BoundaryCase, has_differences: bool) -> i32 {
+    if has_differences {
+        1
+    } else if case == BoundaryCase::VersionMismatch {
+        4
+    } else {
+        0
+    }
+}

@@ -93,8 +93,11 @@ A stub Python worker emits canned frames through the real Rust bridge:
 `malformed` (chatty/non-JSON stdout must not corrupt `--json`→1), and
 `version-mismatch` (unknown major → **4**). The version conformance matrix N,
 N−1, N+1, unknown, missing, and unparseable is asserted through
-`paradl_media::check_protocol`. The CLI returns the **mapped** exit code, which
-is exactly what the CI negative test expects for `version-mismatch`.
+`paradl_media::check_protocol`. The CLI exits `1` whenever any difference is
+recorded (a harness must never print `DIFF` and still succeed); only a **clean**
+`version-mismatch` returns `4`, which is exactly what the CI negative test
+asserts. All other clean cases return `0`. See
+[`boundary_process_exit_code`] for the decision table.
 
 ## Honesty caveats (no warm-cache/drift victories claimed)
 
