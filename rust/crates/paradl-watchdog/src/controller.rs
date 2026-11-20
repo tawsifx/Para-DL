@@ -39,7 +39,11 @@ pub struct WatchdogConfig {
     pub recycle_interval_sec: f64,
     /// Reserved recycle budget for tier escalation.
     pub max_recycles: i64,
-    /// 4-hour bucket; when `None` the controller uses bucket `0`.
+    /// 4-hour bucket for learned profiles (`0..=5`, from `compute_hour_bucket`).
+    ///
+    /// `None` resolves to the sentinel `-1`, meaning **unknown** — callers MUST
+    /// pass `Some(compute_hour_bucket(local_hour))` when profiles are in use.
+    /// `0` is a real bucket (midnight–04:00), NOT a safe default.
     pub hour_bucket: Option<i32>,
     /// Network id; when `None`/empty the controller uses `"default"`.
     pub network_id: Option<String>,
@@ -65,6 +69,8 @@ impl Default for WatchdogConfig {
             min_cooldown_sec: 2.0,
             recycle_interval_sec: 5.0,
             max_recycles: 999_999,
+            // Unknown-bucket sentinel: -1 never collides with a real 0..=5
+            // bucket. Callers must supply Some(compute_hour_bucket(local_hour)).
             hour_bucket: None,
             network_id: None,
             apply_learned_profile: true,
@@ -86,6 +92,7 @@ pub struct WatchdogController {
     connections: i32,
     host: String,
     supports_range: bool,
+    // -1 = unknown sentinel; always 0..=5 when a caller supplies a real bucket.
     hour_bucket: i32,
     network_id: String,
     revalidation_ticks: i32,
@@ -155,7 +162,9 @@ impl WatchdogController {
             .network_id
             .filter(|id| !id.trim().is_empty())
             .unwrap_or_else(|| "default".to_string());
-        let hour_bucket = config.hour_bucket.unwrap_or(0);
+        // -1 is the "unknown" sentinel; 0 is a real bucket and must not be
+        // silently substituted for a missing local-hour value.
+        let hour_bucket = config.hour_bucket.unwrap_or(-1);
         let disabled_reason = if config.mode == WatchdogMode::Off || config.user_floor_bps <= 0.0 {
             Some("off".to_string())
         } else {
@@ -458,6 +467,7 @@ impl WatchdogController {
             current_threshold_bps: self.current_threshold_bps(),
             rolling_p90_bps: self.rolling_p90(),
             ip_family: self.ip_family.clone(),
+            hour_bucket: self.hour_bucket,
             recycle_interval_sec: self.recycle_interval_sec,
             status_label: self.status_label(),
         }

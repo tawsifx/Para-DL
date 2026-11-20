@@ -8,7 +8,7 @@ use paradl_core::{FakeClock, WatchdogMode};
 use paradl_watchdog::{
     InMemoryProfileStore, LearnedProfile, ProfileStore, ResilienceEvent, ResilienceEventType,
     ThroughputSample, Watchdog, WatchdogActionEvent, WatchdogActionType, WatchdogConfig,
-    WatchdogController, compute_percentile,
+    WatchdogController, compute_hour_bucket, compute_percentile,
 };
 
 fn sample(elapsed: f64, speed: f64) -> ThroughputSample {
@@ -514,6 +514,52 @@ fn action_event_field_order_matches_golden() {
             assert!(prev < at, "field {field} out of order");
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Hour-bucket sentinel (review round 1 / lead ruling)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn default_hour_bucket_is_unknown_sentinel_not_real_bucket() {
+    // Default config leaves the bucket unresolved; the controller must resolve
+    // it to -1 ("unknown"), never to 0 (a real midnight-04:00 bucket).
+    assert_eq!(WatchdogConfig::default().hour_bucket, None);
+    let wd = WatchdogController::new(config());
+    assert_eq!(wd.state().hour_bucket, -1);
+
+    // A caller-supplied local-hour bucket is preserved exactly.
+    let wd_real = WatchdogController::new(WatchdogConfig {
+        hour_bucket: Some(compute_hour_bucket(14)),
+        ..config()
+    });
+    assert_eq!(wd_real.state().hour_bucket, 3);
+
+    // The sentinel never collides with any real bucket for any hour of day.
+    for hour in 0..24 {
+        let bucket = compute_hour_bucket(hour);
+        assert!((0..=5).contains(&bucket));
+        assert_ne!(bucket, -1, "bucket for hour {hour} collided with sentinel");
+    }
+
+    // Profiles saved with the default config carry the sentinel, not bucket 0.
+    let store = Arc::new(RecordingStore::default());
+    let mut wd_saver = WatchdogController::with_store(
+        WatchdogConfig {
+            host: "cdn.example.com".to_string(),
+            user_floor_bps: 100_000.0,
+            apply_learned_profile: false,
+            ..WatchdogConfig::default()
+        },
+        Arc::new(FakeClock::new(1000.0, 1000.0)),
+        store.clone(),
+    );
+    for t in 1..=5 {
+        wd_saver.observe(sample(t as f64, 5000.0));
+    }
+    let saved = store.saved.lock().unwrap();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(saved[0].hour_bucket, -1);
 }
 
 // ---------------------------------------------------------------------------

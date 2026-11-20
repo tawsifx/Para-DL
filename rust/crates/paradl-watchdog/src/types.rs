@@ -323,6 +323,9 @@ pub struct WatchdogState {
     pub rolling_p90_bps: f64,
     /// Current IP family (`auto`, `ipv4`, `ipv6`).
     pub ip_family: String,
+    /// Learned-profile hour bucket; `-1` means "unknown" (caller did not supply
+    /// a local-hour bucket). Real buckets are `0..=5`.
+    pub hour_bucket: i32,
     /// Periodic recycle interval in seconds.
     pub recycle_interval_sec: f64,
     /// Human-readable status label from the Python oracle.

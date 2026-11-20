@@ -7,6 +7,7 @@ use std::sync::Arc;
 use paradl_core::{FakeClock, WatchdogMode};
 use paradl_watchdog::{
     ThroughputSample, Watchdog, WatchdogActionType, WatchdogConfig, WatchdogController,
+    compute_hour_bucket,
 };
 
 fn main() {
@@ -16,6 +17,9 @@ fn main() {
             mode: WatchdogMode::V2,
             user_floor_bps: 1000.0,
             recycle_interval_sec: 0.0,
+            // Real integrations pass the caller's local hour; -1 is only the
+            // "unknown" sentinel used by WatchdogConfig::default().
+            hour_bucket: Some(compute_hour_bucket(14)),
             ..WatchdogConfig::default()
         },
         clock,

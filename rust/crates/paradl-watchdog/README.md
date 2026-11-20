@@ -15,6 +15,18 @@ supervision loop.
 
 There are **no feature flags**; the default build has no optional system dependencies.
 
+> [!IMPORTANT]
+> **Learned profiles require an explicit hour bucket.** `WatchdogConfig::default()`
+> leaves `hour_bucket: None`, which resolves to the sentinel `-1` ("unknown").
+> `-1` never collides with a real `0..=5` bucket, so it will not silently
+> mis-bucket profiles, but it also means profile lookup/save cannot match
+> time-of-day data. Callers using learned profiles MUST pass
+> `hour_bucket: Some(compute_hour_bucket(local_hour))` (where `local_hour` is
+> `0..=23`). `0` is a **real** bucket (midnight–04:00), not a safe default —
+> never substitute it for a missing local hour. The injected `Clock` exposes
+> only wall time, so local-hour detection is deliberately deferred to the W4-1
+> application integration; `WatchdogState.hour_bucket` reports the value in use.
+
 ## Parity guarantees
 
 - `WatchdogActionType.tier2_pause_unpause` (L07) is emitted verbatim.
