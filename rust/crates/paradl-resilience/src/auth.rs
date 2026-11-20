@@ -17,9 +17,12 @@
 //! ```
 
 use std::collections::HashMap;
-use std::io::Write;
-use std::process::{Command, Stdio};
 use std::sync::Mutex;
+
+#[cfg(target_os = "macos")]
+use std::io::Write;
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 
 use paradl_core::{Error, is_windows};
 use paradl_events::{AuthStatusEvent, Event};
@@ -265,10 +268,21 @@ pub fn keychain_delete_spec(service: &str, account: &str) -> Vec<String> {
     ]
 }
 
-/// macOS/Windows keychain implementation using stdin for secret writes.
+/// Platform keychain implementation.
+///
+/// On macOS this shells out to `security -i`, putting the secret on **stdin**
+/// so it never appears in argv. On every other platform all three operations
+/// return the documented [`secret_store_unavailable_error`] instead of trying
+/// to spawn a missing `security` binary.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KeychainSecretStore;
 
+/// Error returned by [`KeychainSecretStore`] on non-macOS platforms.
+pub fn secret_store_unavailable_error() -> Error {
+    Error::failure("secret store not available on this platform")
+}
+
+#[cfg(target_os = "macos")]
 impl SecretStore for KeychainSecretStore {
     fn load(&self, service: Service, account: &str) -> Result<Option<String>> {
         let argv = keychain_load_spec("pdl", account);
@@ -320,6 +334,21 @@ impl SecretStore for KeychainSecretStore {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+impl SecretStore for KeychainSecretStore {
+    fn load(&self, _service: Service, _account: &str) -> Result<Option<String>> {
+        Err(secret_store_unavailable_error())
+    }
+
+    fn store(&self, _service: Service, _account: &str, _token: &str) -> Result<bool> {
+        Err(secret_store_unavailable_error())
+    }
+
+    fn delete(&self, _service: Service, _account: &str) -> Result<bool> {
+        Err(secret_store_unavailable_error())
+    }
+}
+
 /// Build `auth_status` metadata and its typed event (never includes tokens).
 pub fn auth_status(env: &dyn EnvLookup, store: &dyn SecretStore) -> Result<(Value, Emitted)> {
     let mut services = Map::new();
@@ -362,5 +391,27 @@ mod tests {
         assert_eq!(Service::parse("other"), None);
         assert_eq!(Service::Hf.env_keys()[0], "HF_TOKEN");
         assert_eq!(Service::Github.env_keys()[0], "GITHUB_TOKEN");
+    }
+
+    #[test]
+    fn unavailable_error_has_documented_message() {
+        assert_eq!(
+            secret_store_unavailable_error().to_string(),
+            "secret store not available on this platform"
+        );
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn keychain_stub_returns_clear_error_on_non_macos() {
+        let store = KeychainSecretStore;
+        for result in [
+            store.load(Service::Hf, "hf").map(|_| ()),
+            store.store(Service::Hf, "hf", "token-value-1234").map(|_| ()),
+            store.delete(Service::Hf, "hf").map(|_| ()),
+        ] {
+            let error = result.unwrap_err();
+            assert!(error.to_string().contains("not available on this platform"));
+        }
     }
 }

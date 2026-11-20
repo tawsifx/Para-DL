@@ -635,11 +635,97 @@ event_struct! {
     }
 }
 
-event_struct! {
-    /// Persistent queue listing (E51).
-    QueueListEvent "queue_list" {
-        /// Serialized job rows.
-        jobs: Value,
+/// One row of a `queue_list` event.
+///
+/// Field order is byte-exact against `src/paradl/resilience/queue.py:464-478`.
+/// All 13 keys are always emitted (including `null` optionals), matching the
+/// oracle dict comprehension — unlike an `Option` event payload, these fields
+/// must not be skipped.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct QueueJobRow {
+    /// Queue job id.
+    pub id: i64,
+    /// Download target.
+    pub target: String,
+    /// Job status (`queued`, `running`, `paused`, `completed`, `failed`).
+    pub status: String,
+    /// Job priority.
+    pub priority: i64,
+    /// Connection count.
+    pub connections: i64,
+    /// Whether AC power is required.
+    pub require_ac: bool,
+    /// `--when-fast` threshold in bytes/s.
+    pub when_fast_bps: f64,
+    /// Scheduled start time.
+    pub start_at: Option<String>,
+    /// Bytes downloaded so far.
+    pub bytes_downloaded: i64,
+    /// Expected content length.
+    pub expected_length: Option<i64>,
+    /// Absolute output directory.
+    pub out_dir: String,
+    /// Output filename, when known.
+    pub filename: Option<String>,
+    /// Last error message, when failed.
+    pub error: Option<String>,
+}
+
+impl QueueJobRow {
+    /// Construct a row with all 13 oracle fields in insertion order.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: i64,
+        target: String,
+        status: String,
+        priority: i64,
+        connections: i64,
+        require_ac: bool,
+        when_fast_bps: f64,
+        start_at: Option<String>,
+        bytes_downloaded: i64,
+        expected_length: Option<i64>,
+        out_dir: String,
+        filename: Option<String>,
+        error: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            target,
+            status,
+            priority,
+            connections,
+            require_ac,
+            when_fast_bps,
+            start_at,
+            bytes_downloaded,
+            expected_length,
+            out_dir,
+            filename,
+            error,
+        }
+    }
+}
+
+/// Persistent queue listing (E51) with insertion-ordered typed rows.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct QueueListEvent {
+    /// The literal event name.
+    pub event: &'static str,
+    /// `round(time.time(), 3)` at emission time.
+    pub timestamp: f64,
+    /// Typed job rows; each keeps the oracle's 13-key insertion order.
+    pub jobs: Vec<QueueJobRow>,
+}
+
+impl QueueListEvent {
+    /// Construct a `queue_list` event from typed rows.
+    pub fn new(timestamp: f64, jobs: Vec<QueueJobRow>) -> Self {
+        Self {
+            event: "queue_list",
+            timestamp,
+            jobs,
+        }
     }
 }
 
@@ -1129,7 +1215,24 @@ impl Event {
                 Some(200.0),
             )),
             Self::QueueJobStarted(QueueJobStartedEvent::new(SAMPLE_TS, 1, "https://e.test".into(), 5, 16)),
-            Self::QueueList(QueueListEvent::new(SAMPLE_TS, sample_array())),
+            Self::QueueList(QueueListEvent::new(
+                SAMPLE_TS,
+                vec![QueueJobRow::new(
+                    1,
+                    "https://e.test".into(),
+                    "queued".into(),
+                    0,
+                    16,
+                    true,
+                    0.0,
+                    None,
+                    0,
+                    None,
+                    "/tmp/out".into(),
+                    None,
+                    None,
+                )],
+            )),
             Self::QueuePaused(QueuePausedEvent::new(SAMPLE_TS, Value::Number(2.into()))),
             Self::QueueRemoved(QueueRemovedEvent::new(SAMPLE_TS, 2)),
             Self::QueueResumed(QueueResumedEvent::new(SAMPLE_TS, Value::Number(2.into()), Some(true))),

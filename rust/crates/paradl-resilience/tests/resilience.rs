@@ -89,6 +89,45 @@ fn queue_events_match_golden_field_sets() {
 }
 
 #[test]
+fn queue_list_nested_rows_are_byte_exact_in_oracle_key_order() {
+    let (_dir, scheduler) = scheduler();
+    let mut job = QueueJob::new("https://example.com/f", "/tmp/out");
+    job.priority = 5;
+    job.filename = Some("f.bin".into());
+    job.expected_length = Some(2048);
+    scheduler.add_job(&job).unwrap();
+
+    let (_jobs, listed) = scheduler.list_jobs_with_timestamp(None, 1763376000.123).unwrap();
+    let expected = "{\"event\": \"queue_list\", \"timestamp\": 1763376000.123, \"jobs\": [{\"id\": 1, \"target\": \"https://example.com/f\", \"status\": \"queued\", \"priority\": 5, \"connections\": 16, \"require_ac\": true, \"when_fast_bps\": 0.0, \"start_at\": null, \"bytes_downloaded\": 0, \"expected_length\": 2048, \"out_dir\": \"/tmp/out\", \"filename\": \"f.bin\", \"error\": null}]}\n";
+    assert_eq!(listed.to_jsonl(), expected);
+
+    // serde_json::Value orders keys alphabetically, so verify insertion order
+    // directly on the emitted bytes instead of through a parsed Value.
+    let raw = listed.to_jsonl();
+    let keys = [
+        "id",
+        "target",
+        "status",
+        "priority",
+        "connections",
+        "require_ac",
+        "when_fast_bps",
+        "start_at",
+        "bytes_downloaded",
+        "expected_length",
+        "out_dir",
+        "filename",
+        "error",
+    ];
+    let mut last = 0;
+    for key in keys {
+        let position = raw.find(&format!("\"{key}\":")).unwrap_or_else(|| panic!("missing {key}"));
+        assert!(position > last, "{key} is out of oracle insertion order");
+        last = position;
+    }
+}
+
+#[test]
 fn queue_orders_by_priority_and_recovers_crashes() {
     let (_dir, scheduler) = scheduler();
     for (target, priority) in [("low", 0), ("high", 9), ("mid", 4)] {
@@ -170,7 +209,9 @@ fn hooks_run_with_json_stdin_timeout_and_typed_events() {
     std::fs::write(&hang_script, "#!/bin/sh\nsleep 30\n").unwrap();
     std::fs::set_permissions(&hang_script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-    let runner = HookRunner::new(hooks, Duration::from_millis(250));
+    // 2 s is generous for shell startup even under parallel test load, while
+    // the hang hook sleeps 30 s so it still reliably exercises the timeout.
+    let runner = HookRunner::new(hooks, Duration::from_secs(2));
     assert_eq!(runner.find_executables(HookType::OnComplete).unwrap().len(), 1);
 
     let events = runner
@@ -261,6 +302,15 @@ fn auth_lookup_precedence_and_no_secret_in_argv() {
     let load = keychain_load_spec("paradl", "hf");
     assert!(!load.iter().any(|arg| arg.contains("secret")));
     assert!(load.contains(&"find-generic-password".to_string()));
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn keychain_stub_fails_clearly_without_security_binary() {
+    use paradl_resilience::auth::KeychainSecretStore;
+    let store = KeychainSecretStore;
+    let error = store.store(Service::Hf, "hf", "secret-value-1234").unwrap_err();
+    assert!(error.to_string().contains("not available on this platform"));
 }
 
 #[test]

@@ -44,7 +44,7 @@ pub use schema::{
     HookFailedEvent, HookTimeoutEvent, HostsResetEvent, InfoEvent, InstallSecurityCheckEvent,
     InterruptedEvent, LaunchdPlistGeneratedEvent, MirrorDroppedEvent, MirrorRejectedEvent,
     NetprobeEvent, ProfilesEvent, ProfilesResetEvent, ProgressEvent, QueueCrashRecoveredEvent,
-    QueueJobAddedEvent, QueueJobDeferredEvent, QueueJobStartedEvent, QueueListEvent,
+    QueueJobAddedEvent, QueueJobDeferredEvent, QueueJobRow, QueueJobStartedEvent, QueueListEvent,
     QueuePausedEvent, QueueRemovedEvent, QueueResumedEvent, ResilienceEventEvent, ResultEvent,
     TargetClassifiedEvent, ThrottleLaunchdPlistGeneratedEvent, VerificationEvent,
     WatchdogActionRangeEvent, WhenFastProbeEvent, names,

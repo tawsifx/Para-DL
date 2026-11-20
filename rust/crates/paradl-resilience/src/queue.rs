@@ -18,12 +18,12 @@
 
 use chrono::{DateTime, Local, Timelike};
 use paradl_events::{
-    Event, QueueCrashRecoveredEvent, QueueJobAddedEvent, QueueJobDeferredEvent,
-    QueueJobStartedEvent, QueueListEvent, QueuePausedEvent, QueueRemovedEvent,
-    QueueResumedEvent, WhenFastProbeEvent, py_round,
+    Event, QueueCrashRecoveredEvent, QueueJobAddedEvent, QueueJobDeferredEvent, QueueJobRow,
+    QueueJobStartedEvent, QueueListEvent, QueuePausedEvent, QueueRemovedEvent, QueueResumedEvent,
+    WhenFastProbeEvent, py_round,
 };
 use paradl_store::{Queue, QueueJob};
-use serde_json::{Map, Value, json};
+use serde_json::Value;
 
 use crate::{Emitted, Result, now};
 
@@ -65,30 +65,43 @@ impl QueueScheduler {
         Ok(Emitted::new(Event::QueueJobAdded(event)))
     }
 
+    /// Convert a stored job into the oracle's 13-field `queue_list` row.
+    ///
+    /// The field order here is byte-exact against
+    /// `src/paradl/resilience/queue.py:464-478`; the custom serializer in
+    /// `paradl-events` preserves struct declaration order.
+    fn job_row(job: &QueueJob) -> QueueJobRow {
+        QueueJobRow::new(
+            job.id,
+            job.target.clone(),
+            job.status.clone(),
+            job.priority,
+            job.connections,
+            job.require_ac,
+            job.when_fast_bps,
+            job.start_at.clone(),
+            job.bytes_downloaded,
+            job.expected_length,
+            job.out_dir.clone(),
+            job.filename.clone(),
+            job.error.clone(),
+        )
+    }
+
     /// List jobs in `priority DESC, id ASC` order and emit `queue_list` (E51).
     pub fn list_jobs(&self, status: Option<&str>) -> Result<(Vec<QueueJob>, Emitted)> {
+        self.list_jobs_with_timestamp(status, now())
+    }
+
+    /// Same as [`Self::list_jobs`] with an injected timestamp for byte-exact goldens.
+    pub fn list_jobs_with_timestamp(
+        &self,
+        status: Option<&str>,
+        timestamp: f64,
+    ) -> Result<(Vec<QueueJob>, Emitted)> {
         let jobs = self.queue.list_jobs(status)?;
-        let rows: Vec<Value> = jobs
-            .iter()
-            .map(|job| {
-                let mut row = Map::new();
-                row.insert("id".into(), json!(job.id));
-                row.insert("target".into(), json!(job.target));
-                row.insert("status".into(), json!(job.status));
-                row.insert("priority".into(), json!(job.priority));
-                row.insert("connections".into(), json!(job.connections));
-                row.insert("require_ac".into(), json!(job.require_ac));
-                row.insert("when_fast_bps".into(), json!(job.when_fast_bps));
-                row.insert("start_at".into(), json!(job.start_at));
-                row.insert("bytes_downloaded".into(), json!(job.bytes_downloaded));
-                row.insert("expected_length".into(), json!(job.expected_length));
-                Value::Object(row)
-            })
-            .collect();
-        let emitted = Emitted::new(Event::QueueList(QueueListEvent::new(
-            now(),
-            Value::Array(rows),
-        )));
+        let rows = jobs.iter().map(Self::job_row).collect();
+        let emitted = Emitted::new(Event::QueueList(QueueListEvent::new(timestamp, rows)));
         Ok((jobs, emitted))
     }
 
