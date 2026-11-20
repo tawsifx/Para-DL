@@ -1,0 +1,24 @@
+[package]
+name = "paradl-resilience"
+description = "Queue scheduling, launchd plists, isolated hooks, resilience event source and auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+keywords = ["paradl", "resilience", "queue", "auth", "hooks"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-events = { path = "../paradl-events" }
+paradl-store = { path = "../paradl-store" }
+paradl-watchdog = { path = "../paradl-watchdog" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
