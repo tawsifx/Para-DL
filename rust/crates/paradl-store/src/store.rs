@@ -113,10 +113,22 @@ impl SqliteStore {
     }
 }
 
+/// Python-compatible `round(value, ndigits)` (round-half-to-even), matching
+/// `HistoryManager.record`'s `round(float(duration), 2)` (`history.py:444`).
+///
+/// This mirrors the public `paradl_watchdog::types::py_round` implementation,
+/// kept local because `paradl-store` is a foundational crate: depending on the
+/// higher-level watchdog would invert the layering (the watchdog's SQLite
+/// profile store needs `paradl-store`) and create a dependency cycle.
+fn round_ties_even(value: f64, ndigits: i32) -> f64 {
+    let factor = 10_f64.powi(ndigits);
+    (value * factor).round_ties_even() / factor
+}
+
 impl crate::Store for SqliteStore {
     fn record_transfer(&self, record: &TransferRecord) -> Result<()> {
         let conn = self.connect()?;
-        let duration = (record.duration * 100.0).round() / 100.0;
+        let duration = round_ties_even(record.duration, 2);
         conn.execute(
             "INSERT INTO downloads (timestamp, target, type, filename, path, size, duration, success, adb, sha256)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

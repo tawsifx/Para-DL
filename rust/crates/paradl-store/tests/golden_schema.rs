@@ -191,6 +191,17 @@ fn record_transfer_and_recent_match_oracle() {
     let again = store.recent(1).expect("recent 1");
     assert_eq!(again[0].duration, 1.26);
     assert_eq!(again[0].filename, "a.bin");
+
+    // D07 golden: exact binary ties use Python's banker's rounding
+    // (`history.py:444`). Captured from the oracle:
+    //   .venv/bin/python -c "print(round(0.125,2), round(0.375,2))" -> 0.12 0.38
+    let lo = TransferRecord::new("https://tie.example/lo", "direct", "/tmp/lo.bin", 1, 0.125, true, false, None);
+    store.record_transfer(&lo).expect("record 0.125");
+    assert_eq!(store.recent(1).expect("recent 0.125")[0].duration, 0.12);
+
+    let hi = TransferRecord::new("https://tie.example/hi", "direct", "/tmp/hi.bin", 2, 0.375, true, false, None);
+    store.record_transfer(&hi).expect("record 0.375");
+    assert_eq!(store.recent(1).expect("recent 0.375")[0].duration, 0.38);
 }
 
 /// D20: migrations add columns without dropping a single row.
