@@ -46,6 +46,7 @@ pub mod compat;
 pub mod dns;
 pub mod isp;
 pub mod routing;
+pub mod sites;
 
 pub use client::{
     DEFAULT_USER_AGENT, HttpClient, HttpClientConfig, HttpProbeResult,
@@ -68,6 +69,18 @@ pub use routing::{
     DelegateReason, ExtractorClaims, MediaClaim, MediaOp, PureClaimsChecker, ResolveContext,
     ResolvedAsset, RouteDecision, TargetResolver, classify_target, resolve_target,
     ytdlp_extractor_claims,
+};
+// W2-3 site engines (pure REST resolvers; no extractor logic — ruling 3).
+pub use sites::{
+    HttpSiteHttp, JsonResponse, RedirectInfo, SiteHttp, SiteRouter,
+    accelerate::{DEFAULT_MIRROR, MIRROR_ENV, accelerate_url, accelerate_url_with_mirror, is_github_archive},
+    brew::BrewResolver,
+    cloud::CloudResolver,
+    github::GithubResolver,
+    hf::HfResolver,
+    ipsw::IpswResolver,
+    pypi::PyPIResolver,
+    token::{EnvSecretProvider, Keychain, SecretProvider, SiteHeaders, SiteService},
 };
 
 /// The framework's single public error type, re-exported for convenience.

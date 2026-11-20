@@ -12,6 +12,27 @@ the paraDL framework.
   never loads yt-dlp; the W3-4 media bridge supplies the live-registry version
   via the `paradl-media/1` `claims` op. `PureClaimsChecker` is the default.
 
+### Site resolvers (W2-3)
+
+Each implements `TargetResolver` and performs pure REST resolution
+(charter §5, ruling 3 — no yt-dlp/extractor logic):
+
+| Resolver | Scheme | Shortcuts |
+|---|---|---|
+| `GithubResolver` | `gh` | `gh:`, `github:`, GitHub URLs/releases/trees |
+| `HfResolver` | `hf` | `hf:`, `huggingface:`, resolve/blob/tree URLs |
+| `BrewResolver` | `brew` | `brew:`, `homebrew:`, formulae.brew.sh URLs |
+| `PyPIResolver` | `pip` | `pip:`, `pypi:`, pypi.org URLs |
+| `IpswResolver` | `ipsw` | `ipsw:`, ipsw.me / CDN firmware URLs |
+| `CloudResolver` | `cloud` | Google Drive, Dropbox, Pastebin rewrites |
+
+`SiteRouter` dispatches by prefix. Supporting public API: `SiteHttp` /
+`HttpSiteHttp` (injectable REST seam), `SecretProvider` / `EnvSecretProvider`
+(`GITHUB_TOKEN`→`GH_TOKEN`→keychain, `HF_TOKEN`→`HUGGING_FACE_HUB_TOKEN`→keychain;
+secrets are registered for redaction and never placed in argv), plus
+`accelerate_url` for GitHub archives via `PARADL_GITHUB_ARCHIVE_MIRROR`.
+Resolved digests use Python's `sha256:<hex>` form.
+
 ## Routing split (ruling 3)
 
 Rust replicates only the **pure** rules from the `paradl-core` single-source
@@ -43,10 +64,13 @@ integration (W4-1); `paradl-core` is not modified.
 ```bash
 cargo run -p paradl-net --example resolve_target
 cargo run -p paradl-net --example resolve_target --features doh
+cargo run -p paradl-net --example site_resolvers
 ```
 
-The example is network-free (probing disabled) and prints classifications,
-RFC 6266/ETag helpers, ISP passthrough, and DoH endpoint parsing.
+Both examples are network-free: `resolve_target` prints classifications,
+RFC 6266/ETag helpers, ISP passthrough and DoH endpoint parsing;
+`site_resolvers` prints shortcut parsing, asset/wheel scoring, archive
+acceleration, cloud rewrites and token precedence.
 
 ## Verification
 
