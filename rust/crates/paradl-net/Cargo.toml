@@ -1,0 +1,14 @@
+[package]
+name = "paradl-net"
+description = "HTTP client, probe, RFC 6266 filenames, ETag, DNS/DoH, routing, and site resolvers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+doh = []
+
+[dependencies]

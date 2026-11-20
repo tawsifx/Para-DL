@@ -1,0 +1,14 @@
+[package]
+name = "paradl-media"
+description = "Rust-side protocol client/router for the Python media worker (no extractor logic)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+media = []
+
+[dependencies]

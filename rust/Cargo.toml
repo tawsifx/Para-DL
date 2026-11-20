@@ -1,7 +1,12 @@
-# Workspace for the in-process Rust download engine that replaces the aria2 JSON-RPC
-# control plane in paradl. The engine core is a trimmed, in-process Rust port.
+# Workspace for the paraDL Rust framework.
+#
+# The entire Python application becomes Rust EXCEPT the media subsystem, which
+# stays a Python package invoked as `python -m paradl_media` over the
+# `paradl-media/1` JSON-lines protocol. New public crates live in `crates/`;
+# `rapids` (engine core) and `paradl-rs` (legacy PyO3 bindings) remain members
+# until their functionality is promoted into `paradl-engine` and `paradl-cli`.
 [workspace]
-members = ["rapids", "paradl-rs"]
+members = ["crates/*", "rapids", "paradl-rs"]
 resolver = "2"
 
 [workspace.package]
@@ -11,11 +16,26 @@ rust-version = "1.98"
 license = "MIT"
 authors = ["Tawsif Rahman"]
 
+# Shared dependency versions. Crates opt in individually; unused entries are
+# not resolved into Cargo.lock. New crates MUST NOT depend on PyO3.
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "socks"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+thiserror = "2"
+async-trait = "0.1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+axum = "0.8"
+ratatui = "0.29"
+rusqlite = { version = "0.32", features = ["bundled"] }
+hickory-dns = "0.25"
+blake2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tar = "0.4"
 sha2 = "0.10"
 md-5 = "0.10"
 sha1 = "0.10"
@@ -26,8 +46,23 @@ httpdate = "1"
 url = { version = "2", features = ["serde"] }
 bytes = "1"
 futures = "0.3"
-thiserror = "2"
+tokio-util = "0.7"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+dirs = "6"
+notify = "6"
 tempfile = "3"
+
+# Feature-flag matrix (declared per crate; all opt-in, none enabled by default):
+#   api              -> paradl-api, paradl          (axum server subcommand)
+#   tui              -> paradl-ui, paradl           (ratatui TUI)
+#   media            -> paradl-media, paradl        (Python worker bridge)
+#   platform-macos   -> paradl-platform, paradl     (macOS metadata/keychain)
+#   platform-windows -> paradl-platform, paradl     (Windows metadata/keychain)
+#   doh              -> paradl-net, paradl-engine   (DNS-over-HTTPS)
+#   server           -> paradl-throttle             (VPS tokio server)
+# A default `cargo build` compiles without optional system tools.
 
 [profile.release]
 opt-level = 3

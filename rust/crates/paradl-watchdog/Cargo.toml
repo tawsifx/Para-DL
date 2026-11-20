@@ -1,0 +1,10 @@
+[package]
+name = "paradl-watchdog"
+description = "Anti-throttle watchdog state machine, percentiles, cooldown, learned profiles, supervision"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]

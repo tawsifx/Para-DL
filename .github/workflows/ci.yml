@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# The framework is now Rust-first: native cargo build/test/clippy/fmt jobs are
+# the primary gate. The Python jobs below are kept as the read-only behavioral
+# oracle until the Wave 5 cutover. Media stays a Python package
+# (`python -m paradl_media`) spoken to over the `paradl-media/1` protocol;
+# it is never embedded in the Rust binary.
+
 jobs:
   lint-and-type:
-    name: Lint & Type Check
+    name: Lint & Type Check (Python oracle)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +34,7 @@ jobs:
         run: uv run mypy src/paradl/
 
   test-macos:
-    name: Tests (macOS)
+    name: Tests (macOS, Python oracle)
     runs-on: macos-latest
     strategy:
       matrix:
@@ -54,7 +60,7 @@ jobs:
         run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
 
   test-windows:
-    name: Tests (Windows)
+    name: Tests (Windows, Python oracle)
     runs-on: windows-latest
     strategy:
       matrix:
@@ -80,8 +86,176 @@ jobs:
       - name: Run test suite
         run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
 
+  rust-native:
+    name: Rust native (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-13, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # PyO3 0.27 rejects Python 3.15 (the Homebrew system Python on some
+      # runners). Pin 3.12 for the legacy `paradl-rs` workspace member;
+      # the new framework crates do not depend on PyO3.
+      - name: Set up Python 3.12 for the legacy PyO3 member
+        id: py
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Build all workspace members
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: cargo build --all
+
+      - name: Test all workspace members
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: cargo test --all
+
+      - name: Clippy (deny warnings)
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: cargo clippy --all -- -D warnings
+
+      # Scoped to the new framework crates: the legacy `rapids`/`paradl-rs`
+      # sources are formatted by their owning waves (W1-2/W4-1).
+      - name: rustfmt check (framework crates)
+        working-directory: rust
+        run: >-
+          cargo fmt --check
+          -p paradl -p paradl-store -p paradl-net -p paradl-engine
+          -p paradl-watchdog -p paradl-throttle -p paradl-postproc
+          -p paradl-platform -p paradl-media -p paradl-events
+          -p paradl-ui -p paradl-api -p paradl-cli
+          -p paradl-app -p paradl-parity
+
+      - name: Version smoke test
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: cargo run -p paradl -- --version
+
+  media-package:
+    name: Media package (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Create binary-managed media venv
+        run: uv venv .venv-media --python ${{ matrix.python-version }}
+
+      - name: Install media package (pip-installed, never frozen)
+        shell: bash
+        run: |
+          if [ -f media/pyproject.toml ]; then
+            uv pip install --python .venv-media/bin/python -e ./media
+          else
+            echo "::notice::media/ package arrives in W3-4a; installing its runtime deps only"
+            uv pip install --python .venv-media/bin/python "yt-dlp[default]" mutagen
+          fi
+
+      - name: Assert the media package has no console script
+        shell: bash
+        run: |
+          test ! -e .venv-media/bin/paradl
+          test ! -e .venv-media/bin/parallel-dl
+          test ! -e .venv-media/bin/pdl
+
+      - name: Assert the worker module imports
+        run: .venv-media/bin/python -c "import paradl_media; print(paradl_media.__name__)"
+
+  cross-boundary:
+    name: Cross-boundary protocol gate
+    runs-on: ubuntu-latest
+    needs: lint-and-type
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12 for the legacy PyO3 member
+        id: py
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Build native binary and parity harness
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: |
+          cargo build -p paradl --bin paradl
+          cargo build -p paradl-parity
+
+      - name: Prepare media worker venv
+        shell: bash
+        run: |
+          python3 -m venv .venv-media
+          if [ -f media/pyproject.toml ]; then
+            .venv-media/bin/pip install -e ./media
+          else
+            .venv-media/bin/pip install "yt-dlp[default]" mutagen
+          fi
+
+      - name: Happy-path handshake (`paradl-media/1`)
+        shell: bash
+        run: |
+          REQUEST='{"protocol":"paradl-media/1","request_id":"00000000-0000-4000-8000-000000000001","op":"claims","target":"https://example.com/file","out_dir":"'$PWD'","options":{}}'
+          printf '%s\n' "$REQUEST" \
+            | PARADL_MEDIA_PY=.venv-media/bin/python .venv-media/bin/python -m paradl_media \
+            | tee handshake.jsonl
+          tail -n 1 handshake.jsonl | .venv-media/bin/python -c \
+            'import json,sys; f=json.load(sys.stdin); assert f["protocol"]=="paradl-media/1" and f["frame"]=="result" and f["versions"]'
+
+      - name: Protocol-mismatch negative test (requires exit 4)
+        shell: bash
+        run: |
+          set +e
+          # W4-2 provides the boundary lane; Rust owns the ExitCode mapping and
+          # must fail closed with 4 on an unknown major or missing version.
+          REQUEST='{"protocol":"paradl-media/9","request_id":"00000000-0000-4000-8000-000000000002","op":"claims","target":"https://example.com/file","out_dir":"'$PWD'","options":{}}'
+          printf '%s\n' "$REQUEST" \
+            | PARADL_MEDIA_PY=.venv-media/bin/python \
+              cargo run --quiet --manifest-path rust/Cargo.toml -p paradl-parity -- \
+                boundary --case version-mismatch --worker .venv-media/bin/python
+          code=$?
+          set -e
+          echo "protocol-mismatch exit code: $code"
+          test "$code" -eq 4
+
   bench:
-    name: Performance Benchmarks
+    name: Performance Benchmarks (Python oracle)
     runs-on: ubuntu-latest
     needs: lint-and-type
     steps:

@@ -1,0 +1,14 @@
+[package]
+name = "paradl-engine"
+description = "Download engine: planner, state, limiter, verification, probe, and transfer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+doh = []
+
+[dependencies]

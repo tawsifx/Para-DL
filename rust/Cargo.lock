@@ -634,6 +634,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "paradl"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-api"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-app"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-cli"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-engine"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-events"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-media"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-net"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-parity"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-platform"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-postproc"
+version = "0.1.0"
+
+[[package]]
 name = "paradl-rs"
 version = "0.1.0"
 dependencies = [
@@ -642,6 +686,22 @@ dependencies = [
  "tokio",
  "url",
 ]
+
+[[package]]
+name = "paradl-store"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-throttle"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-ui"
+version = "0.1.0"
+
+[[package]]
+name = "paradl-watchdog"
+version = "0.1.0"
 
 [[package]]
 name = "parking_lot"

@@ -1,0 +1,10 @@
+[package]
+name = "paradl-postproc"
+description = "Checksums (BLAKE2b, GNU/BSD text, companion), archive security, and ADB post-processing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]

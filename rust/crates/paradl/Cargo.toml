@@ -1,0 +1,20 @@
+[package]
+name = "paradl"
+description = "Thin reference binary owning the `paradl` and `parallel-dl` commands"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+api = []
+tui = []
+media = []
+platform-macos = []
+platform-windows = []
+
+[[bin]]
+name = "paradl"
+path = "src/main.rs"

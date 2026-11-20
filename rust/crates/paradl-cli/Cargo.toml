@@ -1,0 +1,10 @@
+[package]
+name = "paradl-cli"
+description = "clap command-line parser: flags, subcommands, environment variables, and dispatch trait"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
