@@ -6,8 +6,8 @@
 //! section 2). Concrete implementations are **feature-gated** so the default build
 //! needs no system tools:
 //!
-//! - `platform-macos` → [`MacOSPlatform`] (`xattr`, `security -i`, `codesign`)
-//! - `platform-windows` → [`WindowsPlatform`] (`Zone.Identifier` ADS, WinCred/file store)
+//! - `platform-macos` → `MacOSPlatform` (`xattr`, `security -i`, `codesign`)
+//! - `platform-windows` → `WindowsPlatform` (`Zone.Identifier` ADS, WinCred/file store)
 //!
 //! All external tools stay external processes; no Python is ever spawned.
 //!

@@ -4,7 +4,7 @@
 //! of `src/paradl/api/server.py`, pydantic-compatible serde validation, and a
 //! task store/runner abstraction. The actual download bodies are **not**
 //! implemented here — they are typed commands delegated to a
-//! [`CommandExecutor`] that W4-1 wires to the rest of the framework.
+//! `CommandExecutor` that W4-1 wires to the rest of the framework.
 //!
 //! Everything except [`API_VERSION`] is behind the `api` feature, so a default
 //! build pulls in no axum dependency at all:
