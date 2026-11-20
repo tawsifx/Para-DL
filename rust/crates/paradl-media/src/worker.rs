@@ -112,6 +112,9 @@ impl WorkerMediaResolver {
         let mut command = Command::new(&launch.program);
         command
             .args(&launch.args)
+            // Tokio reaps the child in the background if this future is
+            // dropped before `wait()` (error frames, malformed frames, timeouts).
+            .kill_on_drop(true)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             // Worker human logs belong on stderr; stdout is protocol-only.
@@ -345,6 +348,31 @@ impl Drop for SignalForwarder {
     }
 }
 
+/// POSIX signal delivered to a worker child.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkerSignal {
+    /// Ctrl-C (`SIGINT`).
+    Interrupt,
+    /// Termination request (`SIGTERM`).
+    Terminate,
+}
+
+/// Send a signal to a recorded worker pid.
+///
+/// This is the seam exercised by the Unix signal test: the forwarder and the
+/// test call the exact same helper, so no test needs to signal its own runner.
+#[cfg(unix)]
+fn send_worker_signal(pid: u32, signal: WorkerSignal) -> bool {
+    let number = match signal {
+        WorkerSignal::Interrupt => libc::SIGINT,
+        WorkerSignal::Terminate => libc::SIGTERM,
+    };
+    // SAFETY: `pid` is the child just spawned by `send`, and `kill` with a
+    // positive pid signals only that process (never the test runner/group).
+    unsafe { libc::kill(pid as libc::pid_t, number) == 0 }
+}
+
 #[cfg(unix)]
 fn spawn_signal_forwarder(
     pid: Option<u32>,
@@ -364,13 +392,11 @@ fn spawn_signal_forwarder(
                 _ = &mut shutdown => break,
                 _ = sigint.recv() => {
                     interrupted.store(true, Ordering::Relaxed);
-                    // SAFETY: `kill` only signals the child pid we just spawned.
-                    unsafe { libc::kill(pid as libc::pid_t, libc::SIGINT); }
+                    send_worker_signal(pid, WorkerSignal::Interrupt);
                 }
                 _ = sigterm.recv() => {
                     interrupted.store(true, Ordering::Relaxed);
-                    // SAFETY: `kill` only signals the child pid we just spawned.
-                    unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM); }
+                    send_worker_signal(pid, WorkerSignal::Terminate);
                 }
             }
         }
@@ -388,4 +414,163 @@ fn spawn_signal_forwarder(
     tokio::spawn(async move {
         let _ = shutdown.await;
     })
+}
+
+#[cfg(all(test, unix))]
+mod signal_tests {
+    use std::path::{Path, PathBuf};
+    use std::time::Duration;
+
+    use paradl_core::ExitCode;
+    use tokio::io::AsyncBufReadExt;
+    use tokio::process::Command;
+
+    use crate::{ErrorKind, MediaResolver};
+
+    use super::{
+        KillOnDrop, WorkerFrame, WorkerLaunch, WorkerMediaResolver, WorkerSignal,
+        error_kind_to_error, send_worker_signal,
+    };
+
+    fn test_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "paradl-media-signal-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    async fn wait_for_marker(path: &Path) -> String {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if let Ok(text) = tokio::fs::read_to_string(path).await
+                    && !text.is_empty()
+                {
+                    return text;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("child trapped the forwarded signal and wrote its marker")
+    }
+
+    async fn wait_for_reap(pid: i32) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                // SAFETY: `kill(pid, 0)` only probes the recorded child pid.
+                if unsafe { libc::kill(pid, 0) } != 0 {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("child was killed and reaped (no zombie/orphan left behind)");
+    }
+
+    const INTERRUPTED_FRAME: &str = r#"{"protocol":"paradl-media/1","request_id":"signal-test","frame":"error","ok":false,"error":{"kind":"interrupted","message":"interrupted by signal"},"versions":{"worker_version":"0.1.0","yt_dlp_version":"0","mutagen_version":"0","ffmpeg_version":"0"}}"#;
+
+    #[tokio::test]
+    async fn unix_forwarder_seam_signals_recorded_child_and_maps_130() {
+        let dir = test_dir();
+        let marker = dir.join("signal.marker");
+        let part = dir.join("clip.m4a.pdl.part");
+        let sidecar = dir.join("clip.m4a.pdl.json");
+        std::fs::write(&part, b"partial").unwrap();
+        std::fs::write(&sidecar, b"{}").unwrap();
+
+        let script = format!(
+            "trap 'printf \"INT\" > \"{}\"; exit 130' INT\nprintf '%s\\n' '{}'\nwhile :; do sleep 0.05; done\n",
+            marker.display(),
+            INTERRUPTED_FRAME,
+        );
+        let mut command = Command::new("sh");
+        command
+            .args(["-c", &script])
+            .stdout(std::process::Stdio::piped())
+            .kill_on_drop(true);
+        let mut child = KillOnDrop(command.spawn().unwrap());
+        let pid = child.0.id().unwrap();
+        let stdout = child.0.stdout.take().unwrap();
+        let reader = tokio::io::BufReader::new(stdout);
+        let line = tokio::time::timeout(Duration::from_secs(2), reader.lines().next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .expect("stub emitted its terminal error frame");
+
+        let WorkerFrame::Error { kind, message, .. } = WorkerFrame::parse(&line, "signal-test").unwrap()
+        else {
+            panic!("expected an interrupted terminal frame");
+        };
+        assert_eq!(kind, ErrorKind::Interrupted);
+        assert_eq!(
+            error_kind_to_error(kind.as_str(), message).exit_code(),
+            ExitCode::Interrupted,
+        );
+
+        // The same helper used by the real SIGINT/SIGTERM forwarder, but with
+        // the recorded child pid: the test runner is never signalled.
+        assert!(send_worker_signal(pid, WorkerSignal::Interrupt));
+        assert_eq!(wait_for_marker(&marker).await, "INT");
+        let status = tokio::time::timeout(Duration::from_secs(2), child.0.wait())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(status.code(), Some(130));
+        assert!(part.exists(), ".pdl.part must survive SIGINT");
+        assert!(sidecar.exists(), ".pdl.json must survive SIGINT");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn unix_forwarder_seam_also_forwards_sigterm() {
+        let dir = test_dir();
+        let marker = dir.join("term.marker");
+        let ready = dir.join("term.ready");
+        let script = format!(
+            "trap 'printf \"TERM\" > \"{}\"; exit 0' TERM\nprintf 'ready' > \"{}\"\nwhile :; do sleep 0.05; done\n",
+            marker.display(),
+            ready.display(),
+        );
+        let mut command = Command::new("sh");
+        command.args(["-c", &script]).kill_on_drop(true);
+        let mut child = KillOnDrop(command.spawn().unwrap());
+        let pid = child.0.id().unwrap();
+        // Wait until the child has installed its trap before signalling it.
+        assert_eq!(wait_for_marker(&ready).await, "ready");
+        assert!(send_worker_signal(pid, WorkerSignal::Terminate));
+        assert_eq!(wait_for_marker(&marker).await, "TERM");
+        let _ = tokio::time::timeout(Duration::from_secs(2), child.0.wait())
+            .await
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn malformed_frame_return_reaps_child_without_zombie() {
+        let dir = test_dir();
+        let pidfile = dir.join("worker.pid");
+        let script = format!(
+            "printf '%s\\n' \"$$\" > \"{}\"\nprintf 'this-is-not-json\\n'\nwhile :; do sleep 0.05; done\n",
+            pidfile.display(),
+        );
+        let resolver = WorkerMediaResolver::with_launch(WorkerLaunch::new(
+            "sh",
+            ["-c".to_owned(), script],
+        ));
+        let error = resolver.claims("https://example.com/x").await.unwrap_err();
+        assert_eq!(error.exit_code().as_i32(), 1, "malformed frame fails closed");
+
+        let pid: i32 = std::fs::read_to_string(&pidfile)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        wait_for_reap(pid).await;
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
