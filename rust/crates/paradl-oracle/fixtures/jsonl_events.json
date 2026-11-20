@@ -1,0 +1,475 @@
+{
+  "event_count": 43,
+  "event_shapes": {
+    "api_server_started": {
+      "fields": [
+        "host",
+        "port"
+      ],
+      "sources": [
+        "paradl/api/server.py"
+      ]
+    },
+    "auth_remove": {
+      "fields": [
+        "service",
+        "success"
+      ],
+      "sources": [
+        "paradl/auth/manager.py"
+      ]
+    },
+    "auth_set": {
+      "fields": [
+        "service",
+        "success"
+      ],
+      "sources": [
+        "paradl/auth/manager.py"
+      ]
+    },
+    "auth_status": {
+      "fields": [
+        "services"
+      ],
+      "sources": [
+        "paradl/auth/manager.py"
+      ]
+    },
+    "bench": {
+      "fields": [
+        "url",
+        "duration_limit_sec",
+        "results"
+      ],
+      "sources": [
+        "paradl/diagnostics/bench.py"
+      ]
+    },
+    "clean": {
+      "fields": [
+        "directory",
+        "removed"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "config": {
+      "fields": [
+        "config"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "config_reset": {
+      "fields": [
+        "config"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "config_updated": {
+      "fields": [
+        "key",
+        "value"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "deferred": {
+      "fields": [
+        "reason",
+        "start_at",
+        "wait_seconds"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "diagnose": {
+      "fields": [],
+      "sources": [
+        "paradl/diagnostics/doctor.py"
+      ]
+    },
+    "doctor": {
+      "fields": [],
+      "sources": [
+        "paradl/diagnostics/doctor.py"
+      ]
+    },
+    "error": {
+      "fields": [
+        "message",
+        "reason",
+        "status_code",
+        "target",
+        "measured_bps",
+        "threshold_bps"
+      ],
+      "sources": [
+        "paradl/app/commands.py",
+        "paradl/engines/aria2.py",
+        "paradl/engines/rust_engine.py",
+        "paradl/postproc/checksum.py"
+      ]
+    },
+    "hashes": {
+      "fields": [
+        "file",
+        "filename",
+        "size",
+        "duration",
+        "hashes"
+      ],
+      "sources": [
+        "paradl/postproc/checksum.py"
+      ]
+    },
+    "history": {
+      "fields": [
+        "entries",
+        "count",
+        "search",
+        "target_type",
+        "success"
+      ],
+      "sources": [
+        "paradl/storage/history.py"
+      ]
+    },
+    "hook_error": {
+      "fields": [
+        "hook",
+        "error"
+      ],
+      "sources": [
+        "paradl/resilience/hooks.py"
+      ]
+    },
+    "hook_executed": {
+      "fields": [
+        "hook",
+        "success"
+      ],
+      "sources": [
+        "paradl/resilience/hooks.py"
+      ]
+    },
+    "hook_failed": {
+      "fields": [
+        "hook",
+        "exit_code",
+        "stderr"
+      ],
+      "sources": [
+        "paradl/resilience/hooks.py"
+      ]
+    },
+    "hook_timeout": {
+      "fields": [
+        "hook",
+        "timeout_seconds"
+      ],
+      "sources": [
+        "paradl/resilience/hooks.py"
+      ]
+    },
+    "hosts_reset": {
+      "fields": [
+        "cleared"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "info": {
+      "fields": [
+        "target",
+        "properties"
+      ],
+      "sources": [
+        "paradl/app/inspector.py"
+      ]
+    },
+    "install_security_check": {
+      "fields": [
+        "file",
+        "codesign_valid",
+        "codesign_detail",
+        "gatekeeper_accepted",
+        "gatekeeper_detail",
+        "verified_by_pdl"
+      ],
+      "sources": [
+        "paradl/engines/github.py"
+      ]
+    },
+    "interrupted": {
+      "fields": [
+        "signal",
+        "exit_code"
+      ],
+      "sources": [
+        "paradl/cli/main.py"
+      ]
+    },
+    "launchd_plist_generated": {
+      "fields": [
+        "path",
+        "label",
+        "logs_dir",
+        "lint"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    },
+    "mirror_dropped": {
+      "fields": [
+        "mirror_url",
+        "failures",
+        "reason"
+      ],
+      "sources": [
+        "paradl/storage/mirrors.py"
+      ]
+    },
+    "mirror_rejected": {
+      "fields": [
+        "mirror_url",
+        "reason",
+        "expected_length",
+        "mirror_length"
+      ],
+      "sources": [
+        "paradl/storage/mirrors.py"
+      ]
+    },
+    "netprobe": {
+      "fields": [
+        "url",
+        "host",
+        "supports_range",
+        "ipv6_DNS",
+        "throttle_class",
+        "recommended_connections",
+        "recommended_action",
+        "verdict",
+        "http3_supported",
+        "http3_detail",
+        "passes"
+      ],
+      "sources": [
+        "paradl/diagnostics/netprobe.py"
+      ]
+    },
+    "profiles": {
+      "fields": [
+        "profiles",
+        "count"
+      ],
+      "sources": [
+        "paradl/storage/history.py"
+      ]
+    },
+    "profiles_reset": {
+      "fields": [
+        "host",
+        "cleared"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "progress": {
+      "fields": [
+        "title",
+        "downloaded_bytes",
+        "total_bytes",
+        "percent",
+        "speed_bps",
+        "eta_seconds",
+        "connections",
+        "peer_count",
+        "watchdog_state",
+        "file_progress",
+        "connection_speeds"
+      ],
+      "sources": [
+        "paradl/ui/display.py"
+      ]
+    },
+    "queue_crash_recovered": {
+      "fields": [
+        "recovered_count"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    },
+    "queue_job_added": {
+      "fields": [
+        "job_id",
+        "target",
+        "from_history",
+        "priority",
+        "require_ac",
+        "when_fast_bps",
+        "start_at"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "queue_job_deferred": {
+      "fields": [
+        "job_id",
+        "reason",
+        "start_at",
+        "measured_bps",
+        "threshold_bps"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    },
+    "queue_job_started": {
+      "fields": [
+        "job_id",
+        "target",
+        "priority",
+        "connections"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    },
+    "queue_list": {
+      "fields": [
+        "jobs"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    },
+    "queue_paused": {
+      "fields": [
+        "paused"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "queue_removed": {
+      "fields": [
+        "removed"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "queue_resumed": {
+      "fields": [
+        "resumed",
+        "all"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "result": {
+      "fields": [
+        "subcommand",
+        "target",
+        "success",
+        "file_path",
+        "checksum_verified",
+        "error",
+        "exit_code",
+        "target_type",
+        "bytes_downloaded",
+        "duration",
+        "avg_speed_bps",
+        "recycle_count",
+        "audio_format_produced",
+        "checksum_algo",
+        "checksum_digest",
+        "adb_synced"
+      ],
+      "sources": [
+        "paradl/app/commands.py"
+      ]
+    },
+    "target_classified": {
+      "fields": [
+        "target",
+        "target_type",
+        "clean_url",
+        "filename_hint",
+        "content_length",
+        "accept_ranges"
+      ],
+      "sources": [
+        "paradl/app/commands.py",
+        "paradl/app/inspector.py"
+      ]
+    },
+    "verification": {
+      "fields": [
+        "file",
+        "algorithm",
+        "expected",
+        "computed",
+        "verified",
+        "source",
+        "error"
+      ],
+      "sources": [
+        "paradl/app/commands.py",
+        "paradl/engines/aria2.py",
+        "paradl/engines/brew.py",
+        "paradl/engines/github.py",
+        "paradl/engines/hf.py",
+        "paradl/engines/ipsw.py",
+        "paradl/engines/pypi.py",
+        "paradl/engines/rust_engine.py"
+      ]
+    },
+    "watchdog_action": {
+      "fields": [
+        "action",
+        "reason",
+        "supports_range",
+        "cycle",
+        "mode",
+        "resilience_event",
+        "speed_bps",
+        "threshold_bps",
+        "rolling_p90_bps",
+        "connections"
+      ],
+      "sources": [
+        "paradl/engines/aria2.py",
+        "paradl/engines/rust_engine.py"
+      ]
+    },
+    "when_fast_probe": {
+      "fields": [
+        "url",
+        "attempt",
+        "measured_bps",
+        "threshold_bps",
+        "passed"
+      ],
+      "sources": [
+        "paradl/resilience/queue.py"
+      ]
+    }
+  },
+  "envelope_line": "{\"event\": \"progress\", \"timestamp\": 1763376000.123, \"title\": \"demo.bin\", \"downloaded_bytes\": 1024, \"total_bytes\": 2048, \"percent\": 50.0, \"speed_bps\": 1000.0, \"eta_seconds\": 1.0, \"connections\": 16, \"watchdog_state\": \"v2\"}\n"
+}

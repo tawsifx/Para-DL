@@ -1,0 +1,28 @@
+{
+  "redact_secrets": {
+    "Bearer abc123SECRETtoken.XYZ-_+/==": "Bearer ***REDACTED***",
+    "token=supersecretvalue123": "token=***REDACTED***",
+    "token: abcdefghijkl": "token: ***REDACTED***",
+    "HF_TOKEN=abcdefghijklmnop in text": "HF_TOKEN=***REDACTED*** in text",
+    "plain text no secrets": "plain text no secrets"
+  },
+  "redact_obj": {
+    "event": "auth_status",
+    "hf_token": "***REDACTED***",
+    "Authorization": "***REDACTED***",
+    "password": "***REDACTED***",
+    "safe": "hello",
+    "nested": {
+      "github_token": "***REDACTED***",
+      "url": "https://example.com"
+    },
+    "list": [
+      {
+        "secret": "***REDACTED***"
+      },
+      "ok"
+    ]
+  },
+  "redact_env_token": "using ***REDACTED*** here",
+  "redact_event_line": "{\"event\": \"result\", \"timestamp\": 1763376000.123, \"target\": \"https://example.com/f\", \"authorization\": \"***REDACTED***\"}\n"
+}
