@@ -1,5 +1,7 @@
-//! Ported fault-injection suite from `rapids/src/tests.rs` (21 tests), plus the
-//! byte-exact sidecar and connection-cap contracts from the parity matrix.
+//! Ported fault-injection suite from `rapids/src/tests.rs` (21 tests), the
+//! byte-exact sidecar and connection-cap contracts from the parity matrix,
+//! trait-level `DownloadEngine` exit-code mapping tests, and the DoH TLS-name
+//! contract (feature-gated, no live network).
 //!
 //! Every test here is a behavioural port of the legacy engine suite: loopback
 //! servers inject mid-body closes, 5xx responses, stalls and cross-host
@@ -8,7 +10,7 @@
 //! false 100%, `.pdl.part`/`.pdl.json` resume and verify-then-rename.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use paradl_core::ExitCode;
@@ -16,7 +18,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
-use crate::download::{Download, Outcome, StartOptions, State, set_test_read_timeout};
+use crate::download::{Download, Outcome, Snapshot, StartOptions, State, set_test_read_timeout};
+use crate::engine::{DownloadEngine, NdEngine, NoopProgressSink, ProgressSink, Target};
 use crate::limiter::Limiter;
 use crate::planner::{Claim, Planner, SavedSegment};
 use crate::state::{ResumeState, Validators, state_path};
@@ -1339,4 +1342,164 @@ async fn cancel_persists_sidecars_for_resume() {
         "the .pdl.json sidecar must survive an interrupt"
     );
     server.abort();
+}
+
+// ---------------------------------------------------------------------------
+// Public DownloadEngine trait adapter: exercise plan/download/capabilities and
+// assert every exit-code path of the `Ok(TransferResult{...})` mapping.
+// Expected codes are derived from `paradl_core::ExitCode`, never literals.
+// ---------------------------------------------------------------------------
+
+/// Sink that flips a cooperative cancel flag on its first progress tick.
+struct CancelOnFirstTick(Arc<AtomicBool>);
+
+impl ProgressSink for CancelOnFirstTick {
+    fn on_progress(&mut self, _snapshot: &Snapshot) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+}
+
+#[tokio::test]
+async fn engine_trait_success_maps_to_ok_exit_code() {
+    use sha2::Digest as _;
+
+    let payload: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+    let (url, server) = spawn_fault_range_server(
+        Arc::new(payload.clone()), Arc::new(AtomicUsize::new(0)),
+    ).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("trait-ok.bin");
+    let digest_hex = hex::encode(sha2::Sha256::digest(&payload));
+    let checksum = Hash::parse(&format!("sha256:{digest_hex}")).unwrap();
+    let engine = NdEngine::new();
+
+    let caps = engine.capabilities();
+    assert_eq!(caps.max_connections, crate::MAX_CONNECTIONS);
+    assert!(caps.supports_ranges && caps.supports_resume && caps.supports_checksum);
+    assert!(!caps.http3, "HTTP/3 must never be advertised");
+
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        connections: 4,
+        checksum: Some(checksum),
+        ..Target::default()
+    };
+    let plan = engine.plan(&target).await.unwrap();
+    assert_eq!(plan.size, Some(payload.len() as u64));
+    assert!(plan.resumable && !plan.unknown_size);
+    assert_eq!(plan.final_url.host_str(), Some("127.0.0.1"));
+
+    let mut sink = NoopProgressSink;
+    let result = engine.download(plan, &mut sink).await.unwrap();
+    assert!(result.success, "error: {:?}", result.error);
+    assert_eq!(result.exit_code, ExitCode::Ok.as_i32());
+    assert_eq!(result.checksum_verified, Some(true));
+    assert_eq!(result.checksum_algo.as_deref(), Some("sha256"));
+    assert_eq!(result.bytes_downloaded, payload.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), payload);
+    server.abort();
+}
+
+#[tokio::test]
+async fn engine_trait_checksum_mismatch_maps_to_verification_exit_code() {
+    let payload: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+    let (url, server) = spawn_fault_range_server(
+        Arc::new(payload.clone()), Arc::new(AtomicUsize::new(0)),
+    ).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("trait-badsum.bin");
+    let engine = NdEngine::new();
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        connections: 4,
+        checksum: Hash::parse(&format!("sha256:{}", "0".repeat(64))),
+        ..Target::default()
+    };
+
+    let plan = engine.plan(&target).await.unwrap();
+    let result = engine.download(plan, &mut NoopProgressSink).await.unwrap();
+    assert!(!result.success);
+    assert_eq!(result.exit_code, ExitCode::VerificationFailed.as_i32());
+    assert_eq!(result.checksum_verified, Some(false));
+    assert!(!dest.exists(), "failed verification must not rename the part file");
+    server.abort();
+}
+
+#[tokio::test]
+async fn engine_trait_cancel_maps_to_interrupted_exit_code() {
+    let payload: Vec<u8> = (0..1024 * 1024).map(|i| (i % 251) as u8).collect();
+    let (url, server) = spawn_slow_close_delimited_server(
+        Arc::new(payload.clone()), Arc::new(AtomicUsize::new(0)),
+    ).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("trait-cancel.bin");
+    let flag = Arc::new(AtomicBool::new(false));
+    let engine = NdEngine::new();
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        cancel: Some(flag.clone()),
+        ..Target::default()
+    };
+
+    let plan = engine.plan(&target).await.unwrap();
+    let mut sink = CancelOnFirstTick(flag);
+    let result = engine.download(plan, &mut sink).await.unwrap();
+    assert!(!result.success);
+    assert_eq!(result.exit_code, ExitCode::Interrupted.as_i32());
+    assert!(result.error.as_deref().is_some_and(|e| e.contains("cancel")));
+    assert!(crate::naming::part_path(&dest).exists(), "part persists on interrupt");
+    assert!(state_path(&dest).exists(), "sidecar persists on interrupt");
+    server.abort();
+}
+
+#[tokio::test]
+async fn engine_trait_transport_failure_maps_to_failure_exit_code() {
+    let payload: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+    // Probe succeeds but every ranged GET returns 500, with no mirror to fail over to.
+    let (url, server) = spawn_probe_ok_range_500_server(Arc::new(payload)).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("trait-fail.bin");
+    let engine = NdEngine::new();
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        connections: 2,
+        ..Target::default()
+    };
+
+    let plan = engine.plan(&target).await.unwrap();
+    let result = engine.download(plan, &mut NoopProgressSink).await.unwrap();
+    assert!(!result.success);
+    assert_eq!(result.exit_code, ExitCode::Failure.as_i32());
+    assert!(!dest.exists(), "a failed transfer must not produce the final file");
+    server.abort();
+}
+
+// ---------------------------------------------------------------------------
+// DoH contract (feature-gated): the endpoint HOST must be used as the TLS
+// server name so SNI and certificate validation work for hostname endpoints.
+// Pure config construction — no live network is touched.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "doh")]
+#[test]
+fn doh_config_uses_endpoint_host_as_tls_server_name() {
+    let (ns, host, port) = crate::probe::doh_nameserver_config(
+        "https://cloudflare-dns.com/dns-query",
+    ).unwrap();
+    assert_eq!(host, "cloudflare-dns.com");
+    assert_eq!(port, 443);
+    assert_eq!(ns.tls_dns_name.as_deref(), Some("cloudflare-dns.com"));
+    assert_eq!(ns.http_endpoint.as_deref(), Some("/dns-query"));
+
+    let (ns, host, port) = crate::probe::doh_nameserver_config(
+        "https://my-dns.example:8443/custom-path",
+    ).unwrap();
+    assert_eq!(host, "my-dns.example");
+    assert_eq!(port, 8443);
+    assert_eq!(ns.tls_dns_name.as_deref(), Some("my-dns.example"));
+    assert_eq!(ns.http_endpoint.as_deref(), Some("/custom-path"));
 }

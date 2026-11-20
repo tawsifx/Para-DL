@@ -6,6 +6,8 @@
 //! resulting [`Plan`] without re-probing.
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -71,6 +73,11 @@ pub struct Target {
     /// Accepted `--http3` flag. HTTP/3 is logged-dropped, never exposed as a
     /// capability or Cargo feature; transfers use TCP/TLS (HTTP/1.1 or HTTP/2).
     pub http3: bool,
+    /// Optional cooperative cancel flag. When a transfer observes it set,
+    /// workers are cancelled and [`DownloadEngine::download`] returns a failed
+    /// `TransferResult` with `ExitCode::Interrupted` (130); the part file and
+    /// `.pdl.json` sidecar are preserved for resume.
+    pub cancel: Option<Arc<AtomicBool>>,
 }
 
 impl Default for Target {
@@ -91,6 +98,7 @@ impl Default for Target {
             cookie_header: None,
             cookie_hosts: Vec::new(),
             http3: false,
+            cancel: None,
         }
     }
 }
@@ -314,6 +322,7 @@ impl DownloadEngine for NdEngine {
             checksum: plan.checksum.clone(),
         };
         let download = Download::start_with_probe(opts, client, info, plan.probe_failed).await?;
+        let cancel = t.cancel.clone();
 
         let wait = download.wait();
         tokio::pin!(wait);
@@ -321,7 +330,15 @@ impl DownloadEngine for NdEngine {
         let outcome = loop {
             tokio::select! {
                 result = &mut wait => break result,
-                _ = tick.tick() => sink.on_progress(&download.poll_snapshot()),
+                _ = tick.tick() => {
+                    sink.on_progress(&download.poll_snapshot());
+                    if cancel.as_ref().is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                        // Cancel workers so the part file and sidecar stay on disk, then
+                        // surface the interrupt as a failed TransferResult (exit 130).
+                        let _ = download.cancel();
+                        break Err(crate::error::cancelled());
+                    }
+                }
             }
         };
 

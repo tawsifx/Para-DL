@@ -281,17 +281,19 @@ impl reqwest::dns::Resolve for DohResolver {
     }
 }
 
-/// Build a hickory-dns resolver that sends DNS queries over HTTPS to `endpoint`.
+/// Build the hickory-dns nameserver configuration for a DoH endpoint.
 ///
-/// The endpoint is an http(s) URL such as `https://cloudflare-dns.com/dns-query`.
-/// Its host name is bootstrapped once through the system resolver, then every
-/// query for transfer hosts goes over the encrypted HTTPS transport.
+/// Pure (no network I/O) so the SNI/hostname contract can be tested. The
+/// returned `NameServerConfig` carries a placeholder address that
+/// [`build_doh_resolver`] replaces with the bootstrapped IP; the TLS server
+/// name is always the endpoint HOST so SNI and certificate validation succeed
+/// for hostname URLs such as `https://cloudflare-dns.com/dns-query`.
+///
+/// Returns the config together with the endpoint host and port to bootstrap.
 #[cfg(feature = "doh")]
-fn build_doh_resolver(endpoint: &str) -> Result<DohResolver> {
-    use hickory_resolver::config::{NameServerConfig, ResolverConfig};
-    use hickory_resolver::name_server::TokioConnectionProvider;
+pub(crate) fn doh_nameserver_config(endpoint: &str) -> Result<(hickory_resolver::config::NameServerConfig, String, u16)> {
+    use hickory_resolver::config::NameServerConfig;
     use hickory_resolver::proto::xfer::Protocol;
-    use hickory_resolver::Resolver;
 
     let url = Url::parse(endpoint).map_err(crate::error::url)?;
     if !matches!(url.scheme(), "https" | "http") {
@@ -301,14 +303,34 @@ fn build_doh_resolver(endpoint: &str) -> Result<DohResolver> {
         .host_str()
         .ok_or_else(|| Error::failure("DoH endpoint has no host"))?;
     let port = url.port_or_known_default().unwrap_or(443);
-    let socket_addr = (host, port)
+
+    let placeholder = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut ns = NameServerConfig::new(placeholder, Protocol::Https);
+    // The certificate and SNI name is the endpoint host, never its bootstrap IP.
+    ns.tls_dns_name = Some(host.to_owned());
+    ns.http_endpoint = Some(url.path().to_owned());
+    Ok((ns, host.to_owned(), port))
+}
+
+/// Build a hickory-dns resolver that sends DNS queries over HTTPS to `endpoint`.
+///
+/// The endpoint is an http(s) URL such as `https://cloudflare-dns.com/dns-query`.
+/// Its host name is bootstrapped once through the system resolver, then every
+/// query for transfer hosts goes over the encrypted HTTPS transport.
+#[cfg(feature = "doh")]
+fn build_doh_resolver(endpoint: &str) -> Result<DohResolver> {
+    use hickory_resolver::config::ResolverConfig;
+    use hickory_resolver::name_server::TokioConnectionProvider;
+    use hickory_resolver::Resolver;
+
+    let (mut ns, host, port) = doh_nameserver_config(endpoint)?;
+    let socket_addr = (host.as_str(), port)
         .to_socket_addrs()
         .map_err(Error::Io)?
         .next()
         .ok_or_else(|| Error::failure("DoH endpoint host did not resolve"))?;
+    ns.socket_addr = socket_addr;
 
-    let mut ns = NameServerConfig::new(socket_addr, Protocol::Https);
-    ns.http_endpoint = Some(url.path().to_owned());
     let mut config = ResolverConfig::new();
     config.add_name_server(ns);
     let inner = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();

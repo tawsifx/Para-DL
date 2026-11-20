@@ -38,8 +38,18 @@ transport failures → `1`, verification failures → `3`, cancellation → `130
 |---|---|---|
 | `doh` | off | DNS-over-HTTPS via `hickory-resolver`. Off: the OS resolver is used and a supplied endpoint is logged-dropped with a reason. |
 
+The DoH endpoint must be an http(s) URL such as `https://cloudflare-dns.com/dns-query`.
+The endpoint **hostname is resolved once through the operating-system resolver to
+bootstrap the connection** (a known limitation, matching `paradl-net`'s design);
+the resolved IP is used only as the socket address. The hostname itself is stored
+as the hickory-dns `tls_dns_name`, so SNI and certificate validation use the
+correct name. Every subsequent transfer-host lookup goes over the encrypted
+HTTPS transport.
+
 HTTP/3 is accepted (`Target::http3`) and logged-dropped with a reason. There is
-deliberately **no** HTTP/3 Cargo feature.
+deliberately **no** HTTP/3 Cargo feature. Cooperative cancellation is available
+through `Target::cancel`: setting the flag during a transfer cancels workers and
+returns exit code 130 while preserving `.pdl.part` / `.pdl.json` for resume.
 
 ## Example
 
