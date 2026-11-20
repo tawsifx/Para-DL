@@ -142,3 +142,59 @@ rust/crates/paradl-oracle/fixtures/media_protocol.json
    concurrently, W0-3's `paradl-core`). I did not commit that shared file because it is owned by
    W0-1; the lead should keep the regenerated lockfile in the integrated tree so both new crates
    are locked.
+
+---
+
+## 6. Fix loop round 1 — review finding (Important, SPEC/QUALITY)
+
+**Finding:** `model_tests.rs` ignored `contract_sanitize_filename_matches_golden` iterated over
+*all* keys in `core_models.json`'s `sanitize_filename` object, including three synthetic
+placeholder labels (`"<201 chars>"`, `"<250 chars>"`, `"<200 chars>"`) whose keys are not real
+filenames. When W0-3 enables the test by removing `#[ignore]`, it would assert
+`sanitize_filename("<201 chars>")` equals 200 `a` characters and fail — so the test could not be
+activated as promised. The 200-char cap is already authoritatively covered by the separate
+`sanitize_200_cap` golden, making the placeholders both harmful and redundant.
+
+**Ruling applied:** lead directed the reviewer's preferred fix — delete the three placeholder
+entries from the fixture's `sanitize_filename` object, leaving a clean input→output map. No code
+changes were needed: `model_tests.rs` never asserted those placeholders in the 34 GREEN tests.
+Only `rust/crates/paradl-oracle/fixtures/core_models.json` was changed (26 real pairs remain).
+
+### Verification commands and fresh output
+
+Fixture check (no `<`-prefixed keys; cap golden intact):
+
+```
+$ .venv/bin/python - <<'PY'
+import json
+d = json.load(open(".../core_models.json"))
+sf = d["sanitize_filename"]
+bad = [k for k in sf if k.startswith("<")]
+assert not bad, f"placeholder keys remain: {bad}"
+assert d["sanitize_200_cap"]["output_len"] == 200
+...
+PY
+OK: sanitize_filename has 26 real input->output pairs; no '<' keys; 200-char cap golden intact
+```
+
+Contract suite from `rust/` (through the single root workspace, PYO3_PYTHON set to the venv):
+
+```
+$ cd rust && PYO3_PYTHON=<worktree>/.venv/bin/python cargo test -p paradl-oracle
+running 41 tests
+...
+test result: ok. 34 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests paradl_oracle
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+All 34 GREEN tests and 7 `#[ignore]` contract tests are unchanged; the ignored
+`contract_sanitize_filename_matches_golden` loop now contains only real input→output pairs and
+can be activated by removing `#[ignore]` once paradl-core's binding is wired in.
+
+Deferred (per lead, NOT fixed this round): Minor — media_protocol.json version diagnostics and
+byte_exact_contracts strings are authored Rust-side prose rather than oracle-captured (correctness
+fine, carve-out to be ledgered in report); Minor — classifier `empty`/edge-case fixtures weakly
+asserted (12 seeded cases fully asserted, which is the byte-exact requirement).
