@@ -16,7 +16,7 @@ use paradl_core::models::{
     has_direct_extension, is_image_domain, is_media_domain, parse_rate, sanitize_filename,
 };
 use paradl_core::paths::{config_file, get_paradl_home, history_db_file};
-use paradl_core::{Error, ExitCode};
+use paradl_core::{Error, ExitCode, get_active_engine, set_active_engine};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -34,7 +34,9 @@ fn temp_dir(label: &str) -> PathBuf {
 }
 
 fn with_paradl_home<F: FnOnce()>(dir: &PathBuf, f: F) {
-    let _guard = ENV_LOCK.lock().expect("env lock");
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let prev = std::env::var_os("PARADL_HOME");
     // SAFETY: serialized by ENV_LOCK; no other thread reads PARADL_HOME during f().
     unsafe { std::env::set_var("PARADL_HOME", dir) };
@@ -140,6 +142,8 @@ fn parse_rate_golden_values() {
         ("1Mbit/s", 131072.0),
         ("1Mbits/s", 131072.0),
         ("1b", 0.125),
+        ("1ib", 0.125),
+        ("1kib", 128.0),
         ("1bit", 0.125),
         ("1bits", 0.125),
         ("1byte", 1.0),
@@ -560,6 +564,42 @@ fn config_set_invalid_value_messages_match_oracle() {
             assert_eq!(msg, *expected, "set({key}, {value}) message");
         }
     });
+}
+
+#[test]
+fn config_set_engine_syncs_active_engine() {
+    let dir = temp_dir("engine-set");
+    with_paradl_home(&dir, || {
+        let mut cfg = PDLConfig::default();
+        assert!(cfg.set("engine", "aria2").0);
+        assert_eq!(cfg.engine, "aria2");
+        assert_eq!(get_active_engine(), "aria2");
+        assert!(cfg.set("engine", "rust").0);
+        assert_eq!(cfg.engine, "rust");
+        assert_eq!(get_active_engine(), "rust");
+    });
+}
+
+#[test]
+fn config_load_syncs_active_engine() {
+    let dir = temp_dir("engine-load");
+    with_paradl_home(&dir, || {
+        std::fs::write(config_file(), r#"{"engine":"aria2"}"#).unwrap();
+        let cfg = PDLConfig::load().unwrap();
+        assert_eq!(cfg.engine, "aria2");
+        assert_eq!(get_active_engine(), "aria2");
+        // Restore the process-wide engine so this test does not leak state.
+        set_active_engine("rust").unwrap();
+    });
+}
+
+#[test]
+fn config_get_effective_isp_explicit_branch() {
+    let cfg = PDLConfig {
+        isp: "Comcast Cable".into(),
+        ..Default::default()
+    };
+    assert_eq!(cfg.get_effective_isp(), "Comcast Cable");
 }
 
 #[test]

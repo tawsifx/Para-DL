@@ -369,7 +369,15 @@ impl PDLConfig {
         if let Err(err) = candidate.validate() {
             return (false, err.to_string());
         }
+        // Mirror `set_active_engine` from the Python `set()` coercion path: the
+        // process-wide engine must follow a committed config change.
+        let previous_engine = get_active_engine();
+        if let Err(err) = set_active_engine(&candidate.engine) {
+            return (false, err.to_string());
+        }
         if let Err(err) = candidate.save() {
+            // Roll back the global engine when the config cannot be committed.
+            let _ = set_active_engine(&previous_engine);
             return (false, err.to_string());
         }
         *self = candidate;
@@ -491,6 +499,12 @@ impl PDLConfig {
         if config.validate().is_err() {
             backup_corrupt(&file);
             return Ok(Self::default());
+        }
+        // Python `load()` sets the process-wide engine after a successful
+        // validate; do the same before returning the loaded config.
+        if let Err(err) = set_active_engine(&config.engine) {
+            backup_corrupt(&file);
+            return Err(err);
         }
         Ok(config)
     }

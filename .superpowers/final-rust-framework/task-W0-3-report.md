@@ -51,3 +51,66 @@
 - `PDLConfig::set()` persists through `save()` like Python; callers/tests that must not touch the real home should set/isolate `PARADL_HOME` (golden tests do this under a mutex).
 - During verification, W0-2's in-progress `paradl-oracle` briefly had its own `[workspace]` marker; that transient root conflict cleared before final verification. No W0-2 files were modified.
 - Root `rust/Cargo.lock` gained a `paradl-core` dependency entry during workspace builds, but that file is outside my ownership (W0-1) and the shared diff also contains W0-2's `paradl-oracle` entry, so I left it unstaged; normal (non-`--locked`) Cargo commands regenerate it.
+
+---
+
+## Fix loop round 1 — `fix(W0-3): review round 1`
+
+### Changes (only `rust/crates/paradl-core/**` + this report)
+
+1. **Important — active-engine sync.** `PDLConfig::set()` now calls
+   `set_active_engine(&candidate.engine)` after validation and before `save()`/commit,
+   restoring the previous engine if the save fails. `PDLConfig::load()` calls
+   `set_active_engine(&config.engine)` after successful validation before returning
+   (corrupt/unparseable files still fall back to defaults without touching the global).
+   Added goldens: `config_set_engine_syncs_active_engine` (both `aria2` and `rust`),
+   `config_load_syncs_active_engine` (config.json with `"engine":"aria2"`).
+2. **Important — `parse_rate` IEC marker.** Moved `i` consumption out of the
+   magnitude-prefix branch so `([kKmMgGtT])?(i)?` is honored with or without a
+   prefix. Added goldens for `"1ib"` and `"1kib"` (plus existing `"1b"`).
+3. **Accepted handoff — ISP golden only.** Added
+   `config_get_effective_isp_explicit_branch` (`isp="Comcast Cable"` →
+   `"Comcast Cable"`). No auto-detection code added, per lead ruling.
+4. Test-harness robustness: `with_paradl_home` now recovers a poisoned `ENV_LOCK`
+   so one failing test cannot cascade masking failures onto the rest.
+
+### Python oracle values captured before asserting
+
+Command: `PYTHONPATH=src .venv/bin/python -c "from paradl.core.models import parse_rate; print('1ib ->', parse_rate('1ib')); print('1b ->', parse_rate('1b')); print('1kib ->', parse_rate('1kib'))"`
+
+Output:
+```
+1ib -> 0.125
+1b -> 0.125
+1kib -> 128.0
+```
+
+### RED evidence (new goldens before code fix)
+
+`cargo test --offline -p paradl-core --test golden` → `test result: FAILED. 18 passed; 7 failed`
+(`parse_rate_golden_values`: expected `0.125`, got unparseable error;
+`config_set_engine_syncs_active_engine`: `left: "rust"`, `right: "aria2"`;
+`config_load_syncs_active_engine` likewise). FIX 3's golden passed from the start,
+as expected for an accepted handoff.
+
+### GREEN verification (commands + outputs)
+
+```
+$ PYO3_PYTHON=<worktree>/.venv/bin/python cargo test --offline -p paradl-core
+    Finished `test` profile [unoptimized + debuginfo] target(s)
+running 9 tests   (unit)       -> test result: ok. 9 passed; 0 failed
+running 25 tests  (golden)     -> test result: ok. 25 passed; 0 failed
+running 5 tests   (doc-tests)  -> test result: ok. 5 passed; 0 failed
+
+$ PYO3_PYTHON=<worktree>/.venv/bin/python cargo clippy --offline -p paradl-core -- -D warnings
+    Checking paradl-core v0.1.0
+    Finished `dev` profile [unoptimized + debuginfo] target(s)
+    (only workspace-manifest unused-dependency warnings from W0-1; none for paradl-core)
+
+$ cargo fmt --check -p paradl-core
+OK
+```
+
+No files outside `rust/crates/paradl-core/**` and this report were modified;
+`rust/Cargo.lock` remains lead-owned and uncommitted.
+

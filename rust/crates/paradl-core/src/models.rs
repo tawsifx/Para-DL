@@ -372,9 +372,11 @@ fn parse_rate_str(input: &str) -> Result<f64, Error> {
             _ => unreachable!(),
         };
         i += 1;
-        if i < len && bytes[i] == b'i' {
-            i += 1;
-        }
+    }
+    // The Python regex `([kKmMgGtT])?(i)?` allows the IEC marker on its own
+    // (e.g. "1ib" -> 0.125 B/s), so consume it outside the magnitude branch.
+    if i < len && bytes[i] == b'i' {
+        i += 1;
     }
 
     let rest = &s[i..];
