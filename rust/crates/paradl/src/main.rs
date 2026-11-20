@@ -1,8 +1,9 @@
 //! Thin reference binary for the paraDL Rust framework.
 //!
-//! Wave 0 placeholder: only `--version` is implemented. The full command set
-//! (including `doctor`) is wired in W4-1 via `paradl-app`. The media subsystem
-//! is a Python worker invoked over `paradl-media/1`, never linked into Rust.
+//! Wave 0 placeholder: `--version` and a minimal, Python-free `doctor` are
+//! implemented. The full command set is wired in W4-1 via `paradl-app`. The
+//! media subsystem is a Python worker invoked over `paradl-media/1`, never
+//! linked into Rust.
 #![warn(missing_docs)]
 
 use std::path::Path;
@@ -36,6 +37,12 @@ fn version_line(program: &str) -> String {
     format!("{program} {VERSION}")
 }
 
+/// Render the minimal `doctor` report: no Python, no external tools, no I/O.
+/// W4-1 expands this into the full diagnostics subcommand.
+fn doctor_line() -> String {
+    format!("ready version={VERSION} protocol={MEDIA_PROTOCOL}")
+}
+
 fn main() {
     let mut args = std::env::args();
     let arg0 = args.next().unwrap_or_else(|| "paradl".to_string());
@@ -43,9 +50,11 @@ fn main() {
 
     match args.next().as_deref() {
         Some("--version") | Some("-V") | None => println!("{}", version_line(&program)),
+        Some("doctor") => println!("{}", doctor_line()),
         Some("--help") | Some("-h") => {
             println!("{program} {VERSION}");
-            println!("Usage: {program} [OPTIONS]");
+            println!("Usage: {program} [COMMAND] [OPTIONS]");
+            println!("  doctor          Print minimal diagnostics (no Python required)");
             println!("  -V, --version   Print version and exit");
             println!("  -h, --help      Print help and exit");
         }
@@ -76,5 +85,13 @@ mod tests {
     #[test]
     fn protocol_constant_is_pinned() {
         assert_eq!(MEDIA_PROTOCOL, "paradl-media/1");
+    }
+
+    #[test]
+    fn doctor_reports_ready_version_and_protocol_without_python() {
+        let report = doctor_line();
+        assert!(report.starts_with("ready "), "{report}");
+        assert!(report.contains("version=0.1.0"), "{report}");
+        assert!(report.contains("protocol=paradl-media/1"), "{report}");
     }
 }

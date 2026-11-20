@@ -58,7 +58,9 @@ Assert-LastExitCode
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 $SourceBinary = Join-Path $RustDir "target\release\paradl.exe"
 Copy-Item $SourceBinary (Join-Path $BinDir "paradl.exe") -Force
-foreach ($linkName in @("paradl", "parallel-dl")) {
+# `paradl.exe` is the real copied file; only the alias is a symlink.
+# Never symlink paradl.exe onto itself.
+foreach ($linkName in @("parallel-dl")) {
     $LinkPath = Join-Path $BinDir "$linkName.exe"
     try {
         New-Item -ItemType SymbolicLink -Path $LinkPath -Target (Join-Path $BinDir "paradl.exe") -Force | Out-Null
