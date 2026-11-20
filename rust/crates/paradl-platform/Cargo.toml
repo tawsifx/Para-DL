@@ -6,6 +6,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+keywords = ["paradl", "platform", "macos", "windows", "keychain"]
+categories = ["os"]
 
 [features]
 default = []
@@ -13,3 +17,9 @@ platform-macos = []
 platform-windows = []
 
 [dependencies]
+paradl-core = { path = "../paradl-core" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+hex = { workspace = true }
