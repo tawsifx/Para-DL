@@ -40,8 +40,11 @@ Parse failures are rendered into argparse's exact stderr byte stream by
 `parallel-dl: error: <argparse message>\n`. Clap's own wording is never passed
 through. Dispatch-time `USAGE_*` constants hold the **rendered** (Rich-markup-
 stripped) text, captured from piped oracle processes, including the oracle's
-trailing spaces and line wraps. `--help`/`--version` follow left-to-right
-precedence: an earlier bad argument wins (exit `2`).
+trailing spaces and line wraps. `--help`/`--version` are argparse-style immediate
+actions: whichever token is encountered first wins, so `--version --engine bogus`
+prints the exact version bytes and exits `0`, while `--engine bogus --version`
+exits `2`. `--version` is added as a clap `ArgAction::Version` with the oracle's
+exact text (`display_name` + `version`); clap's extra `-V` alias is not registered.
 
 ## Feature flags
 

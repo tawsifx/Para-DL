@@ -19,7 +19,7 @@
 //! ```
 
 use clap::error::{ContextKind, ContextValue, ErrorKind};
-use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, ValueEnum};
+use clap::{Arg, ArgAction, CommandFactory, FromArgMatches, Parser, ValueEnum};
 
 use crate::{Error, ThrottleCli};
 
@@ -132,7 +132,12 @@ pub enum ParseOutcome {
 /// Every field is public so `paradl-app` can read exactly the data W4-1 needs without
 /// a second parsing layer.
 #[derive(Debug, Clone, PartialEq, Parser)]
-#[command(name = "parallel-dl")]
+#[command(
+    name = "parallel-dl",
+    display_name = "parallel-dl (paradl)",
+    version = "v1.0.0",
+    disable_version_flag = true
+)]
 pub struct Cli {
     /// Subcommand name (install/info/hash/…) or download target(s).
     #[arg(value_name = "targets")]
@@ -368,9 +373,6 @@ pub struct Cli {
     /// Read pasted cURL input from the macOS clipboard.
     #[arg(long, action = ArgAction::SetTrue)]
     pub clipboard: bool,
-    /// Print the program version and exit (handled explicitly for byte parity).
-    #[arg(long, action = ArgAction::SetTrue)]
-    pub version: bool,
 
     /// API server bind host.
     #[arg(long, default_value = "127.0.0.1")]
@@ -418,7 +420,17 @@ impl Cli {
     /// should use this instead of [`CommandFactory::command`].
     pub fn command() -> clap::Command {
         let mut cmd = <Self as CommandFactory>::command();
-        cmd = cmd.override_help(HELP_TEXT).disable_version_flag(true);
+        // Python registers `--version` as `action="version"`, which exits at the
+        // token's position. clap's `ArgAction::Version` has the same left-to-right
+        // behaviour. Adding it via the builder avoids both clap's extra `-V` alias
+        // (disabled on the derive command) and a meaningless namespace field.
+        cmd = cmd.arg(
+            Arg::new("version")
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print version"),
+        );
+        cmd = cmd.override_help(HELP_TEXT);
         cmd
     }
 
@@ -442,12 +454,12 @@ impl Cli {
 
     /// Parse a process-style argument vector into a [`ParseOutcome`].
     ///
-    /// `--help` and `--version` follow the oracle's left-to-right precedence: a
-    /// validation failure earlier on the command line wins; there is no
-    /// scan-anywhere fast path except Python's exact `argv == ["--version"]`,
-    /// which is observationally identical to letting clap parse that single token.
-    /// Parse failures are rendered into argparse's byte-exact stderr shape by
-    /// [`argparse_error`].
+    /// `--help` and `--version` use argparse's immediate-exit actions: whichever
+    /// is encountered first wins, and an earlier invalid argument wins over both.
+    /// The custom `--version` argument uses clap's `ArgAction::Version` with the
+    /// oracle's exact version bytes (via `display_name` + `version`), so no
+    /// argv scan is needed. Parse failures are rendered into argparse's
+    /// byte-exact stderr shape by [`argparse_error`].
     pub fn parse_command_line(argv: Vec<String>) -> Result<ParseOutcome, Error> {
         // Python's run_cli checks `throttle` before building the main parser.
         if argv
@@ -462,19 +474,12 @@ impl Cli {
             return Ok(ParseOutcome::Throttle(throttle));
         }
         match Self::try_parse_from(argv.iter().cloned()) {
-            Ok(cli) => {
-                if cli.version {
-                    Ok(ParseOutcome::Version)
-                } else {
-                    Ok(ParseOutcome::Command(cli))
-                }
-            }
-            Err(err) => {
-                if err.kind() == ErrorKind::DisplayHelp {
-                    return Ok(ParseOutcome::Help);
-                }
-                Err(Error::usage(argparse_error(&err, &argv)))
-            }
+            Ok(cli) => Ok(ParseOutcome::Command(cli)),
+            Err(err) => match err.kind() {
+                ErrorKind::DisplayHelp => Ok(ParseOutcome::Help),
+                ErrorKind::DisplayVersion => Ok(ParseOutcome::Version),
+                _ => Err(Error::usage(argparse_error(&err, &argv))),
+            },
         }
     }
 

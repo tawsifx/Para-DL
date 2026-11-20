@@ -305,10 +305,8 @@ impl Command {
     /// Returns [`Error::Usage`] (exit code `2`) for a recognised subcommand that is
     /// missing required positional arguments, using the oracle's exact message.
     pub fn from_cli(cli: &Cli) -> Result<Self, Error> {
-        if cli.version {
-            return Ok(Self::Version);
-        }
-
+        // `--version` exits during parsing (clap ArgAction::Version), so a Cli that
+        // reaches here never represents a version request.
         let targets = &cli.targets;
         let Some(first) = targets.first() else {
             if let Some(file) = &cli.hash_file {

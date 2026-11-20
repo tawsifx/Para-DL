@@ -476,6 +476,42 @@ fn help_and_version_precedence_follow_oracle_left_to_right() {
 }
 
 #[test]
+fn version_first_wins_with_byte_exact_version_bytes() {
+    // Oracle: `action="version"` exits at the moment --version is encountered.
+    let cases: &[&[&str]] = &[
+        &["--version", "--engine", "bogus"],
+        &["--version", "-c", "abc"],
+        &["--version", "--help"],
+        &["--version", "--engine", "aria2"],
+    ];
+    for argv in cases {
+        let argv_owned = argv.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(
+            Cli::parse_command_line(argv_owned).unwrap(),
+            ParseOutcome::Version,
+            "argv: {argv:?}"
+        );
+    }
+
+    // clap's Version action itself renders the exact oracle bytes (no auto-format).
+    let err = Cli::try_parse_from(["--version"]).unwrap_err();
+    assert_eq!(err.kind(), clap::error::ErrorKind::DisplayVersion);
+    assert_eq!(err.to_string(), VERSION_TEXT);
+    assert_eq!(VERSION_TEXT, "parallel-dl (paradl) v1.0.0\n");
+}
+
+#[test]
+fn clap_short_v_alias_is_not_invented() {
+    // Python argparse has no -V; it must remain an unrecognized argument (exit 2).
+    let err = parse_error(&["-V"]);
+    assert_eq!(err.exit_code(), ExitCode::Usage);
+    assert_eq!(
+        err.to_string(),
+        format!("{}parallel-dl: error: unrecognized arguments: -V\n", usage_block())
+    );
+}
+
+#[test]
 fn unknown_action_messages_are_byte_exact() {
     let cases: &[(&[&str], &str)] = &[
         (
