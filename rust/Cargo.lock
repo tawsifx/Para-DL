@@ -1367,6 +1367,10 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "paradl"
 version = "0.1.0"
+dependencies = [
+ "paradl-app",
+ "paradl-cli",
+]
 
 [[package]]
 name = "paradl-api"
@@ -1387,6 +1391,29 @@ dependencies = [
 [[package]]
 name = "paradl-app"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "paradl-api",
+ "paradl-cli",
+ "paradl-core",
+ "paradl-engine",
+ "paradl-events",
+ "paradl-media",
+ "paradl-net",
+ "paradl-platform",
+ "paradl-postproc",
+ "paradl-resilience",
+ "paradl-store",
+ "paradl-throttle",
+ "paradl-ui",
+ "paradl-watchdog",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "paradl-cli"
@@ -1482,6 +1509,15 @@ dependencies = [
 [[package]]
 name = "paradl-parity"
 version = "0.1.0"
+dependencies = [
+ "paradl-core",
+ "paradl-events",
+ "paradl-media",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+]
 
 [[package]]
 name = "paradl-platform"
