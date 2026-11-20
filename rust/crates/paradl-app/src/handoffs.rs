@@ -86,18 +86,16 @@ pub fn watchdog_config_for(
 
 /// Normalise a target-resolution failure into a client-side usage error.
 ///
-/// The Python `POST /resolve` endpoint answers HTTP 400 for a bad target.
-/// `paradl-api`'s `ApiError::from_core` maps [`ExitCode::Failure`] to 500, so an
-/// app-owned executor must convert resolution failures to [`Error::usage`]
-/// before handing them to the API layer. This preserves the worker's human
-/// message while producing the byte-exact HTTP status.
+/// Called by the app's `CommandExecutor` (through `ApiBridge`) before a
+/// resolution error reaches `paradl-api`. A generic transfer failure would map
+/// to HTTP 500; converting it to [`Error::usage`] makes the running API answer
+/// the oracle's HTTP 400 while preserving the human message.
 ///
 /// ```
-/// use paradl_app::handoffs::{api_resolve_failure_status, normalise_resolve_failure};
+/// use paradl_app::handoffs::normalise_resolve_failure;
 /// use paradl_core::Error;
 /// let normalised = normalise_resolve_failure(&Error::failure("no such target"));
 /// assert_eq!(normalised.exit_code(), paradl_core::ExitCode::Usage);
-/// assert_eq!(api_resolve_failure_status(&Error::failure("no such target")), 400);
 /// ```
 pub fn normalise_resolve_failure(error: &Error) -> Error {
     Error::usage(error.to_string())
@@ -105,8 +103,16 @@ pub fn normalise_resolve_failure(error: &Error) -> Error {
 
 /// HTTP status produced by the API layer for a normalised resolve failure.
 ///
-/// Always `400` (client error); a resolution failure is never an internal
-/// server error in the oracle.
+/// The Python `POST /resolve` endpoint answers **400** for a bad target.
+/// `paradl-api`'s `ApiError::from_core` derives that status from the exit code,
+/// so this helper (called by the app executor) is the authoritative contract:
+/// after [`normalise_resolve_failure`] the answer is always 400, never 500.
+///
+/// ```
+/// use paradl_app::handoffs::{api_resolve_failure_status, normalise_resolve_failure};
+/// use paradl_core::Error;
+/// assert_eq!(api_resolve_failure_status(&Error::failure("no such target")), 400);
+/// ```
 pub fn api_resolve_failure_status(error: &Error) -> u16 {
     match normalise_resolve_failure(error).exit_code() {
         ExitCode::Usage | ExitCode::VerificationFailed | ExitCode::MissingDependency => 400,

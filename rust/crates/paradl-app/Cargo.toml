@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 default = []
 # The opt-in surfaces are forwarded from the reference binary. Every default
 # build compiles with NO optional system tools and NO Python on non-media paths.
-api = ["dep:paradl-api", "paradl-api/api"]
+api = ["dep:paradl-api", "paradl-api/api", "dep:async-trait"]
 tui = ["paradl-ui/tui"]
 media = ["dep:paradl-media", "paradl-media/media"]
 platform-macos = ["paradl-platform/platform-macos"]
@@ -35,13 +35,16 @@ paradl-events = { path = "../paradl-events" }
 paradl-resilience = { path = "../paradl-resilience" }
 paradl-ui = { path = "../paradl-ui" }
 paradl-media = { path = "../paradl-media", optional = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 url = { workspace = true }
 paradl-api = { path = "../paradl-api", optional = true }
+async-trait = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Protocol handshake is asserted in the handoff tests even when the binary's
 # `media` feature is off; the client itself has no optional system tools.
 paradl-media = { path = "../paradl-media" }
+tempfile = { workspace = true }

@@ -1,0 +1,26 @@
+paraDL doctor
+------------------
+binary            0.1.0
+oracle version    1.0.0
+media protocol    paradl-media/1
+media package     0.1.0
+python probed     no
+media enabled     no
+
+toolchain
+------------------
+yt-dlp            2026.10.26
+node              v20.11.1
+deno              not found
+bun               not found
+ffmpeg            7.0
+js runtime        node v20.11.1
+
+authentication
+------------------
+hf                none
+github            none
+
+fixes
+------------------
+status            none

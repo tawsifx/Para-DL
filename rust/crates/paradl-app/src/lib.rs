@@ -49,5 +49,5 @@ pub mod app;
 pub mod diagnostics;
 pub mod handoffs;
 
-pub use app::{App, Capture, OutputSink};
-pub use diagnostics::{DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, ToolProbe};
+pub use app::{ApiBridge, ApiResolve, App, Capture, OutputSink, TransferSetup};
+pub use diagnostics::{DoctorEnv, DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, ToolProbe};
