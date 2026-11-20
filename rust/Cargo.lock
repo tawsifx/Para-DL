@@ -650,6 +650,16 @@ name = "paradl-cli"
 version = "0.1.0"
 
 [[package]]
+name = "paradl-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "paradl-engine"
 version = "0.1.0"
 
@@ -664,6 +674,13 @@ version = "0.1.0"
 [[package]]
 name = "paradl-net"
 version = "0.1.0"
+
+[[package]]
+name = "paradl-oracle"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "paradl-parity"
