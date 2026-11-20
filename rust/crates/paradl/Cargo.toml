@@ -6,14 +6,22 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+keywords = ["paradl", "parallel-dl", "download", "binary"]
+categories = ["command-line-utilities"]
 
 [features]
 default = []
-api = []
-tui = []
-media = []
-platform-macos = []
-platform-windows = []
+api = ["paradl-app/api"]
+tui = ["paradl-app/tui"]
+media = ["paradl-app/media"]
+platform-macos = ["paradl-app/platform-macos"]
+platform-windows = ["paradl-app/platform-windows"]
+
+[dependencies]
+paradl-app = { path = "../paradl-app" }
+paradl-cli = { path = "../paradl-cli" }
 
 [[bin]]
 name = "paradl"

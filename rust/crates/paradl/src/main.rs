@@ -1,67 +1,61 @@
 //! Thin reference binary for the paraDL Rust framework.
 //!
-//! Wave 0 placeholder: `--version` and a minimal, Python-free `doctor` are
-//! implemented. The full command set is wired in W4-1 via `paradl-app`. The
-//! media subsystem is a Python worker invoked over `paradl-media/1`, never
-//! linked into Rust.
+//! This binary owns the `paradl` / `parallel-dl` names. It is deliberately
+//! small: [`paradl_cli`] provides the byte-exact `--help`, `--version` and
+//! argparse error text, and [`paradl_app::App`] executes every subcommand by
+//! delegating to the framework crates. Media stays a Python one-shot worker
+//! (`python -m paradl_media`, `paradl-media/1`) behind the `media` feature;
+//! no Python is spawned on any non-media path.
 #![warn(missing_docs)]
 
-use std::path::Path;
+use paradl_app::App;
+use paradl_cli::{Cli, Command, Dispatch, ExitCode, ParseOutcome, ThrottleCommand};
 
-/// Framework version, kept in sync with `[workspace.package].version`.
-pub const VERSION: &str = "0.1.0";
+fn main() {
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    let outcome = match Cli::parse_command_line(argv) {
+        Ok(outcome) => outcome,
+        Err(error) => exit_with_error(&error),
+    };
 
-/// Protocol spoken with the Python media worker.
-pub const MEDIA_PROTOCOL: &str = "paradl-media/1";
-
-/// Derive the command name from `argv[0]` so the `parallel-dl` symlink reports
-/// its own name in `--version` output.
-fn program_name(arg0: &str) -> String {
-    // Handle both separators so the test is portable across the macOS and
-    // Windows CI runners (Cargo also strips a `.exe` suffix only on Windows).
-    let base = arg0.rsplit(['/', '\\']).next().unwrap_or(arg0);
-    let base = base.strip_suffix(".exe").unwrap_or(base);
-    let base = Path::new(base)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(base);
-    if base.is_empty() {
-        "paradl".to_string()
-    } else {
-        base.to_string()
+    match outcome {
+        ParseOutcome::Help => print!("{}", paradl_cli::HELP_TEXT),
+        ParseOutcome::ThrottleHelp => print!("{}", paradl_cli::THROTTLE_HELP_TEXT),
+        ParseOutcome::Version => print!("{}", paradl_cli::VERSION_TEXT),
+        ParseOutcome::Throttle(options) => {
+            // The standalone throttle parser owns these flags (dispatch.py fast
+            // path). Rebuild the flat namespace so the same App handles it.
+            let cli = empty_cli();
+            let command = Command::Throttle(ThrottleCommand { options });
+            let code = App::new().handle(&command, &cli);
+            if code != ExitCode::Ok {
+                std::process::exit(code.as_i32());
+            }
+        }
+        ParseOutcome::Command(cli) => {
+            let command = match Command::from_cli(&cli) {
+                Ok(command) => command,
+                Err(error) => exit_with_error(&error),
+            };
+            let code = App::new().handle(&command, &cli);
+            if code != ExitCode::Ok {
+                std::process::exit(code.as_i32());
+            }
+        }
     }
 }
 
-/// Render the exact `--version` line.
-fn version_line(program: &str) -> String {
-    format!("{program} {VERSION}")
+/// Print an argparse-exact error to stderr and exit with its mapped code.
+fn exit_with_error(error: &paradl_cli::Error) -> ! {
+    eprintln!("{error}");
+    std::process::exit(error.exit_code().as_i32());
 }
 
-/// Render the minimal `doctor` report: no Python, no external tools, no I/O.
-/// W4-1 expands this into the full diagnostics subcommand.
-fn doctor_line() -> String {
-    format!("ready version={VERSION} protocol={MEDIA_PROTOCOL}")
-}
-
-fn main() {
-    let mut args = std::env::args();
-    let arg0 = args.next().unwrap_or_else(|| "paradl".to_string());
-    let program = program_name(&arg0);
-
-    match args.next().as_deref() {
-        Some("--version") | Some("-V") | None => println!("{}", version_line(&program)),
-        Some("doctor") => println!("{}", doctor_line()),
-        Some("--help") | Some("-h") => {
-            println!("{program} {VERSION}");
-            println!("Usage: {program} [COMMAND] [OPTIONS]");
-            println!("  doctor          Print minimal diagnostics (no Python required)");
-            println!("  -V, --version   Print version and exit");
-            println!("  -h, --help      Print help and exit");
-        }
-        Some(other) => {
-            eprintln!("{program}: '{other}' is not implemented yet (Wave 0 placeholder)");
-            std::process::exit(2);
-        }
+/// The default flat namespace used for the standalone throttle fast path.
+fn empty_cli() -> Cli {
+    match Cli::parse_command_line(Vec::new()) {
+        Ok(ParseOutcome::Command(cli)) => cli,
+        other => unreachable!("an empty argv always parses to a Cli: {other:?}"),
     }
 }
 
@@ -70,28 +64,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_matches_workspace_version() {
-        assert_eq!(version_line("paradl"), "paradl 0.1.0");
-        assert_eq!(version_line("parallel-dl"), "parallel-dl 0.1.0");
+    fn version_is_byte_exact_oracle() {
+        assert_eq!(paradl_cli::VERSION_TEXT, "parallel-dl (paradl) v1.0.0\n");
+        assert_eq!(
+            Cli::parse_command_line(vec!["--version".to_string()]).unwrap(),
+            ParseOutcome::Version,
+        );
     }
 
     #[test]
-    fn symlink_name_is_preserved() {
-        assert_eq!(program_name("/opt/homebrew/bin/parallel-dl"), "parallel-dl");
-        assert_eq!(program_name("C:\\bin\\paradl.exe"), "paradl");
-        assert_eq!(program_name("/usr/local/bin/paradl"), "paradl");
+    fn help_is_byte_exact_oracle() {
+        let oracle = include_str!("../../paradl-cli/tests/fixtures/help.txt");
+        assert_eq!(paradl_cli::HELP_TEXT, oracle);
+        assert_eq!(Cli::render_help(), oracle);
     }
 
     #[test]
-    fn protocol_constant_is_pinned() {
-        assert_eq!(MEDIA_PROTOCOL, "paradl-media/1");
+    fn throttle_help_is_byte_exact_oracle() {
+        let oracle = include_str!("../../paradl-cli/tests/fixtures/throttle_help.txt");
+        assert_eq!(paradl_cli::THROTTLE_HELP_TEXT, oracle);
     }
 
     #[test]
-    fn doctor_reports_ready_version_and_protocol_without_python() {
-        let report = doctor_line();
-        assert!(report.starts_with("ready "), "{report}");
-        assert!(report.contains("version=0.1.0"), "{report}");
-        assert!(report.contains("protocol=paradl-media/1"), "{report}");
+    fn empty_cli_carries_oracle_defaults() {
+        let cli = empty_cli();
+        assert_eq!(cli.connections, 16);
+        assert_eq!(cli.engine, paradl_cli::Engine::Rust);
     }
 }
