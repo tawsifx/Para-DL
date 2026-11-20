@@ -42,12 +42,14 @@ pub use dispatch::{
     ConfigAction, ConfigCommand, Dispatch, ExtractCommand, HashCommand, HistoryCommand,
     InstallCommand, InfoCommand, NetprobeCommand, NoopDispatch, PipAction, PipCommand,
     ProfilesAction, ProfilesCommand, QueueAction, QueueCommand, ResumeCommand, ServerCommand,
-    SUBCOMMANDS, ThrottleCommand, USAGE_BENCH, USAGE_BREW, USAGE_BREW_CMD, USAGE_BREW_MISSING,
-    USAGE_EXTRACT, USAGE_HASH, USAGE_HISTORY_LIMIT, USAGE_INFO, USAGE_INSTALL, USAGE_NETPROBE,
-    USAGE_PIP, USAGE_PIP_CMD, dispatch,
+    SUBCOMMANDS, ThrottleCommand, USAGE_AUTH_UNKNOWN, USAGE_BENCH, USAGE_BREW, USAGE_BREW_CMD,
+    USAGE_BREW_MISSING, USAGE_CONFIG_UNKNOWN, USAGE_EXTRACT, USAGE_HASH, USAGE_HISTORY_LIMIT,
+    USAGE_INFO, USAGE_INSTALL, USAGE_NETPROBE, USAGE_PIP, USAGE_PIP_CMD, USAGE_QUEUE_UNKNOWN,
+    dispatch,
 };
 pub use parser::{
     AudioCodec, Cli, Engine, HELP_TEXT, HistoryType, ParseOutcome, Quality, VERSION_TEXT,
+    argparse_error, usage_block,
 };
 pub use throttle::{ThrottleCli, ThrottleSubcommand, THROTTLE_HELP_TEXT};
 

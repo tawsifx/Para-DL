@@ -18,6 +18,7 @@
 //! assert_eq!(VERSION_TEXT, "parallel-dl (paradl) v1.0.0\n");
 //! ```
 
+use clap::error::{ContextKind, ContextValue, ErrorKind};
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, ValueEnum};
 
 use crate::{Error, ThrottleCli};
@@ -64,16 +65,22 @@ pub enum AudioCodec {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Quality {
     /// Best available resolution.
+    #[value(name = "best")]
     Best,
     /// 4K.
+    #[value(name = "4k")]
     K4,
     /// 1440p.
+    #[value(name = "1440p")]
     P1440,
     /// 1080p.
+    #[value(name = "1080p")]
     P1080,
     /// 720p.
+    #[value(name = "720p")]
     P720,
     /// 480p.
+    #[value(name = "480p")]
     P480,
 }
 
@@ -435,9 +442,12 @@ impl Cli {
 
     /// Parse a process-style argument vector into a [`ParseOutcome`].
     ///
-    /// `--help` and `--version` are handled explicitly so their output is byte-exact
-    /// with the Python oracle. Every other parse failure becomes
-    /// [`Error::Usage`], which maps to [`crate::ExitCode::Usage`] (`2`).
+    /// `--help` and `--version` follow the oracle's left-to-right precedence: a
+    /// validation failure earlier on the command line wins; there is no
+    /// scan-anywhere fast path except Python's exact `argv == ["--version"]`,
+    /// which is observationally identical to letting clap parse that single token.
+    /// Parse failures are rendered into argparse's byte-exact stderr shape by
+    /// [`argparse_error`].
     pub fn parse_command_line(argv: Vec<String>) -> Result<ParseOutcome, Error> {
         // Python's run_cli checks `throttle` before building the main parser.
         if argv
@@ -451,15 +461,20 @@ impl Cli {
                 .map_err(|e| Error::usage(e.to_string()))?;
             return Ok(ParseOutcome::Throttle(throttle));
         }
-        if argv.iter().any(|arg| arg == "--version") {
-            return Ok(ParseOutcome::Version);
-        }
-        if argv.iter().any(|arg| arg == "--help" || arg == "-h") {
-            return Ok(ParseOutcome::Help);
-        }
-        match Self::try_parse_from(argv) {
-            Ok(cli) => Ok(ParseOutcome::Command(cli)),
-            Err(err) => Err(Error::usage(err.to_string())),
+        match Self::try_parse_from(argv.iter().cloned()) {
+            Ok(cli) => {
+                if cli.version {
+                    Ok(ParseOutcome::Version)
+                } else {
+                    Ok(ParseOutcome::Command(cli))
+                }
+            }
+            Err(err) => {
+                if err.kind() == ErrorKind::DisplayHelp {
+                    return Ok(ParseOutcome::Help);
+                }
+                Err(Error::usage(argparse_error(&err, &argv)))
+            }
         }
     }
 
@@ -507,4 +522,149 @@ impl Cli {
     pub fn render_help() -> String {
         HELP_TEXT.to_string()
     }
+}
+
+/// The exact `usage:` block argparse prints before an error: the prefix of
+/// [`HELP_TEXT`] through the `[targets ...]` line (1,978 bytes).
+pub fn usage_block() -> &'static str {
+    let split = HELP_TEXT
+        .find("\n\n")
+        .expect("captured oracle help contains a usage block");
+    &HELP_TEXT[..split + 1]
+}
+
+/// Render a clap parse failure into argparse's exact stderr byte stream:
+/// `<usage block>parallel-dl: error: <argparse message>\n`.
+///
+/// The message is selected from clap's `ErrorKind` and context (not from
+/// `err.to_string()`, whose wording differs from argparse).
+pub fn argparse_error(err: &clap::Error, argv: &[String]) -> String {
+    format!(
+        "{}{}\n",
+        usage_block(),
+        argparse_message(err, argv)
+    )
+}
+
+fn ctx_string(err: &clap::Error, kind: ContextKind) -> Option<String> {
+    match err.get(kind) {
+        Some(ContextValue::String(s)) => Some(s.clone()),
+        Some(ContextValue::Strings(v)) => Some(v.join(", ")),
+        Some(other) => Some(other.to_string()),
+        None => None,
+    }
+}
+
+/// How argparse spells an argument in an error: `-c/--connections` when the
+/// option has a short alias, otherwise just the long form.
+fn argparse_arg_label(clap_label: &str) -> String {
+    let base = clap_label.split(" <").next().unwrap_or(clap_label);
+    const SHORT_ALIASES: &[(&str, &str)] = &[
+        ("--audio", "-a/--audio"),
+        ("--video", "-v/--video"),
+        ("--lossless", "-l/--lossless"),
+        ("--connections", "-c/--connections"),
+        ("--output", "-o/--output"),
+        ("--input-file", "-i/--input-file"),
+        ("--extract", "-x/--extract"),
+        ("--format", "-f/--format"),
+        ("--quiet", "-q/--quiet"),
+        ("--yes", "-y/--yes"),
+        ("--quality", "-Q/--quality"),
+    ];
+    for (long, display) in SHORT_ALIASES {
+        if base == *long {
+            return (*display).to_string();
+        }
+    }
+    base.to_string()
+}
+
+fn argparse_message(err: &clap::Error, argv: &[String]) -> String {
+    let arg = ctx_string(err, ContextKind::InvalidArg).unwrap_or_default();
+    let value = ctx_string(err, ContextKind::InvalidValue).unwrap_or_default();
+
+    match err.kind() {
+        ErrorKind::UnknownArgument => {
+            let unknown = unknown_tokens(argv);
+            let listed = if unknown.is_empty() {
+                arg
+            } else {
+                unknown.join(" ")
+            };
+            format!("parallel-dl: error: unrecognized arguments: {listed}")
+        }
+        ErrorKind::InvalidValue if value.is_empty() => format!(
+            "parallel-dl: error: argument {}: expected one argument",
+            argparse_arg_label(&arg)
+        ),
+        ErrorKind::InvalidValue => {
+            let choices = ctx_string(err, ContextKind::ValidValue).unwrap_or_default();
+            format!(
+                "parallel-dl: error: argument {}: invalid choice: '{}' (choose from {})",
+                argparse_arg_label(&arg),
+                value,
+                choices
+            )
+        }
+        ErrorKind::ValueValidation => {
+            let base = arg.split(" <").next().unwrap_or(&arg);
+            const FLOAT_ARGS: &[&str] = &["--stall-timeout", "--duration"];
+            let kind = if FLOAT_ARGS.contains(&base) {
+                "float"
+            } else {
+                "int"
+            };
+            format!(
+                "parallel-dl: error: argument {}: invalid {} value: '{}'",
+                argparse_arg_label(&arg),
+                kind,
+                value
+            )
+        }
+        _ if arg.is_empty() => "parallel-dl: error: invalid arguments".to_string(),
+        _ => format!(
+            "parallel-dl: error: argument {}: invalid value",
+            argparse_arg_label(&arg)
+        ),
+    }
+}
+
+fn unknown_tokens(argv: &[String]) -> Vec<String> {
+    let cmd = Cli::command();
+    let known: Vec<String> = cmd
+        .get_arguments()
+        .flat_map(|a| {
+            let mut names = Vec::new();
+            if let Some(long) = a.get_long() {
+                names.push(format!("--{long}"));
+            }
+            if let Some(short) = a.get_short() {
+                names.push(format!("-{short}"));
+            }
+            names.extend(
+                a.get_aliases()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|alias| format!("--{alias}")),
+            );
+            names.extend(
+                a.get_visible_aliases()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|alias| format!("--{alias}")),
+            );
+            names
+        })
+        .collect();
+    argv.iter()
+        .filter(|token| {
+            token.starts_with('-')
+                && *token != "--"
+                && !known
+                    .iter()
+                    .any(|k| **token == *k || token.starts_with(&format!("{k}=")))
+        })
+        .cloned()
+        .collect()
 }

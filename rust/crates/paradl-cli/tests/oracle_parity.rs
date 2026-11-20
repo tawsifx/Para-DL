@@ -163,40 +163,29 @@ fn usage_errors_map_to_exit_code_two() {
 fn install_usage_message_is_byte_exact() {
     let err = Command::from_cli(&parse(&["install"])).unwrap_err();
     assert_eq!(err.to_string(), USAGE_INSTALL);
-    assert_eq!(err.to_string(), "  [error]Usage: pdl install <target> [--yes][/error]");
+    assert_eq!(err.to_string(), "  Usage: pdl install <target> [--yes]\n");
 }
 
 #[test]
 fn subcommand_usage_messages_are_byte_exact() {
+    // Captured from the piped oracle (`run_cli`), i.e. Rich markup already stripped.
     let expectations: &[(&[&str], &str)] = &[
-        (&["info"], "  [error]Usage: pdl info <target>[/error]"),
-        (&["hash"], "  [error]Usage: pdl hash <file>[/error]"),
-        (
-            &["extract"],
-            "  [error]Usage: pdl extract <archive> [dest_dir][/error]",
-        ),
+        (&["info"], "  Usage: pdl info <target>\n"),
+        (&["hash"], "  Usage: pdl hash <file>\n"),
+        (&["extract"], "  Usage: pdl extract <archive> \n"),
         (
             &["netprobe"],
-            "  [error]Usage: pdl netprobe <url> [--duration 60] [--http3-probe][/error]",
+            "  Usage: pdl netprobe <url> [--duration 60] [--http3-probe]\n",
         ),
         (
             &["bench"],
-            "  [error]Usage: pdl bench <url> [--watchdog v1,v2,off] [--duration 60][/error]",
+            "  Usage: pdl bench <url> [--watchdog v1,v2,off] [--duration 60]\n",
         ),
-        (
-            &["pip"],
-            "  [error]Usage: pdl pip [install|upgrade] <package>[/error]",
-        ),
-        (
-            &["pypi", "install"],
-            "  [error]Usage: pdl pypi install <package>[/error]",
-        ),
-        (&["brew"], "  [error]Usage: pdl brew [install|update|upgrade] <formula>[/error]"),
-        (&["brew", "install"], "  [error]Usage: pdl brew install <formula>[/error]"),
-        (
-            &["history", "abc"],
-            "  [error]Invalid history limit: abc[/error]",
-        ),
+        (&["pip"], "  Usage: pdl pip  <package>\n"),
+        (&["pypi", "install"], "  Usage: pdl pypi install <package>\n"),
+        (&["brew"], "  Usage: pdl brew  <formula>\n"),
+        (&["brew", "install"], "  Usage: pdl brew install <formula>\n"),
+        (&["history", "abc"], "  Invalid history limit: 'abc'\n"),
     ];
     for (argv, expected) in expectations {
         let err = Command::from_cli(&parse(argv)).unwrap_err();
@@ -395,4 +384,131 @@ fn cli_env_var_contract_is_documented() {
     assert!(CLI_ENV_VARS.contains(&"GITHUB_TOKEN"));
     assert!(CLI_ENV_VARS.contains(&"PARADL_HOME"));
     assert!(CLI_ENV_VARS.contains(&"PYO3_PYTHON"));
+}
+
+// ---- Round-1 fix: byte-exact argparse error output -------------------------
+
+fn parse_error(args: &[&str]) -> Error {
+    let argv = args.iter().map(|s| (*s).to_string()).collect();
+    Cli::parse_command_line(argv).unwrap_err()
+}
+
+#[test]
+fn argparse_error_output_is_byte_exact_for_reviewed_cases() {
+    let cases: &[(&[&str], &str)] = &[
+        (&["--bogus"], include_str!("fixtures/error_unknown_arg.txt")),
+        (&["--engine", "bogus"], include_str!("fixtures/error_engine_bogus.txt")),
+        (&["-c", "abc"], include_str!("fixtures/error_connections_abc.txt")),
+    ];
+    for (argv, golden) in cases {
+        let err = parse_error(argv);
+        assert_eq!(err.exit_code(), ExitCode::Usage, "argv: {argv:?}");
+        assert_eq!(err.to_string(), *golden, "argv: {argv:?}");
+        assert!(err.to_string().starts_with("usage: parallel-dl [-h]"));
+        assert!(err.to_string().contains("parallel-dl: error: "));
+    }
+}
+
+#[test]
+fn argparse_error_output_is_byte_exact_for_additional_choices_and_types() {
+    let cases: &[(&[&str], &str)] = &[
+        (
+            &["--audio-codec", "foo"],
+            "parallel-dl: error: argument --audio-codec: invalid choice: 'foo' (choose from lossless, native, mp3, flac, opus, wav, aac)\n",
+        ),
+        (
+            &["-Q", "8k"],
+            "parallel-dl: error: argument -Q/--quality: invalid choice: '8k' (choose from best, 4k, 1440p, 1080p, 720p, 480p)\n",
+        ),
+        (
+            &["--type", "bogus"],
+            "parallel-dl: error: argument --type: invalid choice: 'bogus' (choose from direct, stream, search, github, huggingface, ipsw, pypi, brew, torrent)\n",
+        ),
+        (
+            &["--watchdog"],
+            "parallel-dl: error: argument --watchdog: expected one argument\n",
+        ),
+        (
+            &["--port", "x"],
+            "parallel-dl: error: argument --port: invalid int value: 'x'\n",
+        ),
+        (
+            &["--bogus", "--also"],
+            "parallel-dl: error: unrecognized arguments: --bogus --also\n",
+        ),
+    ];
+    let usage = usage_block();
+    assert_eq!(usage.len(), 1978);
+    for (argv, message) in cases {
+        let expected = format!("{usage}{message}");
+        assert_eq!(parse_error(argv).to_string(), expected, "argv: {argv:?}");
+    }
+}
+
+#[test]
+fn help_and_version_precedence_follow_oracle_left_to_right() {
+    // Captured from Python: all three exit 2; an earlier bad arg beats the action.
+    let cases: &[(&[&str], &str)] = &[
+        (
+            &["--engine", "bogus", "--version"],
+            "parallel-dl: error: argument --engine: invalid choice: 'bogus' (choose from aria2, rust)\n",
+        ),
+        (
+            &["--engine", "bogus", "--help"],
+            "parallel-dl: error: argument --engine: invalid choice: 'bogus' (choose from aria2, rust)\n",
+        ),
+        (
+            &["--host", "--version"],
+            "parallel-dl: error: argument --host: expected one argument\n",
+        ),
+    ];
+    for (argv, message) in cases {
+        let err = parse_error(argv);
+        assert_eq!(err.exit_code(), ExitCode::Usage, "argv: {argv:?}");
+        assert_eq!(err.to_string(), format!("{}{message}", usage_block()), "argv: {argv:?}");
+    }
+
+    // The exact single-arg fast path still succeeds, as does help-first.
+    let argv = vec!["--version".to_string()];
+    assert_eq!(Cli::parse_command_line(argv).unwrap(), ParseOutcome::Version);
+    let argv = vec!["--help".to_string()];
+    assert_eq!(Cli::parse_command_line(argv).unwrap(), ParseOutcome::Help);
+}
+
+#[test]
+fn unknown_action_messages_are_byte_exact() {
+    let cases: &[(&[&str], &str)] = &[
+        (
+            &["config", "bogus"],
+            "  Error: Unknown config action: 'bogus' (expected show, set, reset, or reset-hosts)\n",
+        ),
+        (
+            &["queue", "x"],
+            "  Unknown queue action: 'x' (expected add, list, remove, pause, resume, run, or \nlaunchd-plist)\n",
+        ),
+        (
+            &["auth", "x"],
+            "  Unknown auth action 'x'. Use: pdl auth set|status|remove\n",
+        ),
+    ];
+    for (argv, expected) in cases {
+        let err = Command::from_cli(&parse(argv)).unwrap_err();
+        assert_eq!(err.to_string(), *expected, "argv: {argv:?}");
+        assert_eq!(err.exit_code(), ExitCode::Usage);
+    }
+    assert!(USAGE_CONFIG_UNKNOWN.contains("{action}"));
+    assert!(USAGE_QUEUE_UNKNOWN.contains("{action}"));
+    assert!(USAGE_AUTH_UNKNOWN.contains("{action}"));
+}
+
+#[test]
+fn unknown_profiles_token_is_a_hostname_not_a_usage_error() {
+    // Python: `pdl profiles x` lists profiles for host `x` and exits 0.
+    let cli = parse(&["profiles", "example.com"]);
+    let cmd = Command::from_cli(&cli).unwrap();
+    assert!(matches!(
+        cmd,
+        Command::Profiles(p)
+            if p.action == ProfilesAction::List && p.host.as_deref() == Some("example.com")
+    ));
 }

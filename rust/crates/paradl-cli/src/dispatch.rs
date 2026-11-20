@@ -418,10 +418,9 @@ impl Command {
             }
             "history" => {
                 let limit = match rest.first() {
-                    Some(raw) => Some(
-                        raw.parse::<i64>()
-                            .map_err(|_| usage(&USAGE_HISTORY_LIMIT.replace("{value}", raw)))?,
-                    ),
+                    Some(raw) => Some(raw.parse::<i64>().map_err(|_| {
+                        usage(&USAGE_HISTORY_LIMIT.replace("{value}", &py_repr(raw)))
+                    })?),
                     None => None,
                 };
                 Ok(Self::History(HistoryCommand { limit }))
@@ -435,7 +434,11 @@ impl Command {
                     Some("set") => ConfigAction::Set,
                     Some("reset") => ConfigAction::Reset,
                     Some("reset-hosts") => ConfigAction::ResetHosts,
-                    Some(other) => return Err(usage(&format!("  [error]Unknown config action: {other}[/error]"))),
+                    Some(other) => {
+                        return Err(usage(
+                            &USAGE_CONFIG_UNKNOWN.replace("{action}", &py_repr(other)),
+                        ))
+                    }
                 };
                 Ok(Self::Config(ConfigCommand {
                     action,
@@ -449,7 +452,11 @@ impl Command {
                     None | Some("status") => AuthAction::Status,
                     Some("set") => AuthAction::Set,
                     Some("remove") => AuthAction::Remove,
-                    Some(other) => return Err(usage(&format!("  [error]Unknown auth action: {other}[/error]"))),
+                    Some(other) => {
+                        return Err(usage(
+                            &USAGE_AUTH_UNKNOWN.replace("{action}", &py_repr(other)),
+                        ))
+                    }
                 };
                 Ok(Self::Auth(AuthCommand {
                     action,
@@ -472,7 +479,8 @@ impl Command {
                 let (action, host) = match rest.first().map(|s| s.to_ascii_lowercase()).as_deref() {
                     None | Some("list") => (ProfilesAction::List, None),
                     Some("reset") => (ProfilesAction::Reset, rest.get(1).cloned()),
-                    Some(other) => return Err(usage(&format!("  [error]Unknown profiles action: {other}[/error]"))),
+                    // Python treats any other token as a hostname to list, exiting 0.
+                    Some(other) => (ProfilesAction::List, Some(other.to_string())),
                 };
                 Ok(Self::Profiles(ProfilesCommand { action, host }))
             }
@@ -486,7 +494,11 @@ impl Command {
                     Some("remove") => (QueueAction::Remove, tail.to_vec()),
                     Some("run") => (QueueAction::Run, tail.to_vec()),
                     Some("launchd-plist") => (QueueAction::LaunchdPlist, tail.to_vec()),
-                    Some(other) => return Err(usage(&format!("  [error]Unknown queue action: {other}[/error]"))),
+                    Some(other) => {
+                        return Err(usage(
+                            &USAGE_QUEUE_UNKNOWN.replace("{action}", &py_repr(other)),
+                        ))
+                    }
                 };
                 Ok(Self::Queue(QueueCommand { action, args }))
             }
@@ -520,33 +532,72 @@ fn usage(message: &str) -> Error {
     Error::usage(message)
 }
 
-/// Exact `print_plain` usage strings from `src/paradl/cli/dispatch.py`.
-pub const USAGE_INSTALL: &str = "  [error]Usage: pdl install <target> [--yes][/error]";
-/// Exact `print_plain` usage string for `pip`/`pypi` (contains `{sub}`).
-pub const USAGE_PIP: &str = "  [error]Usage: pdl {sub} [install|upgrade] <package>[/error]";
-/// Exact `print_plain` usage string for a pip sub-action (contains `{sub}`/`{cmd}`).
-pub const USAGE_PIP_CMD: &str = "  [error]Usage: pdl {sub} {cmd} <package>[/error]";
-/// Exact `print_plain` usage string for `brew`.
-pub const USAGE_BREW: &str = "  [error]Usage: pdl brew [install|update|upgrade] <formula>[/error]";
-/// Exact `print_plain` usage string for a brew sub-action (contains `{cmd}`).
-pub const USAGE_BREW_CMD: &str = "  [error]Usage: pdl brew {cmd} <formula>[/error]";
-/// Exact `print_plain` usage string for `info`.
-pub const USAGE_INFO: &str = "  [error]Usage: pdl info <target>[/error]";
-/// Exact `print_plain` usage string for `hash`.
-pub const USAGE_HASH: &str = "  [error]Usage: pdl hash <file>[/error]";
-/// Exact `print_plain` usage string for `extract`.
-pub const USAGE_EXTRACT: &str = "  [error]Usage: pdl extract <archive> [dest_dir][/error]";
-/// Exact `print_plain` template for an invalid history limit (contains `{value}`).
-pub const USAGE_HISTORY_LIMIT: &str = "  [error]Invalid history limit: {value}[/error]";
-/// Exact `print_plain` usage string for `netprobe`.
+/// Python `repr()` for a string, using single quotes like CPython does.
+fn py_repr(value: &str) -> String {
+    let quote = if value.contains('\'') && !value.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push(quote);
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c == quote => {
+                out.push('\\');
+                out.push(c);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push(quote);
+    out
+}
+
+// These are the RENDERED (Rich-markup-stripped) bytes printed by the oracle in a
+// piped/non-TTY process, captured via `run_cli(...)` with stdout/stderr separated.
+// Rich also strips tokens such as `[install|upgrade]` and `[dest_dir]`, so the
+// literals below intentionally differ from the `[error]...[/error]` source strings.
+
+/// Rendered output for `pdl install` with no target.
+pub const USAGE_INSTALL: &str = "  Usage: pdl install <target> [--yes]\n";
+/// Rendered output for bare `pip`/`pypi` (contains `{sub}`).
+pub const USAGE_PIP: &str = "  Usage: pdl {sub}  <package>\n";
+/// Rendered output for a pip sub-action missing its package (contains `{sub}`/`{cmd}`).
+pub const USAGE_PIP_CMD: &str = "  Usage: pdl {sub} {cmd} <package>\n";
+/// Rendered output for bare `brew`.
+pub const USAGE_BREW: &str = "  Usage: pdl brew  <formula>\n";
+/// Rendered output for a brew sub-action missing its formula (contains `{cmd}`).
+pub const USAGE_BREW_CMD: &str = "  Usage: pdl brew {cmd} <formula>\n";
+/// Rendered output for `pdl info` with no target.
+pub const USAGE_INFO: &str = "  Usage: pdl info <target>\n";
+/// Rendered output for `pdl hash` with no file.
+pub const USAGE_HASH: &str = "  Usage: pdl hash <file>\n";
+/// Rendered output for `pdl extract` with no archive (note the trailing space).
+pub const USAGE_EXTRACT: &str = "  Usage: pdl extract <archive> \n";
+/// Rendered template for an invalid history limit (contains `{value}`, a Python repr).
+pub const USAGE_HISTORY_LIMIT: &str = "  Invalid history limit: {value}\n";
+/// Rendered output for `pdl netprobe` with no URL.
 pub const USAGE_NETPROBE: &str =
-    "  [error]Usage: pdl netprobe <url> [--duration 60] [--http3-probe][/error]";
-/// Exact `print_plain` usage string for `bench`.
+    "  Usage: pdl netprobe <url> [--duration 60] [--http3-probe]\n";
+/// Rendered output for `pdl bench` with no URL.
 pub const USAGE_BENCH: &str =
-    "  [error]Usage: pdl bench <url> [--watchdog v1,v2,off] [--duration 60][/error]";
-/// Exact `print_plain` message when `brew` is not on `PATH`.
-pub const USAGE_BREW_MISSING: &str =
-    "  [error]Homebrew ('brew') binary not found on PATH.[/error]";
+    "  Usage: pdl bench <url> [--watchdog v1,v2,off] [--duration 60]\n";
+/// Rendered output when `brew` is not on `PATH`.
+pub const USAGE_BREW_MISSING: &str = "  Homebrew ('brew') binary not found on PATH.\n";
+/// Rendered stderr for an unknown `config` action (contains `{action}`, a Python repr).
+pub const USAGE_CONFIG_UNKNOWN: &str =
+    "  Error: Unknown config action: {action} (expected show, set, reset, or reset-hosts)\n";
+/// Rendered stdout for an unknown `queue` action (contains `{action}`, a Python repr).
+/// The line break is Rich's 80-column wrap in non-TTY mode.
+pub const USAGE_QUEUE_UNKNOWN: &str = "  Unknown queue action: {action} (expected add, list, remove, pause, resume, run, or \nlaunchd-plist)\n";
+/// Rendered stdout for an unknown `auth` action (contains `{action}`).
+pub const USAGE_AUTH_UNKNOWN: &str =
+    "  Unknown auth action {action}. Use: pdl auth set|status|remove\n";
 
 /// The dispatch seam implemented by `paradl-app` in W4-1.
 ///

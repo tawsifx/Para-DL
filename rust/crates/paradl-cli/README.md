@@ -35,6 +35,14 @@ captured goldens asserted by `tests/oracle_parity.rs`.
 variables the Python entry point reads through `PDLConfig` and the auth layer.
 No new flags or env bindings were invented.
 
+Parse failures are rendered into argparse's exact stderr byte stream by
+`argparse_error`: the captured usage block followed by
+`parallel-dl: error: <argparse message>\n`. Clap's own wording is never passed
+through. Dispatch-time `USAGE_*` constants hold the **rendered** (Rich-markup-
+stripped) text, captured from piped oracle processes, including the oracle's
+trailing spaces and line wraps. `--help`/`--version` follow left-to-right
+precedence: an earlier bad argument wins (exit `2`).
+
 ## Feature flags
 
 None. This crate depends only on `clap` (derive + env) and `paradl-core`; it must not
