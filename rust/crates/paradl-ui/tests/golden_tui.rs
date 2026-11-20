@@ -4,9 +4,11 @@
 #![cfg(feature = "tui")]
 
 use paradl_events::{
-    Event, ProgressEvent, QueueJobRow, QueueJobStartedEvent, QueueListEvent, ResultEvent,
+    Event, ProgressEvent, QueueJobRow, QueueJobStartedEvent, QueueListEvent, QueuePausedEvent,
+    QueueResumedEvent, ResultEvent,
 };
 use paradl_ui::tui::{TaskState, TaskStore, apply_event, status_label};
+use serde_json::json;
 
 fn sample_task() -> TaskState {
     TaskState {
@@ -165,6 +167,79 @@ fn typed_events_populate_task_store_and_render_oracle_row() {
             "16",
         ]
     );
+}
+
+fn task_with(id: i64, created_at: &str, status: &str) -> TaskState {
+    TaskState {
+        id,
+        created_at: created_at.into(),
+        status: status.into(),
+        ..sample_task()
+    }
+}
+
+/// `queue_paused paused=<count>` is a COUNT (commands.py:343), not an id.
+/// With tasks ordered 1, 3, 2 newest-first, `paused=2` must pause tasks 1 and 3
+/// and leave job id 2 running — the old code paused only the row whose id
+/// equalled the count.
+#[test]
+fn queue_paused_count_pauses_first_n_compatible_tasks_not_matching_id() {
+    let mut store = TaskStore::new();
+    store.upsert(task_with(1, "2026-11-20 10:00:03", "running"));
+    store.upsert(task_with(3, "2026-11-20 10:00:02", "queued"));
+    store.upsert(task_with(2, "2026-11-20 10:00:01", "running"));
+
+    apply_event(
+        &mut store,
+        &Event::QueuePaused(QueuePausedEvent::new(1_763_376_000.123, json!(2))),
+    );
+
+    assert_eq!(store.get(1).expect("task 1").status, "paused");
+    assert_eq!(store.get(3).expect("task 3").status, "paused");
+    // Job id 2 happens to equal the count but is NOT among the first two.
+    assert_eq!(store.get(2).expect("task 2").status, "running");
+    // Byte-exact row status cells from the oracle's `to_row()`.
+    assert_eq!(store.get(1).unwrap().to_row()[4], "paused");
+    assert_eq!(store.get(3).unwrap().to_row()[4], "paused");
+    assert_eq!(store.get(2).unwrap().to_row()[4], "running");
+}
+
+/// `queue_resumed resumed=<count>` is a COUNT (commands.py:360 and :471).
+#[test]
+fn queue_resumed_count_resumes_first_n_compatible_tasks_not_matching_id() {
+    let mut store = TaskStore::new();
+    store.upsert(task_with(1, "2026-11-20 10:00:03", "paused"));
+    store.upsert(task_with(3, "2026-11-20 10:00:02", "failed"));
+    store.upsert(task_with(2, "2026-11-20 10:00:01", "paused"));
+
+    apply_event(
+        &mut store,
+        &Event::QueueResumed(QueueResumedEvent::new(
+            1_763_376_000.123,
+            json!(2),
+            Some(true),
+        )),
+    );
+
+    assert_eq!(store.get(1).expect("task 1").status, "queued");
+    assert_eq!(store.get(3).expect("task 3").status, "queued");
+    assert_eq!(store.get(2).expect("task 2").status, "paused");
+}
+
+/// Forward-compatible id-array form still transitions the named rows.
+#[test]
+fn queue_paused_id_array_transitions_named_ids() {
+    let mut store = TaskStore::new();
+    store.upsert(task_with(1, "2026-11-20 10:00:03", "running"));
+    store.upsert(task_with(2, "2026-11-20 10:00:02", "running"));
+
+    apply_event(
+        &mut store,
+        &Event::QueuePaused(QueuePausedEvent::new(1_763_376_000.123, json!([2]))),
+    );
+
+    assert_eq!(store.get(1).unwrap().status, "running");
+    assert_eq!(store.get(2).unwrap().status, "paused");
 }
 
 #[test]

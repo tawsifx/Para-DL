@@ -33,6 +33,17 @@ cargo run -p paradl-ui --example plain_progress
 cargo run -p paradl-ui --features tui --example tui_preview
 ```
 
+## Event payload semantics (counts, not ids)
+
+`queue_paused` / `queue_resumed` / `queue_removed` carry a **count**, not an id
+(`src/paradl/app/commands.py:343,360,471` emit the return value of
+`QueueManager.pause_jobs` / `resume_jobs`). `tui::apply_event` therefore applies
+a numeric payload `n` to the first `n` tasks in `list_all()` order whose status
+is compatible with the transition — pause touches `running`/`queued` tasks,
+resume touches `paused`/`failed` tasks, removal deletes the first `n` tasks. A
+task whose *id* happens to equal `n` is **not** specially targeted. A future
+`Value::Array(ids)` form is still honored as explicit ids.
+
 ## Golden parity
 
 `tests/golden.rs` and `tests/golden_tui.rs` assert byte-exact strings captured

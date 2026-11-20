@@ -355,14 +355,10 @@ pub fn apply_event(store: &mut TaskStore, event: &Event) {
             }
         }
         Event::QueuePaused(paused) => {
-            for id in changed_ids(&paused.paused) {
-                store.set_status(id, "paused");
-            }
+            apply_status_change(store, &paused.paused, &["running", "queued"], "paused");
         }
         Event::QueueResumed(resumed) => {
-            for id in changed_ids(&resumed.resumed) {
-                store.set_status(id, "queued");
-            }
+            apply_status_change(store, &resumed.resumed, &["paused", "failed"], "queued");
         }
         Event::QueueRemoved(removed) => {
             let ids: Vec<i64> = store
@@ -379,12 +375,38 @@ pub fn apply_event(store: &mut TaskStore, event: &Event) {
     }
 }
 
-/// Parse a `queue_paused`/`queue_resumed` payload into job ids.
-fn changed_ids(value: &Value) -> Vec<i64> {
-    match value {
-        Value::Number(number) => number.as_i64().into_iter().collect(),
+/// Apply a `queue_paused` / `queue_resumed` payload to the task store.
+///
+/// # Count vs. id semantics
+///
+/// The Python emitter sends a **count**, never an id array:
+/// `src/paradl/app/commands.py:343` emits `paused=<count>` (the return value of
+/// `QueueManager.pause_jobs`), and `:360` / `:471` emit `resumed=<count>`.
+/// Therefore a `Value::Number(n)` means "N tasks changed": it is applied to the
+/// first N tasks in `list_all()` order whose current status is compatible with
+/// the transition (`from`), never to the task whose *id* equals `n`. Treating
+/// the number as an id would pause/queue an unrelated row — e.g. `paused=2`
+/// would wrongly mutate job id 2.
+///
+/// A `Value::Array(ids)` form is accepted for forward compatibility with a
+/// future schema that carries explicit ids; every listed id is transitioned.
+fn apply_status_change(store: &mut TaskStore, value: &Value, from: &[&str], to: &str) {
+    let ids: Vec<i64> = match value {
+        Value::Number(number) => {
+            let count = number.as_u64().unwrap_or(0) as usize;
+            store
+                .list_all()
+                .iter()
+                .filter(|task| from.contains(&task.status.as_str()))
+                .take(count)
+                .map(|task| task.id)
+                .collect()
+        }
         Value::Array(items) => items.iter().filter_map(Value::as_i64).collect(),
         _ => Vec::new(),
+    };
+    for id in ids {
+        store.set_status(id, to);
     }
 }
 
