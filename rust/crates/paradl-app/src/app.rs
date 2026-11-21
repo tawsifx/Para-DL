@@ -18,7 +18,7 @@ use paradl_cli::{
     NetprobeCommand, PipCommand, ProfilesAction, ProfilesCommand, QueueAction, QueueCommand,
     ResumeCommand, ServerCommand,
 };
-use paradl_core::{Error, PDLConfig, SystemClock};
+use paradl_core::{Error, PDLConfig, SystemClock, WatchdogMode, format_speed, parse_rate};
 use paradl_events::{
     ApiServerStartedEvent, AuthRemoveEvent, AuthSetEvent, AuthStatusEvent, BenchEvent, CleanEvent,
     ConfigEvent, ConfigResetEvent, ConfigUpdatedEvent, ErrorEvent, Event, HashesEvent, HistoryEvent,
@@ -32,10 +32,11 @@ use paradl_postproc::{PostProcessor, checksum};
 use paradl_resilience::auth::{InMemorySecretStore, OsEnv, Service, TokenSource, lookup_token};
 use paradl_store::{QueueJob, SqliteStore, Store, TransferRecord};
 use paradl_ui::event_summary;
-use paradl_watchdog::{ThroughputSample, WatchdogController};
+use paradl_watchdog::{ThroughputSample, WatchdogController, py_round};
 use serde_json::{Value, json};
 
 use crate::diagnostics::DoctorReport;
+use crate::events::{InfoRow, ProgressRow, ResultRow, TargetClassifiedRow};
 use crate::handoffs::{api_resolve_failure_status, normalise_resolve_failure, resolve_isp, watchdog_config_for};
 #[cfg(feature = "media")]
 use crate::handoffs::map_media_error_kind;
@@ -138,6 +139,15 @@ pub struct TransferSetup {
     pub host: String,
 }
 
+/// First telemetry snapshot from the real engine, used for the one `progress`
+/// event the oracle emits at the start of a transfer.
+#[derive(Debug, Clone, Copy)]
+struct ProgressTelemetry {
+    downloaded: u64,
+    total: Option<u64>,
+    speed_bps: u64,
+}
+
 /// Normalised outcome of one real engine transfer.
 #[derive(Debug, Clone)]
 struct EngineOutcome {
@@ -147,6 +157,7 @@ struct EngineOutcome {
     error: Option<String>,
     exit_code: ExitCode,
     avg_speed_bps: f64,
+    progress: Option<ProgressTelemetry>,
 }
 
 /// Orchestrates all framework crates for the `paradl` reference binary.
@@ -161,6 +172,9 @@ pub struct App {
     runtime: Option<tokio::runtime::Runtime>,
     cancel: Option<Arc<AtomicBool>>,
     last_transfer: Option<TransferSetup>,
+    /// Resolved ISP observed on the info path (handoff (a)); observable without
+    /// polluting the byte-exact oracle `info` event.
+    last_info_isp: Option<String>,
     record_history: bool,
 }
 
@@ -190,6 +204,7 @@ impl App {
             runtime: None,
             cancel: None,
             last_transfer: None,
+            last_info_isp: None,
             record_history: true,
         }
     }
@@ -203,6 +218,7 @@ impl App {
             runtime: None,
             cancel: None,
             last_transfer: None,
+            last_info_isp: None,
             record_history: true,
         }
     }
@@ -221,6 +237,7 @@ impl App {
             runtime: None,
             cancel: None,
             last_transfer: None,
+            last_info_isp: None,
             record_history: true,
         }
     }
@@ -244,6 +261,11 @@ impl App {
     /// Inputs used by the most recent transfer, if one was dispatched.
     pub fn last_transfer(&self) -> Option<&TransferSetup> {
         self.last_transfer.as_ref()
+    }
+
+    /// Resolved ISP observed on the most recent `info` dispatch.
+    pub fn last_info_isp(&self) -> Option<&str> {
+        self.last_info_isp.as_deref()
     }
 
     /// Disable writing transfer-history rows (used by loopback integration tests).
@@ -390,6 +412,33 @@ impl App {
         let mut code = ExitCode::Ok;
         for target in targets {
             let decision = classify_target(&target, None, &PureClaimsChecker);
+            // The oracle emits target_classified for every target before it
+            // decides whether to download, delegate to media, or fail.
+            let info = classification_info(&target, &decision);
+            if cli.json {
+                self.line(&emit_jsonl(&TargetClassifiedRow::new(
+                    now_timestamp(),
+                    &target,
+                    &info.target_type,
+                    &info.clean_url,
+                    info.filename_hint.as_deref(),
+                    info.content_length,
+                    info.accept_ranges,
+                )));
+            } else {
+                self.publish(
+                    false,
+                    Event::TargetClassified(paradl_events::TargetClassifiedEvent::new(
+                        now_timestamp(),
+                        target.clone(),
+                        info.target_type.clone(),
+                        info.clean_url.clone(),
+                        info.filename_hint.clone(),
+                        info.content_length,
+                        info.accept_ranges,
+                    )),
+                );
+            }
             if let RouteDecision::DelegateToWorker { .. } = decision {
                 if let Err(error) = self.media_route(&target, cli) {
                     code = self.fail(cli.json, &error);
@@ -397,8 +446,7 @@ impl App {
                 continue;
             }
             match self.transfer(&target, &decision, cli, &isp) {
-                Ok((result, exit_code)) => {
-                    self.publish(cli.json, Event::Result(result));
+                Ok(exit_code) => {
                     if exit_code != ExitCode::Ok {
                         code = exit_code;
                     }
@@ -442,7 +490,7 @@ impl App {
         decision: &RouteDecision,
         cli: &Cli,
         isp: &str,
-    ) -> Result<(ResultEvent, ExitCode), Error> {
+    ) -> Result<ExitCode, Error> {
         let started = Instant::now();
         let file_name = decision_filename(target, decision);
         let dest = destination(cli, &file_name);
@@ -466,6 +514,7 @@ impl App {
                 error: None,
                 exit_code: ExitCode::Ok,
                 avg_speed_bps: 0.0,
+                progress: None,
             }
         } else {
             self.run_engine(target, cli, &dest)?
@@ -477,6 +526,7 @@ impl App {
             error: error_text,
             exit_code,
             avg_speed_bps: avg_speed,
+            progress,
         } = outcome;
 
         // Exercise the v1/v2 controller with the observed transfer speed so the
@@ -509,28 +559,106 @@ impl App {
                 .and_then(|store| store.record_transfer(&record));
         }
 
-        Ok((
-            ResultEvent::new(
+        if cli.json {
+            // The oracle emits one progress event at transfer start, built
+            // from the real engine's first snapshot (never fabricated).
+            if let Some(telemetry) = progress {
+                let total_u64 = telemetry.total.unwrap_or(0);
+                let total = telemetry
+                    .total
+                    .and_then(|value| i64::try_from(value).ok());
+                let percent = if total_u64 > 0 {
+                    py_round(telemetry.downloaded as f64 * 100.0 / total_u64 as f64, 2)
+                } else {
+                    0.0
+                };
+                let speed = py_round(telemetry.speed_bps as f64, 2);
+                let eta = if telemetry.speed_bps > 0 && total_u64 > 0 {
+                    Some(py_round(
+                        (total_u64 - telemetry.downloaded) as f64 / telemetry.speed_bps as f64,
+                        1,
+                    ))
+                } else {
+                    None
+                };
+                let mode = match self.config.watchdog.trim().to_ascii_lowercase().as_str() {
+                    "v1" => WatchdogMode::V1,
+                    "off" => WatchdogMode::Off,
+                    _ => WatchdogMode::V2,
+                };
+                let watchdog_state = if mode == WatchdogMode::Off {
+                    "Watchdog: Off".to_string()
+                } else {
+                    let floor = self
+                        .config
+                        .anti_throttle
+                        .as_deref()
+                        .and_then(|rate| parse_rate(rate).ok())
+                        .unwrap_or(0.0);
+                    format!(
+                        "Watchdog {}: <{} (cycles: 0, {} streams)",
+                        mode.as_str(),
+                        format_speed(floor),
+                        cli.connections
+                    )
+                };
+                // The oracle's `connections` is the configured stream count
+                // (`args.connections`), not the engine's instantaneous worker
+                // count at the first tick (which may still be 1 while workers
+                // spawn). Both are real values; use the configured one to
+                // match the reported parallelism.
+                let configured = paradl_engine::clamp_connections(cli.connections.max(0) as u32);
+                self.line(&emit_jsonl(&ProgressRow::new(
+                    now_timestamp(),
+                    &file_name,
+                    i64::try_from(telemetry.downloaded).unwrap_or(i64::MAX),
+                    total,
+                    percent,
+                    speed,
+                    eta,
+                    configured as i32,
+                    &watchdog_state,
+                )));
+            }
+            self.line(&emit_jsonl(&ResultRow::new(
                 now_timestamp(),
-                Some("download".to_string()),
-                Some(target.to_string()),
+                target,
+                &target_type,
                 success,
-                file_path,
-                None,
-                error_text,
+                file_path.as_deref(),
+                bytes,
+                py_round(started.elapsed().as_secs_f64(), 3),
+                py_round(avg_speed, 2),
+                0,
+                cli.push_adb,
+                error_text.as_deref(),
                 exit_code.as_i32(),
-                Some(target_type),
-                Some(bytes),
-                Some(started.elapsed().as_secs_f64()),
-                Some(avg_speed),
-                Some(0),
-                None,
-                None,
-                None,
-                Some(false),
-            ),
-            exit_code,
-        ))
+            )));
+        } else {
+            self.publish(
+                false,
+                Event::Result(ResultEvent::new(
+                    now_timestamp(),
+                    Some("download".to_string()),
+                    Some(target.to_string()),
+                    success,
+                    file_path,
+                    None,
+                    error_text,
+                    exit_code.as_i32(),
+                    Some(target_type),
+                    Some(bytes),
+                    Some(started.elapsed().as_secs_f64()),
+                    Some(avg_speed),
+                    Some(0),
+                    None,
+                    None,
+                    None,
+                    Some(false),
+                )),
+            );
+        }
+        Ok(exit_code)
     }
 
     fn run_engine(
@@ -539,7 +667,7 @@ impl App {
         cli: &Cli,
         dest: &Path,
     ) -> Result<EngineOutcome, Error> {
-        use paradl_engine::{DownloadEngine, NdEngine, NoopProgressSink, Target as EngineTarget};
+        use paradl_engine::{DownloadEngine, NdEngine, Target as EngineTarget};
         use url::Url;
 
         let url = Url::parse(target)
@@ -562,9 +690,24 @@ impl App {
 
         let engine = NdEngine::default();
         let runtime = self.runtime();
+        let captured: Arc<Mutex<Option<ProgressTelemetry>>> = Arc::new(Mutex::new(None));
+        let sink = {
+            let captured = Arc::clone(&captured);
+            move |snapshot: &paradl_engine::Snapshot| {
+                let mut guard = captured.lock().unwrap();
+                if guard.is_none() {
+                    *guard = Some(ProgressTelemetry {
+                        downloaded: snapshot.downloaded,
+                        total: snapshot.total,
+                        speed_bps: snapshot.speed_bps,
+                    });
+                }
+            }
+        };
+        let mut sink = sink;
         let outcome = runtime.block_on(async {
             let plan = engine.plan(&engine_target).await?;
-            engine.download(plan, &mut NoopProgressSink).await
+            engine.download(plan, &mut sink).await
         })?;
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
         let path = outcome.file_path.map(|path| path.to_string_lossy().into_owned());
@@ -586,6 +729,7 @@ impl App {
             error,
             exit_code,
             avg_speed_bps: outcome.avg_speed_bps,
+            progress: *captured.lock().unwrap(),
         })
     }
 
@@ -652,21 +796,51 @@ impl App {
 
     // ---- inspection / local utilities ------------------------------------
 
-    fn info(&self, command: &InfoCommand, json: bool) -> ExitCode {
+    fn info(&mut self, command: &InfoCommand, json: bool) -> ExitCode {
+        // Handoff (a): resolved on the info path too. Kept out of the byte-exact
+        // oracle `info` event and exposed through `last_info_isp()` instead.
+        self.last_info_isp = Some(resolve_isp(&self.config));
         let decision = classify_target(&command.target, None, &PureClaimsChecker);
-        let mut properties = decision_properties(&command.target, &decision);
-        // Handoff (a): the resolved ISP is observable on the info path too.
-        if let Value::Object(map) = &mut properties {
-            map.insert("isp".to_string(), Value::String(resolve_isp(&self.config)));
-        }
-        self.publish(
-            json,
-            Event::Info(InfoEvent::new(
+        let info = classification_info(&command.target, &decision);
+        if json {
+            self.line(&emit_jsonl(&TargetClassifiedRow::new(
                 now_timestamp(),
-                command.target.clone(),
-                properties,
-            )),
-        );
+                &command.target,
+                &info.target_type,
+                &info.clean_url,
+                info.filename_hint.as_deref(),
+                info.content_length,
+                info.accept_ranges,
+            )));
+            self.line(&emit_jsonl(&InfoRow::new(
+                now_timestamp(),
+                &command.target,
+                &info.target_type.to_ascii_uppercase(),
+                &info.clean_url,
+                info.filename_hint.as_deref(),
+            )));
+        } else {
+            self.publish(
+                false,
+                Event::TargetClassified(paradl_events::TargetClassifiedEvent::new(
+                    now_timestamp(),
+                    command.target.clone(),
+                    info.target_type.clone(),
+                    info.clean_url.clone(),
+                    info.filename_hint.clone(),
+                    info.content_length,
+                    info.accept_ranges,
+                )),
+            );
+            self.publish(
+                false,
+                Event::Info(InfoEvent::new(
+                    now_timestamp(),
+                    command.target.clone(),
+                    decision_properties(&command.target, &decision),
+                )),
+            );
+        }
         ExitCode::Ok
     }
 
@@ -1179,6 +1353,34 @@ fn decision_name(decision: &RouteDecision) -> String {
         RouteDecision::DelegateToWorker { target_type, .. } => {
             format!("{target_type:?}").to_ascii_lowercase()
         }
+    }
+}
+
+/// Data shared by `target_classified` and `info`, straight from pure routing.
+struct ClassificationInfo {
+    target_type: String,
+    clean_url: String,
+    filename_hint: Option<String>,
+    content_length: Option<i64>,
+    accept_ranges: Option<bool>,
+}
+
+fn classification_info(target: &str, decision: &RouteDecision) -> ClassificationInfo {
+    let hint = decision_filename(target, decision);
+    ClassificationInfo {
+        target_type: decision_name(decision),
+        clean_url: decision_clean_url(decision, target),
+        filename_hint: Some(hint),
+        content_length: match decision {
+            RouteDecision::Direct { content_length, .. } => {
+                content_length.and_then(|value| i64::try_from(value).ok())
+            }
+            _ => None,
+        },
+        accept_ranges: match decision {
+            RouteDecision::Direct { accept_ranges, .. } => *accept_ranges,
+            _ => None,
+        },
     }
 }
 

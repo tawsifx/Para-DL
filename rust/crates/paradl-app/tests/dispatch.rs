@@ -95,6 +95,46 @@ fn non_json_mode_never_emits_jsonl() {
 }
 
 #[test]
+fn info_json_emits_target_classified_then_info_with_oracle_fields() {
+    let (_, output) = dispatch(&["info", "https://example.com/f.zip", "--json"]);
+    let lines: Vec<&str> = output.lines().collect();
+    assert_eq!(lines.len(), 2, "{output}");
+    assert!(lines[0].contains("\"event\": \"target_classified\""), "{}", lines[0]);
+    for field in [
+        "\"target\":", "\"target_type\":", "\"clean_url\":",
+        "\"filename_hint\":", "\"content_length\":", "\"accept_ranges\":",
+    ] {
+        assert!(lines[0].contains(field), "target_classified missing {field}: {}", lines[0]);
+    }
+    assert!(lines[1].contains("\"event\": \"info\""), "{}", lines[1]);
+    for field in ["\"Classification\":", "\"Resolved URL\":", "\"Filename Hint\":"] {
+        assert!(lines[1].contains(field), "info missing {field}: {}", lines[1]);
+    }
+    assert!(!lines[1].contains("\"isp\""), "info must stay byte-exact: {}", lines[1]);
+}
+
+#[test]
+fn download_json_emits_target_classified_before_result() {
+    // Offline mode has no engine telemetry, so no progress row; the ordering
+    // of the two terminal-facing events is still asserted here. The online
+    // progress row is covered by the W4-2 non-media gate.
+    let (_, output) = dispatch(&["https://example.com/f.zip", "--json"]);
+    let lines: Vec<&str> = output.lines().collect();
+    assert_eq!(lines.len(), 2, "{output}");
+    assert!(lines[0].contains("\"event\": \"target_classified\""), "{}", lines[0]);
+    assert!(lines[1].contains("\"event\": \"result\""), "{}", lines[1]);
+    for field in [
+        "\"target\":", "\"target_type\":", "\"success\":", "\"file_path\":",
+        "\"bytes_downloaded\":", "\"duration\":", "\"avg_speed_bps\":",
+        "\"recycle_count\":", "\"audio_format_produced\":", "\"checksum_verified\":",
+        "\"checksum_algo\":", "\"checksum_digest\":", "\"adb_synced\":",
+        "\"error\":", "\"exit_code\":",
+    ] {
+        assert!(lines[1].contains(field), "result missing {field}: {}", lines[1]);
+    }
+}
+
+#[test]
 fn usage_errors_keep_exit_code_two() {
     for argv in [
         &["install"][..],

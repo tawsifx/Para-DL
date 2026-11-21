@@ -47,7 +47,11 @@
 
 pub mod app;
 pub mod diagnostics;
+pub(crate) mod events;
 pub mod handoffs;
 
 pub use app::{ApiBridge, ApiResolve, App, Capture, OutputSink, TransferSetup};
-pub use diagnostics::{DoctorEnv, DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, ToolProbe};
+pub use diagnostics::{
+    DoctorEnv, DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, PlatformUtilities, ToolProbe,
+    UtilityRow,
+};

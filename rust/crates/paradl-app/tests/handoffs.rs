@@ -119,18 +119,20 @@ fn dispatch_level_handoff_effects_are_observable() {
     assert_ne!(setup.hour_bucket, -1, "the -1 unknown sentinel must never appear");
     assert_eq!(setup.hour_bucket, compute_hour_bucket(setup.local_hour));
 
-    // (a) on the info path: the detected ISP appears in the emitted event.
+    // (a) on the info path: resolved and observable via the accessor, while
+    // the byte-exact oracle `info` event carries no isp field.
     let cli = Cli::parse_command_line(vec!["info".to_string(), "https://example.com/f.zip".to_string(), "--json".to_string()]).unwrap();
     let ParseOutcome::Command(cli) = cli else { panic!() };
     let command = Command::from_cli(&cli).unwrap();
     let capture = Capture::default();
     let mut app = App::offline_with_config(config).with_output(capture.sink());
     assert_eq!(app.handle(&command, &cli), paradl_cli::ExitCode::Ok);
-    assert!(
-        capture.contents().contains("\"isp\": \"Detected Fiber ISP\""),
-        "{}",
-        capture.contents()
-    );
+    assert_eq!(app.last_info_isp(), Some("Detected Fiber ISP"));
+    assert!(!capture.contents().contains("\"isp\""), "{}", capture.contents());
+    // Both events are emitted, in oracle order.
+    assert!(capture.contents().contains("\"event\": \"target_classified\""));
+    assert!(capture.contents().find("\"event\": \"target_classified\"").unwrap()
+        < capture.contents().find("\"event\": \"info\"").unwrap());
     paradl_net::reset_isp_detector();
 }
 

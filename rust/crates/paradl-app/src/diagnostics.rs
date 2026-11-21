@@ -4,26 +4,23 @@
 //! [`DoctorReport`] reports the binary version, the `paradl-media/1` protocol,
 //! the Python media-package version, yt-dlp version and JS-runtime status. It
 //! works with **no Python** on non-media paths: tool versions come from
-//! external native binaries probed by [`ToolProbe`], never from
+//! external native binaries and on-disk package metadata, never from
 //! `python -m paradl_media` and never from PyO3.
 //!
-//! The human renderer deliberately avoids Rich (and table crates with dynamic
-//! widths): fixed column widths, stable ordering and no ANSI make the bytes
-//! identical in a pipe and in a TTY, which makes a byte-exact golden test
-//! possible.
+//! The JSON event field order mirrors `src/paradl/diagnostics/doctor.py`
+//! exactly (Python dicts preserve insertion order): every nested object is a
+//! typed struct with declared field order, never a sorted `serde_json::Map`.
+
+use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 use paradl_events::{emit_jsonl, now_timestamp};
-use paradl_resilience::auth::{InMemorySecretStore, OsEnv, Service, TokenSource, lookup_token};
+use paradl_resilience::auth::{KeychainSecretStore, OsEnv};
 use serde::Serialize;
-use serde_json::{Value, json};
 
 /// Protocol spoken with the (Python) media worker.
 pub const MEDIA_PROTOCOL: &str = "paradl-media/1";
 /// Version of the standalone Python media package (`media/pyproject.toml`).
-///
-/// Kept in sync with `paradl_media.__version__` / `WORKER_VERSION`; it is a
-/// constant here so `doctor` never needs to import or spawn Python.
 pub const MEDIA_PACKAGE_VERSION: &str = "0.1.0";
 /// Version reported by the Python oracle (`src/paradl/__init__.py:5`).
 pub const ORACLE_VERSION: &str = "1.0.0";
@@ -33,18 +30,23 @@ pub const NOT_FOUND: &str = "not found";
 const LABEL_WIDTH: usize = 18;
 /// Fixed section separator (no terminal-width detection).
 const SEPARATOR: &str = "------------------";
+/// Fix string for the legacy PyO3 module (deleted in W0-1, never reintroduced).
+const RUST_ENGINE_FIX: &str =
+    "maturin develop --release  # build rust/paradl-rs into this venv";
 
 /// Versions and paths of the external tools `doctor` reports, gathered
-/// without Python. Each field is `None` when the native binary is absent.
+/// without Python. Each field is `None` when the native tool is absent.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToolProbe {
     /// yt-dlp version (`yt-dlp --version` first line).
     pub yt_dlp_version: Option<String>,
     /// Resolved path of the yt-dlp binary.
     pub yt_dlp_path: Option<String>,
+    /// JS runtime label (`deno (/opt/homebrew/bin/deno)`, …).
+    pub js_runtime: Option<String>,
     /// Node.js version (`node --version`).
     pub node_version: Option<String>,
-    /// Deno version (`deno --version`).
+    /// Deno version (`deno --version` first line).
     pub deno_version: Option<String>,
     /// Bun version (`bun --version`).
     pub bun_version: Option<String>,
@@ -54,6 +56,16 @@ pub struct ToolProbe {
     pub npm_version: Option<String>,
     /// Resolved path of the npm binary.
     pub npm_path: Option<String>,
+    /// Resolved path of the deno binary (preferred JS runtime in the oracle).
+    pub deno_path: Option<String>,
+    /// Resolved path of the aria2c binary.
+    pub aria2c_path: Option<String>,
+    /// Resolved path of the afconvert binary.
+    pub afconvert_path: Option<String>,
+    /// Resolved path of the ffmpeg binary.
+    pub ffmpeg_path: Option<String>,
+    /// yt-dlp-ejs version from on-disk package metadata (never Python).
+    pub ytdlp_ejs_version: Option<String>,
 }
 
 impl ToolProbe {
@@ -62,41 +74,40 @@ impl ToolProbe {
     /// Only native binaries are executed; no Python interpreter is discovered
     /// or spawned. A missing or slow tool yields `None`.
     pub fn detect() -> Self {
+        let deno_path = tool_path("deno", &[]);
+        let js_runtime = deno_path
+            .as_ref()
+            .map(|path| format!("deno ({path})"))
+            .or_else(|| tool_path("node", &[]).map(|path| format!("node ({path})")))
+            .or_else(|| tool_path("quickjs", &[]).map(|path| format!("quickjs ({path})")))
+            .or_else(|| tool_path("bun", &[]).map(|path| format!("bun [deprecated] ({path})")));
         Self {
             yt_dlp_version: first_line(&["yt-dlp", "--version"]),
             yt_dlp_path: tool_path("yt-dlp", &[]),
+            js_runtime,
             node_version: first_line(&["node", "--version"]),
             deno_version: first_line(&["deno", "--version"]),
             bun_version: first_line(&["bun", "--version"]),
             ffmpeg_version: first_line(&["ffmpeg", "-version"]),
             npm_version: first_line(&["npm", "--version"]),
             npm_path: tool_path("npm", &[]),
+            deno_path,
+            aria2c_path: tool_path("aria2c", &[]),
+            afconvert_path: tool_path("afconvert", &["/usr/bin/afconvert"]),
+            ffmpeg_path: tool_path("ffmpeg", &[]),
+            ytdlp_ejs_version: discover_ytdlp_ejs_version(),
         }
-    }
-
-    /// First available JS runtime as a stable `name version` label.
-    pub fn js_runtime(&self) -> Option<String> {
-        self.node_version
-            .as_ref()
-            .map(|version| format!("node {version}"))
-            .or_else(|| self.deno_version.as_ref().map(|version| format!("deno {version}")))
-            .or_else(|| self.bun_version.as_ref().map(|version| format!("bun {version}")))
     }
 }
 
 /// Environment-dependent doctor values that cannot be derived from constants.
-///
-/// Every field is always present in the JSON payload; genuinely unavailable
-/// values use JSON `null` rather than being omitted.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DoctorEnv {
     /// `get_auth_status()` equivalent: per-service source metadata.
-    pub auth: Value,
+    pub auth: serde_json::Value,
     /// `check_platform_utilities()` equivalent.
-    pub platform_utilities: Value,
-    /// yt-dlp-ejs version; always `None` without a Python metadata probe.
-    pub ytdlp_ejs_version: Option<String>,
-    /// Version of the in-process native engine.
+    pub platform_utilities: PlatformUtilities,
+    /// Version of the legacy PyO3 engine module (always absent post-W0-1).
     pub rust_engine_version: Option<String>,
     /// npm version, when installed.
     pub npm_version: Option<String>,
@@ -106,11 +117,37 @@ pub struct DoctorEnv {
     pub fixes: Vec<String>,
 }
 
+/// Complete `check_platform_utilities()` result with the oracle's key order.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct PlatformUtilities {
+    /// `caffeinate` availability.
+    pub caffeinate: UtilityRow,
+    /// `scutil` availability.
+    pub scutil: UtilityRow,
+    /// `pmset` availability.
+    pub pmset: UtilityRow,
+    /// `security` availability.
+    pub security: UtilityRow,
+    /// `codesign` availability.
+    pub codesign: UtilityRow,
+    /// `spctl` availability.
+    pub spctl: UtilityRow,
+    /// `xattr` availability.
+    pub xattr: UtilityRow,
+}
+
+/// One entry of `platform_utilities` / `macos_utilities`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct UtilityRow {
+    /// Whether the binary was found.
+    pub available: bool,
+    /// Absolute path, or `null`.
+    pub path: Option<String>,
+    /// Human-readable remediation hint.
+    pub fix: String,
+}
+
 /// The complete `doctor` / `diagnose` payload, independent of stdout.
-///
-/// Constructed with [`DoctorReport::collect`], enriched with
-/// [`DoctorReport::with_tools`], and freely constructible in golden tests by
-/// setting its public fields.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoctorReport {
     /// Reference-binary crate version (`CARGO_PKG_VERSION`, currently `0.1.0`).
@@ -141,17 +178,6 @@ pub struct DoctorReport {
 
 impl DoctorReport {
     /// Build a report from constants and Python-free environment inspection.
-    ///
-    /// `media_enabled` records whether the binary was compiled with the
-    /// `media` feature; it never triggers a Python probe on this non-media
-    /// path. Call [`DoctorReport::with_tools`] to fill in native tool versions.
-    ///
-    /// ```
-    /// use paradl_app::DoctorReport;
-    /// let report = DoctorReport::collect(false);
-    /// assert!(!report.python_probed);
-    /// assert_eq!(report.media_protocol, "paradl-media/1");
-    /// ```
     pub fn collect(media_enabled: bool) -> Self {
         Self {
             binary_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -167,8 +193,6 @@ impl DoctorReport {
             probe: ToolProbe::default(),
             env: DoctorEnv {
                 auth: auth_status(),
-                platform_utilities: platform_utilities(),
-                rust_engine_version: Some(env!("CARGO_PKG_VERSION").to_owned()),
                 ..DoctorEnv::default()
             },
         }
@@ -177,19 +201,17 @@ impl DoctorReport {
     /// Enrich the report with externally probed tool versions.
     ///
     /// No Python is involved; [`ToolProbe::detect`] only executes native
-    /// binaries found on `PATH`. Missing tools become `None` and contribute a
-    /// deterministic fix string.
+    /// binaries found on `PATH` and reads on-disk package metadata.
     pub fn with_tools(mut self, tools: &ToolProbe) -> Self {
+        let age = tools.yt_dlp_version.as_deref().and_then(ytdlp_age_days);
         self.yt_dlp_version = tools.yt_dlp_version.clone();
-        self.ytdlp_age_days = tools
-            .yt_dlp_version
-            .as_deref()
-            .and_then(ytdlp_age_days);
-        self.ytdlp_outdated = self.ytdlp_age_days.is_some_and(|days| days > 30);
-        self.js_runtime = tools.js_runtime();
+        self.ytdlp_age_days = age;
+        self.ytdlp_outdated = age.is_some_and(|days| days > 30);
+        self.js_runtime = tools.js_runtime.clone();
         self.env.npm_version = tools.npm_version.clone();
         self.env.npm_path = tools.npm_path.clone();
-        self.env.fixes = fixes_for(tools);
+        self.env.platform_utilities = platform_utilities();
+        self.env.fixes = fixes_for(tools, &self.env);
         self.probe = tools.clone();
         self
     }
@@ -245,151 +267,255 @@ impl DoctorReport {
         out
     }
 
-    /// `core_tools` payload for the JSON events (oracle field `core_tools`).
-    fn core_tools(&self) -> Value {
-        let mut tools = serde_json::Map::new();
-        let mut insert = |name: &str, status: &str, detail: Option<&str>, fix: Option<&str>| {
-            tools.insert(
-                name.to_owned(),
-                json!({"status": status, "detail": detail, "fix": fix}),
-            );
-        };
-        insert("GitHub PowerSuite (httpx)", "ready", Some("bundled reqwest client"), None);
-        insert(
-            "Hugging Face Hub Engine",
-            "ready",
-            Some("native site resolver"),
-            None,
-        );
-        insert(
-            "Rust Engine (native rapids)",
-            "ready",
-            self.env.rust_engine_version.as_deref(),
-            None,
-        );
-        insert(
-            "yt-dlp (Media Stream Resolver)",
-            if self.yt_dlp_version.is_some() { "ready" } else { "missing" },
-            self.yt_dlp_version.as_deref(),
-            if self.yt_dlp_version.is_some() {
-                None
-            } else {
-                Some("install yt-dlp in the media venv")
-            },
-        );
-        insert(
-            "yt-dlp-ejs (JS Challenge Pkg)",
-            if self.env.ytdlp_ejs_version.is_some() { "ready" } else { "missing" },
-            self.env.ytdlp_ejs_version.as_deref(),
-            None,
-        );
-        insert(
-            "JS Runtime (for EJS)",
-            if self.js_runtime.is_some() { "ready" } else { "optional_missing" },
-            self.js_runtime.as_deref(),
-            None,
-        );
-        insert(
-            "npm (Node Package Manager)",
-            if self.env.npm_version.is_some() { "ready" } else { "optional_missing" },
-            self.env.npm_version.as_deref(),
-            None,
-        );
-        insert(
-            "ffmpeg (AV Transcoder)",
-            if self.probe.ffmpeg_version.is_some() { "ready" } else { "optional_missing" },
-            self.probe.ffmpeg_version.as_deref(),
-            None,
-        );
-        Value::Object(tools)
-    }
-
     /// Render the `doctor` and `diagnose` JSONL lines via the single emitter.
     ///
-    /// The field set matches `src/paradl/diagnostics/doctor.py:349-375`
-    /// exactly: `version`, `ytdlp`, `ytdlp_ejs`, `rust_engine`, `npm`, `auth`,
-    /// `platform_utilities`, `macos_utilities`, `core_tools`, `fixes`. Only
-    /// `paradl-events::emit_jsonl` serializes these lines.
+    /// Field order and nesting match `src/paradl/diagnostics/doctor.py:349-375`
+    /// byte-for-byte; only the timestamp value differs (wall clock).
     pub fn json_events(&self) -> Vec<String> {
         let timestamp = now_timestamp();
-        let ytdlp = json!({
-            "version": self.yt_dlp_version,
-            "age_days": self.ytdlp_age_days,
-            "outdated": self.ytdlp_outdated,
-            "path": self.probe.yt_dlp_path,
-        });
-        let ytdlp_ejs = json!({"version": self.env.ytdlp_ejs_version});
-        let rust_engine = json!({
-            "available": true,
-            "version": self.env.rust_engine_version,
-        });
-        let npm = json!({"version": self.env.npm_version, "path": self.env.npm_path});
-        let core_tools = self.core_tools();
-        let platform = &self.env.platform_utilities;
-        let doctor = DoctorJson {
-            event: "doctor",
-            timestamp,
-            version: &self.oracle_version,
-            ytdlp: ytdlp.clone(),
-            ytdlp_ejs: ytdlp_ejs.clone(),
-            rust_engine: rust_engine.clone(),
-            npm: npm.clone(),
-            auth: &self.env.auth,
-            platform_utilities: platform,
-            macos_utilities: platform,
-            core_tools: core_tools.clone(),
-            fixes: &self.env.fixes,
-        };
-        let diagnose = DoctorJson {
-            event: "diagnose",
-            timestamp,
-            version: &self.oracle_version,
-            ytdlp,
-            ytdlp_ejs,
-            rust_engine,
-            npm,
-            auth: &self.env.auth,
-            platform_utilities: platform,
-            macos_utilities: platform,
-            core_tools,
-            fixes: &self.env.fixes,
-        };
+        let doctor = DoctorJson::new("doctor", timestamp, self);
+        let diagnose = DoctorJson::new("diagnose", timestamp, self);
         vec![emit_jsonl(&doctor), emit_jsonl(&diagnose)]
     }
 }
 
-/// Exact JSON envelope of the oracle's `doctor` / `diagnose` events.
+// ---- Typed JSON rows: field order is the byte contract --------------------
+
 #[derive(Serialize)]
 struct DoctorJson<'a> {
     event: &'static str,
     timestamp: f64,
     version: &'a str,
-    ytdlp: Value,
-    ytdlp_ejs: Value,
-    rust_engine: Value,
-    npm: Value,
-    auth: &'a Value,
-    platform_utilities: &'a Value,
-    macos_utilities: &'a Value,
-    core_tools: Value,
+    ytdlp: YtdlpJson,
+    ytdlp_ejs: VersionOnlyJson,
+    rust_engine: RustEngineJson,
+    npm: NpmJson,
+    auth: AuthJson<'a>,
+    platform_utilities: &'a PlatformUtilities,
+    macos_utilities: &'a PlatformUtilities,
+    core_tools: CoreToolsJson,
     fixes: &'a [String],
 }
+
+impl<'a> DoctorJson<'a> {
+    fn new(event: &'static str, timestamp: f64, report: &'a DoctorReport) -> Self {
+        let probe = &report.probe;
+        let env = &report.env;
+        let ytdlp_detail = match report.ytdlp_age_days {
+            Some(days) => format!("v{} ({days}d old)", report.yt_dlp_version.as_deref().unwrap_or("")),
+            None => format!("v{}", report.yt_dlp_version.as_deref().unwrap_or("")),
+        };
+        let js_detail = probe.js_runtime.clone();
+        let npm_detail = match (&env.npm_version, &env.npm_path) {
+            (Some(version), Some(path)) => Some(format!("v{version} ({path})")),
+            (Some(version), None) => Some(format!("v{version}")),
+            (None, Some(path)) => Some(path.clone()),
+            (None, None) => None,
+        };
+        let ejs_detail = probe
+            .ytdlp_ejs_version
+            .as_ref()
+            .map(|version| format!("v{version}"));
+        Self {
+            event,
+            timestamp,
+            version: &report.oracle_version,
+            ytdlp: YtdlpJson {
+                version: report.yt_dlp_version.clone(),
+                age_days: report.ytdlp_age_days,
+                outdated: report.ytdlp_outdated,
+                path: probe.yt_dlp_path.clone(),
+            },
+            ytdlp_ejs: VersionOnlyJson {
+                version: probe.ytdlp_ejs_version.clone(),
+            },
+            rust_engine: RustEngineJson {
+                available: false,
+                version: None,
+            },
+            npm: NpmJson {
+                version: env.npm_version.clone(),
+                path: env.npm_path.clone(),
+            },
+            auth: AuthJson::new(&env.auth),
+            platform_utilities: &env.platform_utilities,
+            macos_utilities: &env.platform_utilities,
+            core_tools: CoreToolsJson {
+                httpx: ToolRow::ready("ready"),
+                hf: ToolRow::ready("ready (Aria2 RPC)"),
+                rust_engine: ToolRow {
+                    status: "optional_missing".to_owned(),
+                    detail: "not built (HTTP(S) falls back to --engine aria2)".to_owned(),
+                    fix: Some(RUST_ENGINE_FIX.to_owned()),
+                },
+                aria2c: path_row(probe.aria2c_path.as_deref()),
+                ytdlp: status_detail_row(report.yt_dlp_version.is_some(), Some(&ytdlp_detail)),
+                ytdlp_ejs: status_detail_row(
+                    probe.ytdlp_ejs_version.is_some(),
+                    ejs_detail.as_deref(),
+                ),
+                js_runtime: status_detail_row(js_detail.is_some(), js_detail.as_deref()),
+                npm: status_detail_row(npm_detail.is_some(), npm_detail.as_deref()),
+                ffmpeg: path_row(probe.ffmpeg_path.as_deref()),
+                afconvert: path_row(probe.afconvert_path.as_deref()),
+            },
+            fixes: &env.fixes,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct YtdlpJson {
+    version: Option<String>,
+    age_days: Option<i64>,
+    outdated: bool,
+    path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct VersionOnlyJson {
+    version: Option<String>,
+}
+
+#[derive(Serialize)]
+struct RustEngineJson {
+    available: bool,
+    version: Option<String>,
+}
+
+#[derive(Serialize)]
+struct NpmJson {
+    version: Option<String>,
+    path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ToolRow {
+    status: String,
+    detail: String,
+    fix: Option<String>,
+}
+
+impl ToolRow {
+    fn ready(detail: &str) -> Self {
+        Self {
+            status: "ready".to_owned(),
+            detail: detail.to_owned(),
+            fix: None,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CoreToolsJson {
+    #[serde(rename = "GitHub PowerSuite (httpx)")]
+    httpx: ToolRow,
+    #[serde(rename = "Hugging Face Hub Engine")]
+    hf: ToolRow,
+    #[serde(rename = "Rust Engine (native rapids)")]
+    rust_engine: ToolRow,
+    #[serde(rename = "aria2c (legacy JSON-RPC fallback)")]
+    aria2c: ToolRow,
+    #[serde(rename = "yt-dlp (Media Stream Resolver)")]
+    ytdlp: ToolRow,
+    #[serde(rename = "yt-dlp-ejs (JS Challenge Pkg)")]
+    ytdlp_ejs: ToolRow,
+    #[serde(rename = "JS Runtime (for EJS)")]
+    js_runtime: ToolRow,
+    #[serde(rename = "npm (Node Package Manager)")]
+    npm: ToolRow,
+    #[serde(rename = "ffmpeg (AV Transcoder)")]
+    ffmpeg: ToolRow,
+    #[serde(rename = "afconvert (CoreAudio)")]
+    afconvert: ToolRow,
+}
+
+#[derive(Serialize)]
+struct AuthServiceJson<'a> {
+    service: &'a str,
+    label: &'a str,
+    configured: bool,
+    source: &'a str,
+}
+
+#[derive(Serialize)]
+struct AuthJson<'a> {
+    hf: AuthServiceJson<'a>,
+    github: AuthServiceJson<'a>,
+}
+
+impl<'a> AuthJson<'a> {
+    fn new(value: &'a serde_json::Value) -> Self {
+        Self {
+            hf: auth_service(value, "hf", "Hugging Face Hub"),
+            github: auth_service(value, "github", "GitHub API"),
+        }
+    }
+}
+
+fn auth_service<'a>(
+    value: &'a serde_json::Value,
+    name: &'a str,
+    label: &'a str,
+) -> AuthServiceJson<'a> {
+    let entry = value.get(name);
+    let configured = entry
+        .and_then(|entry| entry.get("configured"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let source = match entry
+        .and_then(|entry| entry.get("source"))
+        .and_then(serde_json::Value::as_str)
+    {
+        Some("env") => "env",
+        Some("keychain") | Some("credential_manager") => "keychain",
+        Some("cache_file") => "cache_file",
+        Some("gh_cli") => "gh_cli",
+        _ => "none",
+    };
+    AuthServiceJson { service: name, label, configured, source }
+}
+
+// ---- small helpers --------------------------------------------------------
 
 fn bool_token(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
 }
 
-fn auth_source(auth: &Value, service: &str) -> &'static str {
+fn auth_source(auth: &serde_json::Value, service: &str) -> &'static str {
     match auth
         .get(service)
         .and_then(|entry| entry.get("source"))
-        .and_then(Value::as_str)
+        .and_then(serde_json::Value::as_str)
     {
         Some("env") => "env",
-        Some("keychain") => "keychain",
+        Some("keychain") | Some("credential_manager") => "keychain",
         Some("cache_file") => "cache_file",
         Some("gh_cli") => "gh_cli",
         _ => "none",
+    }
+}
+
+fn status_detail_row(available: bool, detail: Option<&str>) -> ToolRow {
+    ToolRow {
+        status: if available { "ready" } else { "missing" }.to_owned(),
+        detail: detail.unwrap_or("not found").to_owned(),
+        fix: None,
+    }
+}
+
+fn path_row(path: Option<&str>) -> ToolRow {
+    match path {
+        Some(path) => ToolRow {
+            status: "ready".to_owned(),
+            detail: path.to_owned(),
+            fix: None,
+        },
+        None => ToolRow {
+            status: "optional_missing".to_owned(),
+            detail: "not found".to_owned(),
+            fix: None,
+        },
     }
 }
 
@@ -412,7 +538,7 @@ fn tool_path(name: &str, fallbacks: &[&str]) -> Option<String> {
     first_line(&["which", name]).or_else(|| {
         fallbacks
             .iter()
-            .find(|path| std::path::Path::new(path).exists())
+            .find(|path| Path::new(path).exists())
             .map(|path| (*path).to_owned())
     })
 }
@@ -423,68 +549,99 @@ fn ytdlp_age_days(version: &str) -> Option<i64> {
     let month = parts.next()?.parse::<u32>().ok()?;
     let day = parts.next()?.parse::<u32>().ok()?;
     let release = NaiveDate::from_ymd_opt(year, month, day)?;
-    let today = chrono::Local::now().date_naive();
-    Some((today - release).num_days())
+    Some((chrono::Local::now().date_naive() - release).num_days())
 }
 
-fn fixes_for(tools: &ToolProbe) -> Vec<String> {
-    let mut fixes = Vec::new();
+/// Discover `yt-dlp-ejs` from `*.dist-info` on disk (no Python import).
+fn discover_ytdlp_ejs_version() -> Option<String> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(override_path) = std::env::var_os("PARADL_MEDIA_PY") {
+        roots.push(PathBuf::from(override_path));
+    }
+    // Compile-time crate dir and the running binary's ancestors cover both a
+    // source checkout and an installed binary next to its managed venv.
+    roots.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+    if let Ok(exe) = std::env::current_exe() {
+        roots.push(exe);
+    }
+    for root in roots {
+        let mut candidate = root.as_path();
+        for _ in 0..8 {
+            let venv = candidate.join(".venv");
+            if let Some(version) = dist_info_version(&venv) {
+                return Some(version);
+            }
+            candidate = candidate.parent()?;
+        }
+    }
+    None
+}
+
+fn dist_info_version(venv: &Path) -> Option<String> {
+    let site = venv.join("lib");
+    let entries = std::fs::read_dir(site).ok()?;
+    for python_dir in entries.flatten() {
+        let packages = python_dir.path().join("site-packages");
+        let children = match std::fs::read_dir(&packages) {
+            Ok(children) => children,
+            Err(_) => continue,
+        };
+        for entry in children.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("yt_dlp_ejs-") && name.ends_with(".dist-info") {
+                let version = name
+                    .trim_start_matches("yt_dlp_ejs-")
+                    .trim_end_matches(".dist-info");
+                if !version.is_empty() {
+                    return Some(version.to_owned());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn fixes_for(tools: &ToolProbe, env: &DoctorEnv) -> Vec<String> {
+    let mut fixes = vec![RUST_ENGINE_FIX.to_owned()];
+    if auth_source(&env.auth, "hf") == "none" {
+        fixes.push("paradl auth set hf  # or: export HF_TOKEN=<token>".to_owned());
+    }
+    if auth_source(&env.auth, "github") == "none" {
+        fixes.push("paradl auth set github  # or: export GITHUB_TOKEN=<token>".to_owned());
+    }
     if tools.yt_dlp_version.is_none() {
         fixes.push("install yt-dlp in the binary-managed media venv".to_owned());
-    }
-    if tools.node_version.is_none()
-        && tools.deno_version.is_none()
-        && tools.bun_version.is_none()
-    {
-        fixes.push("install a JS runtime (node, deno or bun) for EJS challenges".to_owned());
     }
     fixes
 }
 
-fn auth_status() -> Value {
-    let store = InMemorySecretStore::new();
-    let env = OsEnv;
-    let mut services = serde_json::Map::new();
-    for service in [Service::Hf, Service::Github] {
-        let source = match lookup_token(service, &env, &store).map(|record| record.source) {
-            Some(TokenSource::Env) => "env",
-            Some(TokenSource::Keychain) => "keychain",
-            Some(TokenSource::CacheFile) => "cache_file",
-            Some(TokenSource::GhCli) => "gh_cli",
-            None | Some(TokenSource::None) => "none",
-        };
-        services.insert(
-            service.as_str().to_owned(),
-            json!({
-                "service": service.as_str(),
-                "label": service.label(),
-                "configured": source != "none",
-                "source": source,
-            }),
-        );
-    }
-    Value::Object(services)
+/// `get_auth_status()` equivalent, using env → keychain → none.
+fn auth_status() -> serde_json::Value {
+    let (value, _emitted) = paradl_resilience::auth::auth_status(&OsEnv, &KeychainSecretStore)
+        .unwrap_or_else(|_| (serde_json::Value::Object(serde_json::Map::new()), unreachable_event()));
+    value
 }
 
-fn platform_utilities() -> Value {
-    const UTILS: &[(&str, &[&str], &str)] = &[
-        ("caffeinate", &["/usr/bin/caffeinate"], "Built-in macOS binary (/usr/bin/caffeinate)"),
-        ("scutil", &["/usr/sbin/scutil"], "Built-in macOS binary (/usr/sbin/scutil)"),
-        ("pmset", &["/usr/bin/pmset"], "Built-in macOS binary (/usr/bin/pmset)"),
-        ("security", &["/usr/bin/security"], "Built-in macOS binary (/usr/bin/security)"),
-        ("codesign", &["/usr/bin/codesign"], "Run 'xcode-select --install' to install macOS developer tools"),
-        ("spctl", &["/usr/sbin/spctl"], "Built-in macOS binary (/usr/sbin/spctl)"),
-        ("xattr", &["/usr/bin/xattr"], "Built-in macOS binary (/usr/bin/xattr)"),
-    ];
-    let mut result = serde_json::Map::new();
-    for (name, fallbacks, fix) in UTILS {
+fn unreachable_event() -> paradl_resilience::Emitted {
+    paradl_resilience::Emitted::from(paradl_events::Event::AuthStatus(
+        paradl_events::AuthStatusEvent::new(0.0, serde_json::Value::Null),
+    ))
+}
+
+fn platform_utilities() -> PlatformUtilities {
+    fn row(name: &str, fallbacks: &[&str], fix: &str) -> UtilityRow {
         let path = tool_path(name, fallbacks);
-        result.insert(
-            (*name).to_owned(),
-            json!({"available": path.is_some(), "path": path, "fix": fix}),
-        );
+        UtilityRow { available: path.is_some(), path, fix: fix.to_owned() }
     }
-    Value::Object(result)
+    PlatformUtilities {
+        caffeinate: row("caffeinate", &["/usr/bin/caffeinate"], "Built-in macOS binary (/usr/bin/caffeinate)"),
+        scutil: row("scutil", &["/usr/sbin/scutil"], "Built-in macOS binary (/usr/sbin/scutil)"),
+        pmset: row("pmset", &["/usr/bin/pmset"], "Built-in macOS binary (/usr/bin/pmset)"),
+        security: row("security", &["/usr/bin/security"], "Built-in macOS binary (/usr/bin/security)"),
+        codesign: row("codesign", &["/usr/bin/codesign"], "Run 'xcode-select --install' to install macOS developer tools"),
+        spctl: row("spctl", &["/usr/sbin/spctl"], "Built-in macOS binary (/usr/sbin/spctl)"),
+        xattr: row("xattr", &["/usr/bin/xattr"], "Built-in macOS binary (/usr/bin/xattr)"),
+    }
 }
 
 #[cfg(test)]
@@ -502,13 +659,13 @@ mod tests {
     fn with_tools_does_not_enable_python_probing() {
         let tools = ToolProbe {
             yt_dlp_version: Some("2026.10.26".into()),
-            node_version: Some("v20.0.0".into()),
+            node_version: Some("v20.11.1".into()),
             ..ToolProbe::default()
         };
         let report = DoctorReport::collect(false).with_tools(&tools);
         assert!(!report.python_probed);
         assert!(report.render_human().contains("yt-dlp"));
         assert!(report.render_human().contains("2026.10.26"));
-        assert!(report.render_human().contains("v20.0.0"));
+        assert!(report.render_human().contains("v20.11.1"));
     }
 }

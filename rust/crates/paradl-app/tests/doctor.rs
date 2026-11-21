@@ -3,7 +3,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use paradl_app::{App, DoctorEnv, DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, ToolProbe};
+use paradl_app::{
+    App, DoctorEnv, DoctorReport, MEDIA_PACKAGE_VERSION, MEDIA_PROTOCOL, PlatformUtilities,
+    ToolProbe,
+};
 use paradl_cli::{Cli, Command, Dispatch, ExitCode, ParseOutcome};
 use serde_json::json;
 
@@ -23,10 +26,16 @@ fn fixed_report() -> DoctorReport {
         probe: ToolProbe {
             yt_dlp_version: Some("2026.10.26".into()),
             yt_dlp_path: Some("/opt/homebrew/bin/yt-dlp".into()),
+            js_runtime: Some("deno (/opt/homebrew/bin/deno)".into()),
             node_version: Some("v20.11.1".into()),
-            deno_version: None,
+            deno_version: Some("2.9.8".into()),
+            deno_path: Some("/opt/homebrew/bin/deno".into()),
             bun_version: None,
             ffmpeg_version: Some("7.0".into()),
+            ffmpeg_path: Some("/opt/homebrew/bin/ffmpeg".into()),
+            aria2c_path: Some("/opt/homebrew/bin/aria2c".into()),
+            afconvert_path: Some("/usr/bin/afconvert".into()),
+            ytdlp_ejs_version: Some("0.8.0".into()),
             npm_version: Some("10.2.4".into()),
             npm_path: Some("/opt/homebrew/bin/npm".into()),
         },
@@ -35,12 +44,11 @@ fn fixed_report() -> DoctorReport {
                 "hf": {"service": "hf", "label": "Hugging Face Hub", "configured": false, "source": "none"},
                 "github": {"service": "github", "label": "GitHub API", "configured": false, "source": "none"},
             }),
-            platform_utilities: json!({}),
-            ytdlp_ejs_version: None,
-            rust_engine_version: Some("0.1.0".into()),
+            platform_utilities: PlatformUtilities::default(),
+            rust_engine_version: None,
             npm_version: Some("10.2.4".into()),
             npm_path: Some("/opt/homebrew/bin/npm".into()),
-            fixes: vec![],
+            fixes: vec!["maturin develop --release  # build rust/paradl-rs into this venv".into()],
         },
     }
 }
