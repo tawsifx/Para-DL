@@ -55,6 +55,20 @@ fn help_does_not_advertise_retired_flags() {
 }
 
 #[test]
+fn docs_do_not_advertise_retired_flags() {
+    let cli_readme = include_str!("../README.md");
+    let net_readme = include_str!("../../paradl-net/README.md");
+    for stale in [
+        "the dropped adapter flags `--http3`/`--doh-endpoint`/`--accept-ranges`/`--total`",
+        "The legacy `--http3` flag is kept compatible by",
+    ] {
+        assert!(!cli_readme.contains(stale) && !net_readme.contains(stale), "stale docs: {stale}");
+    }
+    assert!(cli_readme.contains("--http3-probe"), "F59 must stay documented");
+    assert!(net_readme.contains("note_http3_drop"), "public compat shim must stay documented");
+}
+
+#[test]
 fn version_text_is_byte_exact_oracle_output() {
     const ORACLE_VERSION: &str = "parallel-dl (paradl) v1.0.0\n";
     assert_eq!(VERSION_TEXT, ORACLE_VERSION);

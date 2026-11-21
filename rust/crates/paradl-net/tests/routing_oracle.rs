@@ -494,3 +494,9 @@ fn http3_flag_is_log_dropped_with_reason() {
     // Calling the dropped-flag helper must be infallible and never enable HTTP/3.
     note_http3_drop();
 }
+
+#[test]
+fn http3_compat_shim_is_still_public_api() {
+    let _: fn() = paradl_net::note_http3_drop;
+    let _: &str = paradl_net::HTTP3_DROP_REASON;
+}

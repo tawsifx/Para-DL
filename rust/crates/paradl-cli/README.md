@@ -8,8 +8,10 @@ they are wired by `paradl-app` in W4-1.
 ## Public surface
 
 - `Cli` — clap-derived namespace for every flag in the parity matrix (~60 main flags,
-  the dropped adapter flags `--http3`/`--doh-endpoint`/`--accept-ranges`/`--total`, the
-  target-surface aliases, and all throttle flags).
+  `--doh-endpoint`, the retained `--http3-probe` (F59), the target-surface aliases,
+  and all throttle flags). At W5-3 the `--http3`/`--no-http3`, `--accept-ranges` and
+  `--total` flags and the `--install`/`--info`/`--hash` long forms were retired; the
+  corresponding subcommands are canonical.
 - `ThrottleCli` / `ThrottleSubcommand` — the standalone `pdl throttle …` parser.
 - `ParseOutcome` — `Command`, `Throttle`, `Help`, `ThrottleHelp`, `Version`.
 - `Command` and its typed payloads — the ~20 subcommands from parity matrix §1,
