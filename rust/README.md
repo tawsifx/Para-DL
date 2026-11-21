@@ -130,16 +130,14 @@ Formula automate exactly this layout (native binary in `bin/`, media venv in
 
 ```sh
 cd rust
-PYO3_PYTHON="$PWD/../.venv/bin/python" cargo test --all
-PYO3_PYTHON="$PWD/../.venv/bin/python" cargo clippy --all -- -D warnings
+cargo test --all
+cargo clippy --all -- -D warnings
 cargo doc --no-deps && cargo test --doc
 cargo build --all --all-features
 cargo build --all --no-default-features
 ```
 
-MSRV: Rust 1.98 (edition 2024). On this host, legacy `paradl-rs` needs
-`PYO3_PYTHON` pointed at a Python 3.12 interpreter; the new framework crates do
-not depend on PyO3.
+MSRV: Rust 1.98 (edition 2024).
 
 See the repository [CHANGELOG.md](../CHANGELOG.md) and
 `docs/superpowers/framework-charter.md` for the release and architecture policy.
