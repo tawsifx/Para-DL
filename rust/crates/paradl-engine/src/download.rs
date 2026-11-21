@@ -494,7 +494,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
         // These are DIRECT requests (no redirect for reqwest to strip on): scope
         // the caller's sensitive headers to the original host on every request.
         let headers = probe::scope_headers(&shared.headers, shared.header_host.as_deref(), uri.host_str());
-        let mut req = shared.client.get(uri.clone()).headers(headers);
+        let mut req = shared.client.get(uri.clone()).headers(headers.into_owned());
         if !stream_plain {
             req = req.header(RANGE, format!("bytes={pos}-{want_end}"));
         }
@@ -983,7 +983,7 @@ impl Download {
             // credentials to it during the probe either (reqwest only strips on
             // redirects, not on a direct GET to an alternate host).
             let scoped = probe::scope_headers(&opts.headers, opts.url.host_str(), candidate.host_str());
-            match probe::probe(client, candidate.clone(), scoped, cookie).await {
+            match probe::probe(client, candidate.clone(), scoped.into_owned(), cookie).await {
                 Ok(i) => {
                     info = Some(i);
                     break;

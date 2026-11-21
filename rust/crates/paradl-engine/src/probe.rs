@@ -7,6 +7,7 @@
 //
 // W1-2 addition: optional DNS-over-HTTPS behind the `doh` feature.
 
+use std::borrow::Cow;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
@@ -103,20 +104,20 @@ pub fn headers_from_pairs(pairs: Option<&std::collections::HashMap<String, Strin
 /// to policy over, so the same rule must be applied here explicitly. This mirrors
 /// reqwest's own sensitive-header set; benign headers (User-Agent, X-Trace-Id, …)
 /// pass through untouched.
-pub fn scope_headers(
-    headers: &HeaderMap,
+pub fn scope_headers<'a>(
+    headers: &'a HeaderMap,
     allowed_host: Option<&str>,
     target_host: Option<&str>,
-) -> HeaderMap {
+) -> Cow<'a, HeaderMap> {
     let same_host = matches!((allowed_host, target_host), (Some(a), Some(t)) if a.eq_ignore_ascii_case(t));
     if same_host {
-        return headers.clone();
+        return Cow::Borrowed(headers);
     }
     let mut out = headers.clone();
     let _ = out.remove(reqwest::header::AUTHORIZATION);
     let _ = out.remove(reqwest::header::COOKIE);
     let _ = out.remove(reqwest::header::PROXY_AUTHORIZATION);
-    out
+    Cow::Owned(out)
 }
 
 /// What a one-request look at a URL tells us before downloading.
@@ -335,4 +336,37 @@ fn build_doh_resolver(endpoint: &str) -> Result<DohResolver> {
     config.add_name_server(ns);
     let inner = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
     Ok(DohResolver { inner })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::borrow::Cow;
+    use reqwest::header::{AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION};
+
+    #[test]
+    fn scope_headers_borrows_same_host_and_owns_cross_host() {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer secret"));
+        headers.insert(COOKIE, HeaderValue::from_static("sid=1"));
+        headers.insert(PROXY_AUTHORIZATION, HeaderValue::from_static("Basic x"));
+        headers.insert("x-trace", HeaderValue::from_static("t"));
+
+        let same = scope_headers(&headers, Some("Example.COM"), Some("example.com"));
+        assert!(matches!(same, Cow::Borrowed(_)), "same host (case-insensitive) must not clone");
+        assert_eq!(same.get(AUTHORIZATION).unwrap(), "Bearer secret");
+
+        let cross = scope_headers(&headers, Some("a.example"), Some("b.example"));
+        assert!(matches!(cross, Cow::Owned(_)), "cross host must clone and strip");
+        for sensitive in [AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION] {
+            assert!(cross.get(sensitive).is_none(), "sensitive header leaked cross-host");
+        }
+        assert_eq!(cross.get("x-trace").unwrap(), "t");
+        assert!(headers.get(AUTHORIZATION).is_some(), "caller's map must be untouched");
+
+        // No host on either side keeps the existing (stripping) behavior.
+        let unknown = scope_headers(&headers, None, None);
+        assert!(matches!(unknown, Cow::Owned(_)));
+        assert!(unknown.get(AUTHORIZATION).is_none());
+    }
 }
