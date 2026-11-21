@@ -365,6 +365,7 @@ impl Shared {
     ///
     /// All blocking work runs on Tokio's blocking pool. Both mutex guards are dropped
     /// before the `.await`: only owned `Send + 'static` values cross into the closure.
+    /// Per-chunk writes are the deliberate exception and stay on the executor; see [`write_at`].
     async fn maybe_save(&self) {
         let now = Instant::now();
         {
@@ -414,6 +415,16 @@ enum WorkerEnd {
 
 /// Write `buf` at `offset` in the (sparse) part file. `pwrite` on Unix avoids seeks racing
 /// between workers; the portable fallback clones the descriptor (independent file cursor).
+///
+/// This deliberately stays on the Tokio executor instead of hopping through `spawn_blocking`.
+/// A worker first claims the exact byte range it writes from the planner and commits only after
+/// the call returns, so it touches only bytes it owns and no lock is held across the write: there
+/// is no shared cursor to serialize on. `write_all_at` and the cloned-descriptor fallback are
+/// page-cache-hit syscalls, so dispatching one blocking task per chunk would cost more than the
+/// write itself at up to 16 concurrent workers. The genuinely disk-blocking work is the part
+/// fsync and temp-file rename in the sidecar ([`save_sidecar_blocking`]), the final part-file
+/// rename ([`finalize_blocking`]), and the completed-file hash ([`verify_file`]); those are the
+/// operations A1 and `verify_file` offload.
 fn write_at(file: &std::fs::File, buf: &[u8], offset: u64) -> io::Result<()> {
     #[cfg(unix)]
     {
