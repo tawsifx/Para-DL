@@ -352,7 +352,7 @@ fn image_domain_classification_golden_values() {
 
 #[test]
 fn direct_extensions_are_a_single_constant_with_suffix_matching() {
-    assert_eq!(DIRECT_EXTENSIONS.len(), 58);
+    assert_eq!(DIRECT_EXTENSIONS.len(), 63);
     for ext in [
         ".zip", ".iso", ".dmg", ".exe", ".msi", ".pdf", ".mp4", ".mp3", ".tar", ".gz",
     ] {
@@ -364,6 +364,18 @@ fn direct_extensions_are_a_single_constant_with_suffix_matching() {
     assert!(has_direct_extension("file.ZIP"));
     assert!(!has_direct_extension("https://host/page.html"));
     assert!(!has_direct_extension("https://host/noext"));
+}
+
+#[test]
+fn font_extensions_are_direct_downloads() {
+    // Font assets fetched from mirrors (e.g. google/fonts via gh-proxy) must be
+    // classified as direct downloads, not delegated to the media worker.
+    for ext in [".ttf", ".otf", ".woff", ".woff2", ".eot"] {
+        assert!(DIRECT_EXTENSIONS.contains(&ext), "missing {ext}");
+    }
+    assert!(has_direct_extension(
+        "https://gh-proxy.com/https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/static/SpaceGrotesk-SemiBold.ttf"
+    ));
 }
 
 // ---------------------------------------------------------------------------
