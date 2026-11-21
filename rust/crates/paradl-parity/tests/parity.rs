@@ -11,7 +11,8 @@ use std::process::{Command, Stdio};
 
 use paradl_parity::{
     BoundaryCase, DiffReport, LoopbackServer, PythonGuard, boundary_process_exit_code, diff_bytes,
-    diff_snapshots, run_boundary_case, run_media_replay,
+    diff_snapshots, interrupt_payload, normalize_stdout_timestamps, run_boundary_case,
+    run_interrupt_resume_gate, run_media_replay,
 };
 use serde_json::Value;
 
@@ -215,6 +216,29 @@ fn diff_engine_detects_byte_differences() {
 }
 
 #[test]
+fn raw_stdout_diff_ignores_only_timestamps() {
+    let python = b"{\"event\": \"progress\", \"timestamp\": 1795200000.123, \"percent\": 50.0}\n";
+    let rust = b"{\"event\": \"progress\", \"timestamp\": 1795200999.987, \"percent\": 50.0}\n";
+    let mut clean = DiffReport::new("non-media", "timestamp-only");
+    clean.compare(
+        "stdout",
+        &normalize_stdout_timestamps(python),
+        &normalize_stdout_timestamps(rust),
+    );
+    assert!(clean.is_clean(), "{}", clean.render());
+
+    let rust_different = b"{\"event\": \"progress\", \"timestamp\": 1795200999.987, \"percent\": 49.0}\n";
+    let mut dirty = DiffReport::new("non-media", "payload-diff");
+    dirty.compare(
+        "stdout",
+        &normalize_stdout_timestamps(python),
+        &normalize_stdout_timestamps(rust_different),
+    );
+    assert!(!dirty.is_clean(), "a non-timestamp difference must fail");
+    assert_eq!(dirty.differences[0].field, "stdout");
+}
+
+#[test]
 fn loopback_server_serves_deterministic_bytes() {
     let server = LoopbackServer::start(b"paradl-loopback-golden".to_vec()).unwrap();
     let authority = server.url().strip_prefix("http://").unwrap();
@@ -227,6 +251,13 @@ fn loopback_server_serves_deterministic_bytes() {
     let response = String::from_utf8_lossy(&response);
     assert!(response.contains("paradl-loopback-golden"), "{response}");
     assert!(response.contains("200 OK"));
+}
+
+#[test]
+fn interrupt_resume_gate_preserves_part_and_sidecar() {
+    let report = run_interrupt_resume_gate(interrupt_payload()).unwrap();
+    assert!(report.is_clean(), "{}", report.render());
+    assert_eq!(report.case, "download-interrupt-resume");
 }
 
 #[test]

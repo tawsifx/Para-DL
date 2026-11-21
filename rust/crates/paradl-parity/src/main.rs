@@ -15,8 +15,8 @@
 use std::path::PathBuf;
 
 use paradl_parity::{
-    BoundaryCase, DiffReport, boundary_process_exit_code, run_boundary_case, run_media_replay,
-    run_nonmedia_case,
+    BoundaryCase, DiffReport, boundary_process_exit_code, run_boundary_case,
+    run_interrupt_resume_gate, run_media_replay, run_nonmedia_case,
 };
 use paradl_parity::diff::Difference;
 use paradl_parity::media::find_media_python;
@@ -116,6 +116,18 @@ fn run_nonmedia(args: &[String]) -> i32 {
                 eprintln!("[non-media/{}] error: {error}", case.name);
                 dirty = true;
             }
+        }
+    }
+    match run_interrupt_resume_gate(paradl_parity::interrupt_payload()) {
+        Ok(report) => {
+            print!("{}", report.render());
+            if !report.is_clean() {
+                dirty = true;
+            }
+        }
+        Err(error) => {
+            eprintln!("[non-media/download-interrupt-resume] error: {error}");
+            dirty = true;
         }
     }
     if dirty { 1 } else { 0 }

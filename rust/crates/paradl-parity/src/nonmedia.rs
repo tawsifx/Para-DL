@@ -18,9 +18,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use paradl_core::Error;
+use paradl_app::{App, Capture};
+use paradl_cli::{Cli, Command as AppCommand, Dispatch, ExitCode, ParseOutcome};
+use paradl_core::{Error, PDLConfig};
+use paradl_engine::ResumeState;
 
-use crate::diff::{DiffReport, diff_snapshots, normalize_jsonl, snapshot_dir};
+use crate::diff::{
+    DiffReport, Difference, diff_snapshots, normalize_jsonl, normalize_stdout_timestamps,
+    snapshot_dir,
+};
 
 /// A deterministic loopback HTTP server shared by both sides of a case.
 pub struct LoopbackServer {
@@ -30,11 +36,19 @@ pub struct LoopbackServer {
 }
 
 impl LoopbackServer {
-    /// Start a server serving `body` on an ephemeral loopback port.
+    /// Start a server serving `body` immediately on an ephemeral loopback port.
     ///
     /// The response includes stable `Accept-Ranges`/`ETag` headers so routing
     /// and range probing are reproducible without the public internet.
     pub fn start(body: Vec<u8>) -> std::io::Result<Self> {
+        Self::start_with_delay(body, 0)
+    }
+
+    /// Start a server that delays each response by `delay_ms`.
+    ///
+    /// The delay makes a cooperative interrupt deterministic: it gives the
+    /// harness time to set the engine cancel flag while the transfer is live.
+    pub fn start_with_delay(body: Vec<u8>, delay_ms: u64) -> std::io::Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr()?.port();
         let stop = Arc::new(AtomicBool::new(false));
@@ -43,18 +57,9 @@ impl LoopbackServer {
             let _ = listener.set_nonblocking(true);
             while !thread_stop.load(Ordering::Relaxed) {
                 match listener.accept() {
-                    Ok((mut stream, _)) => {
-                        let mut request = [0_u8; 4096];
-                        let _ = stream.read(&mut request);
-                        let headers = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\
-                             Content-Length: {}\r\nAccept-Ranges: bytes\r\n\
-                             ETag: \"pdl-parity-golden\"\r\nConnection: close\r\n\r\n",
-                            body.len(),
-                        );
-                        if stream.write_all(headers.as_bytes()).is_ok() {
-                            let _ = stream.write_all(&body);
-                        }
+                    Ok((stream, _)) => {
+                        let bytes = body.clone();
+                        thread::spawn(move || serve_one(stream, bytes, delay_ms));
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(10));
@@ -74,6 +79,76 @@ impl LoopbackServer {
     pub fn url(&self) -> &str {
         &self.url
     }
+}
+
+/// Serve one loopback request with stable `200`/`206` semantics and no network.
+fn serve_one(mut stream: std::net::TcpStream, body: Vec<u8>, delay_ms: u64) {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+    let mut request = Vec::new();
+    let mut byte = [0_u8; 1];
+    while request.len() < 16 * 1024 {
+        match stream.read(&mut byte) {
+            Ok(0) => break,
+            Ok(_) => {
+                request.push(byte[0]);
+                if request.ends_with(b"\r\n\r\n") {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    let text = String::from_utf8_lossy(&request);
+    let first_line = text.lines().next().unwrap_or("");
+    let is_head = first_line.starts_with("HEAD");
+    let range = text.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("range")
+            .then(|| value.trim().to_owned())
+    });
+    let (status, start, end) = match range
+        .as_deref()
+        .and_then(|value| value.strip_prefix("bytes="))
+        .and_then(parse_range)
+    {
+        Some((start, end)) => ("206 Partial Content", start, end.min(body.len().saturating_sub(1))),
+        None => ("200 OK", 0, body.len().saturating_sub(1)),
+    };
+    let slice = if start <= end && end < body.len() {
+        &body[start..=end]
+    } else {
+        &[][..]
+    };
+    if delay_ms > 0 {
+        thread::sleep(Duration::from_millis(delay_ms));
+    }
+    let mut headers = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: application/octet-stream\r\n\
+         Content-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"pdl-parity-golden\"\r\n\
+         Connection: close\r\n",
+        slice.len(),
+    );
+    if range.is_some() && start <= end {
+        headers.push_str(&format!(
+            "Content-Range: bytes {start}-{end}/{}\r\n",
+            body.len()
+        ));
+    }
+    headers.push_str("\r\n");
+    if stream.write_all(headers.as_bytes()).is_ok() && !is_head {
+        let _ = stream.write_all(slice);
+    }
+    let _ = stream.flush();
+}
+
+fn parse_range(value: &str) -> Option<(usize, usize)> {
+    let (start, end) = value.split_once('-')?;
+    let start = start.trim().parse::<usize>().ok()?;
+    let end = match end.trim() {
+        "" => usize::MAX,
+        text => text.parse::<usize>().ok()?,
+    };
+    Some((start, end))
 }
 
 impl Drop for LoopbackServer {
@@ -156,16 +231,22 @@ impl NonMediaCase {
 
 /// The representative corpus used by the live gate.
 ///
-/// Cases are intentionally small; the full CLI/flag/event corpus is enumerated
-/// in `docs/superpowers/parity-matrix.md` and these rows are its representative
-/// sample. The download case is descriptive-only until the W4-1 reference
-/// binary implements it (`deferred` is surfaced in the report, never hidden).
+/// The full CLI/flag/event corpus is enumerated in
+/// `docs/superpowers/parity-matrix.md`; these rows are its representative
+/// sample. Since W4-1 landed the engine-backed binary, `download` is a **gated**
+/// case: real bytes, `.pdl.part` / `.pdl.json` sidecars, stdout, stderr, JSONL
+/// and exit code are all compared byte-for-byte against the Python oracle.
 pub fn corpus() -> Vec<NonMediaCase> {
     vec![
         NonMediaCase::new("version", &["--version"], &["C20", "F85"]),
         NonMediaCase::new("help", &["--help"], &["F13", "F29", "F36", "F37"]),
         NonMediaCase::new("doctor-json", &["doctor", "--json"], &["C05", "C22", "E10", "E27", "E28"]),
         NonMediaCase::new("info-json", &["info", "{url}", "--json"], &["C07", "E37"]),
+        NonMediaCase::new(
+            "download",
+            &["{url}", "-o", "{out}", "--json", "--non-interactive"],
+            &["C01", "E46", "E56", "E59", "L14"],
+        ),
     ]
 }
 
@@ -257,6 +338,7 @@ pub fn run_nonmedia_case(
         case.rows.join(", ")
     ));
     report.note("both sides use the same loopback server; stdin/args/env matched");
+    report.note("stdout/stderr/files/sidecars/exit byte-exact except JSONL timestamp values -> <TS>");
     report.note("Rust side: PARADL_ASSERT_NO_PYTHON=1 + poisoned PATH (X05/X06)");
     if let Some(reason) = &case.deferred {
         report.note(format!("deferred: {reason}"));
@@ -320,7 +402,12 @@ pub fn run_nonmedia_case(
         &python_exit.to_string().into_bytes(),
         &rust_exit.to_string().into_bytes(),
     );
-    report.compare("stdout", &python_side.stdout, &rust_side.stdout);
+    // Raw stdout stays byte-exact EXCEPT for live wall-clock `timestamp`
+    // values, which are replaced by a stable token. For non-JSONL output the
+    // normalizer is a byte-for-byte no-op.
+    let python_stdout = normalize_stdout_timestamps(&python_side.stdout);
+    let rust_stdout = normalize_stdout_timestamps(&rust_side.stdout);
+    report.compare("stdout", &python_stdout, &rust_stdout);
     report.compare("stderr", &python_side.stderr, &rust_side.stderr);
     if guard.triggered() {
         report.differences.push(crate::diff::Difference {
@@ -354,4 +441,165 @@ pub fn run_nonmedia_case(
         python_exit,
         rust_exit,
     })
+}
+
+/// Deterministic payload used by the interrupt/resume gate.
+pub fn interrupt_payload() -> Vec<u8> {
+    (0..96 * 1024).map(|index| (index % 251) as u8).collect()
+}
+
+/// Interrupt/resume gate: drive the **real** engine through the online app
+/// entry point, cancel it cooperatively mid-transfer, and assert that exit code
+/// `130` and byte-exact `.pdl.part` / `.pdl.json` sidecars survive.
+///
+/// This is a Rust-side contract gate (a Python process cannot be cancelled
+/// through the app's cooperative flag deterministically); it complements the
+/// two-sided `download` corpus case rather than replacing any comparison.
+pub fn run_interrupt_resume_gate(body: Vec<u8>) -> Result<DiffReport, Error> {
+    let server = LoopbackServer::start_with_delay(body.clone(), 350)?;
+    let out = std::env::temp_dir().join(format!(
+        "paradl-parity-interrupt-{}-{}",
+        std::process::id(),
+        body.len(),
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    std::fs::create_dir_all(&out)
+        .map_err(|error| Error::failure(format!("cannot create {}: {error}", out.display())))?;
+
+    let parsed = Cli::parse_command_line(vec![
+        server.url().to_owned(),
+        "-o".to_owned(),
+        out.display().to_string(),
+        "--json".to_owned(),
+    ])
+    .map_err(|error| Error::failure(format!("cannot parse interrupt command: {error}")))?;
+    let ParseOutcome::Command(cli) = parsed else {
+        return Err(Error::failure("interrupt command did not parse to a Cli"));
+    };
+    let command = AppCommand::from_cli(&cli)
+        .map_err(|error| Error::failure(format!("cannot build download command: {error}")))?;
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    let flag = Arc::clone(&cancel);
+    let canceller = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(40));
+        flag.store(true, Ordering::Relaxed);
+    });
+
+    let capture = Capture::default();
+    let mut app = App::with_config(PDLConfig::default()).with_output(capture.sink());
+    app.disable_history_recording();
+    app.set_cancel(cancel);
+    let code = app.handle(&command, &cli);
+    canceller
+        .join()
+        .map_err(|_| Error::failure("cancel thread panicked"))?;
+
+    let mut report = DiffReport::new("non-media", "download-interrupt-resume");
+    report.note("real paradl-engine transfer via App::with_config + cooperative cancel");
+    report.note("no offline shim; no Python spawn on this non-media path");
+    report.compare(
+        "exit_code",
+        ExitCode::Interrupted.as_i32().to_string().as_bytes(),
+        code.as_i32().to_string().as_bytes(),
+    );
+    let events = capture.contents();
+    if !events.contains("\"exit_code\": 130") {
+        report.differences.push(Difference {
+            field: "jsonl:exit_code".to_owned(),
+            expected: "\"exit_code\": 130".to_owned(),
+            actual: preview_events(&events),
+        });
+    }
+
+    let part = out.join("origin.bin.pdl.part");
+    let sidecar = out.join("origin.bin.pdl.json");
+    let state = if sidecar.is_file() {
+        let first = std::fs::read(&sidecar)
+            .map_err(|error| Error::failure(format!("cannot read sidecar: {error}")))?;
+        let second = std::fs::read(&sidecar)
+            .map_err(|error| Error::failure(format!("cannot re-read sidecar: {error}")))?;
+        if first != second {
+            report.differences.push(Difference {
+                field: "sidecar:pdl.json stability".to_owned(),
+                expected: "byte-identical on repeated read".to_owned(),
+                actual: "<unstable>".to_owned(),
+            });
+        }
+        match ResumeState::load(&sidecar) {
+            Ok(state) => {
+                report.compare(
+                    "sidecar:size",
+                    body.len().to_string().as_bytes(),
+                    state.size.to_string().as_bytes(),
+                );
+                report.compare(
+                    "sidecar:url",
+                    server.url().as_bytes(),
+                    state.url.as_str().as_bytes(),
+                );
+                report.compare(
+                    "sidecar:dest",
+                    out.join("origin.bin").display().to_string().as_bytes(),
+                    state.dest.display().to_string().as_bytes(),
+                );
+                Some(state)
+            }
+            Err(error) => {
+                report.differences.push(Difference {
+                    field: "sidecar:pdl.json parse".to_owned(),
+                    expected: "valid ResumeState v1".to_owned(),
+                    actual: error.to_string(),
+                });
+                None
+            }
+        }
+    } else {
+        report.differences.push(Difference {
+            field: "sidecar:pdl.json".to_owned(),
+            expected: "<present>".to_owned(),
+            actual: "<missing>".to_owned(),
+        });
+        None
+    };
+
+    if !part.is_file() {
+        report.differences.push(Difference {
+            field: "sidecar:pdl.part".to_owned(),
+            expected: "<present>".to_owned(),
+            actual: "<missing>".to_owned(),
+        });
+    } else {
+        let bytes = std::fs::read(&part)
+            .map_err(|error| Error::failure(format!("cannot read part file: {error}")))?;
+        if bytes.is_empty() {
+            report.differences.push(Difference {
+                field: "sidecar:pdl.part bytes".to_owned(),
+                expected: "non-empty part file".to_owned(),
+                actual: "<empty>".to_owned(),
+            });
+        }
+        // The part file may be pre-allocated to the full size with out-of-order
+        // segments. Verify every range the sidecar claims against the source,
+        // exactly as the engine's owning tests do; an early interrupt is
+        // allowed to leave the segment table empty.
+        if let Some(state) = state {
+            for segment in &state.segments {
+                let (start, cursor) = (segment.start as usize, segment.cursor as usize);
+                if cursor > start && (cursor > bytes.len() || bytes[start..cursor] != body[start..cursor]) {
+                    report.differences.push(Difference {
+                        field: format!("sidecar:pdl.part bytes[{start}..{cursor}]"),
+                        expected: "source payload bytes".to_owned(),
+                        actual: "part bytes differ".to_owned(),
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    Ok(report)
+}
+
+fn preview_events(events: &str) -> String {
+    events.chars().take(200).collect()
 }

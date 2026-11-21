@@ -124,6 +124,79 @@ pub fn diff_text(field: impl Into<String>, expected: &str, actual: &str) -> Opti
     diff_bytes(field, expected.as_bytes(), actual.as_bytes())
 }
 
+/// Replace the numeric value of every JSON `timestamp` field with the stable
+/// token `"<TS>"`, leaving **all other bytes untouched**.
+///
+/// This is used on the raw-stdout channel for JSONL-mode cases: both the Python
+/// oracle and the Rust binary emit live wall-clock values, so a byte compare of
+/// the unmodified streams would flag a difference on every event. The scan is
+/// deliberately textual (not a JSON re-serialization) so field order, spacing,
+/// and every other byte remain byte-exact. Non-UTF-8 output and streams without
+/// a numeric `timestamp` field are returned unchanged.
+///
+/// ```
+/// use paradl_parity::normalize_stdout_timestamps;
+/// let a = br#"{"event":"x","timestamp":1.1,"n":1}"#;
+/// let b = br#"{"event":"x","timestamp":9.9,"n":1}"#;
+/// assert_eq!(normalize_stdout_timestamps(a), normalize_stdout_timestamps(b));
+/// let c = br#"{"event":"x","timestamp":9.9,"n":2}"#;
+/// assert_ne!(normalize_stdout_timestamps(a), normalize_stdout_timestamps(c));
+/// ```
+pub fn normalize_stdout_timestamps(bytes: &[u8]) -> Vec<u8> {
+    const KEY: &str = "\"timestamp\"";
+    let text = match std::str::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(_) => return bytes.to_vec(),
+    };
+    if !text.contains(KEY) {
+        return bytes.to_vec();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0;
+    while let Some(relative) = text[cursor..].find(KEY) {
+        let start = cursor + relative;
+        let key_end = start + KEY.len();
+        let after_key = &text[key_end..];
+        let replaced = after_key
+            .find(':')
+            .and_then(|colon| {
+                let before_colon = &after_key[..colon];
+                if !before_colon.chars().all(|ch: char| ch.is_ascii_whitespace()) {
+                    return None;
+                }
+                let after_colon = &after_key[colon + 1..];
+                let whitespace = after_colon
+                    .len()
+                    - after_colon
+                        .trim_start_matches(|ch: char| ch.is_ascii_whitespace())
+                        .len();
+                let number_at = colon + 1 + whitespace;
+                let number = &after_key[number_at..];
+                let length = number
+                    .bytes()
+                    .take_while(|byte| {
+                        byte.is_ascii_digit() || matches!(byte, b'-' | b'+' | b'.' | b'e' | b'E')
+                    })
+                    .count();
+                (length > 0).then_some((number_at, length))
+            });
+        match replaced {
+            Some((number_at, length)) => {
+                out.push_str(&text[cursor..key_end]);
+                out.push_str(&after_key[..number_at]);
+                out.push_str("\"<TS>\"");
+                cursor = key_end + number_at + length;
+            }
+            None => {
+                out.push_str(&text[cursor..key_end]);
+                cursor = key_end;
+            }
+        }
+    }
+    out.push_str(&text[cursor..]);
+    out.into_bytes()
+}
+
 /// Parse newline-delimited JSONL, replacing each `timestamp` with `0.0`.
 ///
 /// Wall-clock timestamps are inherently nondeterministic; the harness compares
@@ -231,5 +304,40 @@ mod tests {
         assert_eq!(normalized.len(), 2);
         assert!(normalized[0].get("timestamp").is_none());
         assert_eq!(normalized[0]["n"], 1);
+    }
+
+    #[test]
+    fn raw_stdout_normalizer_ignores_timestamp_but_keeps_everything_else_byte_exact() {
+        let first = br#"{"event": "x", "timestamp": 1.125, "n": 1}
+"#;
+        let second = br#"{"event": "x", "timestamp": 99.875, "n": 1}
+"#;
+        let different_payload = br#"{"event": "x", "timestamp": 99.875, "n": 2}
+"#;
+        assert_eq!(
+            normalize_stdout_timestamps(first),
+            normalize_stdout_timestamps(second),
+        );
+        assert_ne!(
+            normalize_stdout_timestamps(first),
+            normalize_stdout_timestamps(different_payload),
+        );
+        let normalized = String::from_utf8(normalize_stdout_timestamps(first)).unwrap();
+        assert!(normalized.contains("\"event\": \"x\""), "{normalized}");
+        assert!(normalized.contains("\"timestamp\": \"<TS>\""), "{normalized}");
+        assert!(normalized.contains("\"n\": 1"), "{normalized}");
+    }
+
+    #[test]
+    fn raw_stdout_normalizer_is_a_noop_for_non_json_and_non_numeric_timestamps() {
+        let plain = b"parallel-dl (paradl) v1.0.0\n";
+        assert_eq!(normalize_stdout_timestamps(plain), plain.to_vec());
+        let non_numeric = br#"{"event":"x","timestamp":"<TS>","n":1}"#;
+        assert_eq!(
+            normalize_stdout_timestamps(non_numeric),
+            non_numeric.to_vec(),
+        );
+        let binary = [0xff, 0xfe, 0x00, b'"', b't', b'i', b'm', b'e', 0x80];
+        assert_eq!(normalize_stdout_timestamps(&binary), binary.to_vec());
     }
 }

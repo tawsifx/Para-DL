@@ -42,8 +42,12 @@ the same URL. It captures and compares, byte-for-byte:
 - produced files and `.pdl.part` / `.pdl.json` sidecars (hex snapshot),
 - exit codes.
 
-JSONL is additionally compared structurally with `timestamp` removed, so a
-wall-clock difference is never mistaken for a payload difference.
+The raw stdout bytes are compared byte-for-byte **except** that the numeric
+value of each JSON `timestamp` field is replaced by the stable token `"<TS>"`
+(`normalize_stdout_timestamps`). This is a textual substitution: field order,
+spacing and every other byte remain exact, and non-JSONL output is untouched.
+JSONL is additionally compared structurally with `timestamp` removed. No other
+field is normalized.
 
 **Process policy (X05/X06).** The Rust side runs with
 `PARADL_ASSERT_NO_PYTHON=1` *and* a `PATH` whose `python`/`python3` are poison
@@ -61,13 +65,16 @@ corpus is deliberately small and spans the main categories:
 | `--help` | F13, F29, F36, F37 | stdout (usage/help text) |
 | `doctor --json` | C05, C22, E10, E27, E28 | JSONL stdout |
 | `info <loopback> --json` | C07, E37 | loopback routing, JSONL, exit code |
-| download (descriptive) | C01, E46, E56, E59, L14 | files + `.pdl.*` sidecars |
+| `download <loopback> -o {out} --json --non-interactive` | C01, E46, E56, E59, L14 | **gated**: bytes + `.pdl.*` sidecars + stdout/stderr/JSONL/exit |
 
-The harness itself supports the download/files/sidecar channels; the corpus
-entry is intentionally not enabled as a default gate while the W4-1 reference
-binary is still a placeholder (see honesty caveat below). The diff engine for
-stdout/stderr/JSONL/files/sidecars/exit codes is covered by
-`diff_engine_detects_byte_differences`.
+With W4-1's engine-backed binary landed, the non-media lane is now the **full
+criterion-2 gate**, not a mechanism demo. The download case drives a real
+transfer on both sides against one loopback server (with HEAD/Range support);
+success must produce byte-identical files with both sidecars cleaned. A second,
+deterministic interrupt/resume gate (`run_interrupt_resume_gate`) drives the
+online `App::with_config` engine with a cooperative cancel and asserts exit
+`130` plus byte-exact `.pdl.part` / `.pdl.json` preservation and a valid
+`ResumeState` — no offline shim, no Python spawn.
 
 ## Lane 2 — media (golden replay, no live network)
 
@@ -101,21 +108,24 @@ asserts. All other clean cases return `0`. See
 
 ## Honesty caveats (no warm-cache/drift victories claimed)
 
-- **Current non-media state:** at this worktree HEAD the `paradl` binary is the
-  Wave-0 placeholder (`--version`, `doctor`, `--help`); W4-1 wiring has not
-  landed. Running `non-media` therefore reports real differences (version
-  `1.0.0` vs `0.1.0`, full argparse help vs short help, full `doctor` JSON vs
-  the placeholder line, `info` exit 2 vs 0). The harness is the gate
-  *mechanism*; those rows turn green when the reference binary lands. The lane
-  is never made green by normalization or by hiding rows.
+- **Current non-media result:** `--version`, `--help`, the gated `download`
+  file/sidecar channels, and the interrupt/resume gate are CLEAN. The lane
+  still reports **real** parity differences in `doctor --json` (Python emits
+  an extra `diagnose` event and richer tool/auth fields; Rust emits one
+  `doctor` event) and `info --json` / `download` JSONL (event sets and field
+  shapes differ, e.g. Python's `target_classified`/`progress` vs Rust's
+  `result`-only). These are genuine W4-1 event-contract gaps, reported
+  verbatim; nothing is normalized away or hidden to force green.
 - **No-Python proof is scoped:** the poison-`PATH` canary proves the Rust
   process does not spawn `python`/`python3`; it does not trace arbitrary
   `execve` of a renamed interpreter.
 - **Media startup:** only the Python worker's spawn overhead is measured
   (`startup_ms`), and only on this lane. A warm interpreter is not a
   throughput win; no cold/warm number here supports a performance claim.
-- **Timestamps and ports:** JSONL `timestamp` is removed before comparison;
-  the loopback port is equal for both sides within a case but not across runs.
+- **Timestamps and ports:** JSONL `timestamp` is removed in the structural
+  comparison and replaced by `<TS>` in the raw-stdout comparison; no other
+  field is normalized. The loopback port is equal for both sides within a case
+  but not across runs.
 - **Bytes/tags are Python-owned:** Rust deliberately has no extractor. The
   media lane proves the bridge preserves the golden protocol payload, JSONL,
   bytes, and tags; it does not claim Rust produced them.
