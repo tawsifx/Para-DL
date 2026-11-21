@@ -5,9 +5,13 @@
 //! crate test suite that established the byte-exact contract. This test is the
 //! W4-1 audit that no row was left without an executable proof.
 
+const RETIRED_CLI_FLAG_ROWS: &[&str] = &["F09", "F11", "F60"];
+
 /// Return the proving path for a parity-matrix row id (e.g. `C05`, `P21`).
 fn proving_path(row: &str) -> Option<&'static str> {
     match row {
+        // Retired at W5-3; Python oracle deleted — no proving path.
+        "F09" | "F11" | "F60" => None,
         // ---- W4-1 owned rows: proved here -------------------------------
         "C01" | "C05" | "C07" | "C15" | "C16" | "C17" | "C18" | "C22" | "C52" => {
             Some("paradl-app/tests/dispatch.rs")
@@ -63,6 +67,19 @@ fn assert_rows(prefix: char, end: u32) {
     }
 }
 
+fn assert_rows_excluding(prefix: char, end: u32, retired: &[&str]) {
+    for index in 1..=end {
+        let row = format!("{prefix}{index:02}");
+        if retired.contains(&row.as_str()) {
+            continue;
+        }
+        assert!(
+            proving_path(&row).is_some(),
+            "parity row {row} has no proving path"
+        );
+    }
+}
+
 #[test]
 fn every_cli_subcommand_row_has_a_proving_path() {
     assert_rows('C', 52);
@@ -70,7 +87,14 @@ fn every_cli_subcommand_row_has_a_proving_path() {
 
 #[test]
 fn every_cli_flag_row_has_a_proving_path() {
-    assert_rows('F', 92);
+    assert_rows_excluding('F', 92, RETIRED_CLI_FLAG_ROWS);
+}
+
+#[test]
+fn retired_cli_flag_rows_are_not_audited() {
+    for row in ["F09", "F11", "F60"] {
+        assert_eq!(proving_path(row), None, "retired row {row} still claims a proving path");
+    }
 }
 
 #[test]
