@@ -378,7 +378,7 @@ Seeded L01–L15 preserved; L16+ enumerate the remaining exact strings/numbers/f
 | L39 | power guard: free disk `>= remaining + margin`, `margin = max(5% remaining, min(10% remaining, 64 MiB), 1 KiB)` → `ExitCode.FAILURE(1)`; `--require-ac` on battery → 1 (`DEV_CONTEXT §3`) | W2-4 | guard tests |
 | L40 | Watchdog v2 constants: `threshold = max(user_floor, 0.5*rolling_p90)` at ≥3 samples; `grace_period = 5s` (min 2); 5 low samples / 5s periodic; 2s min cooldown; 4-hour hour buckets `00-03..20-23`; staleness 70% of `speed_after` (`DEV_CONTEXT §3`) | W1-3 | `test_watchdog.py` |
 
-> F08/F09/F10/F11 in §2 similarly record target-Rust flags absent from today's Python parser; they stay as acceptance rows, not as claims about current source.
+> F08/F10 in §2 similarly record target-Rust flags absent from today's Python parser; they stay as acceptance rows, not as claims about current source. F09 and F11 are retired at W5-3 — see the retired-rows table above.
 
 ---
 

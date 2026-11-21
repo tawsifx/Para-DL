@@ -504,7 +504,7 @@ impl Cli {
 }
 
 /// The exact `usage:` block argparse prints before an error: the prefix of
-/// [`HELP_TEXT`] through the `[targets ...]` line (1,978 bytes).
+/// [`HELP_TEXT`] through the `[targets ...]` line (1,850 bytes).
 pub fn usage_block() -> &'static str {
     let split = HELP_TEXT
         .find("\n\n")
