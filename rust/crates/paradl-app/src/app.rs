@@ -29,7 +29,7 @@ use paradl_events::{
 };
 use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
 use paradl_postproc::{PostProcessor, checksum};
-use paradl_resilience::auth::{InMemorySecretStore, OsEnv, Service, TokenSource, lookup_token};
+use paradl_resilience::auth::{OsEnv, Service, TokenSource, lookup_token};
 use paradl_store::{QueueJob, SqliteStore, Store, TransferRecord};
 use paradl_ui::event_summary;
 use paradl_watchdog::{ThroughputSample, WatchdogController, py_round};
@@ -559,6 +559,18 @@ impl App {
                 .and_then(|store| store.record_transfer(&record));
         }
 
+        // Best-effort origin metadata on the real transfer path only: never
+        // offline, never on failure, and outside the JSON output block. The
+        // seam emits no event and its result is discarded, so it cannot change
+        // an exit code.
+        if !self.offline && success {
+            let _ = crate::platform_store::apply_origin_metadata(
+                paradl_platform::current(),
+                &dest,
+                &[target.to_owned()],
+            );
+        }
+
         if cli.json {
             // The oracle emits one progress event at transfer start, built
             // from the real engine's first snapshot (never fabricated).
@@ -1008,8 +1020,8 @@ impl App {
             }
             return self.fail(json, &Error::usage("auth action needs a service: hf or github"));
         };
-        let platform = paradl_platform::NoopPlatform;
-        use paradl_platform::Platform;
+        let platform = paradl_platform::current();
+        let store = crate::platform_store::PlatformSecretStore::new(platform);
         match command.action {
             AuthAction::Set => {
                 let token = if self.offline {
@@ -1032,7 +1044,6 @@ impl App {
                 ExitCode::Ok
             }
             AuthAction::Status => {
-                let store = InMemorySecretStore::new();
                 let record = lookup_token(service, &OsEnv, &store);
                 if let Some(record) = &record {
                     paradl_events::register_secret(&record.token);
@@ -1050,7 +1061,7 @@ impl App {
     }
 
     fn auth_status(&self, json: bool) -> ExitCode {
-        let store = InMemorySecretStore::new();
+        let store = crate::platform_store::PlatformSecretStore::new(paradl_platform::current());
         let mut services = serde_json::Map::new();
         for service in [Service::Hf, Service::Github] {
             let record = lookup_token(service, &OsEnv, &store);

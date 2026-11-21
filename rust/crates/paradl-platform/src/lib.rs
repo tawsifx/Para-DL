@@ -80,3 +80,53 @@ pub use macos::MacOSPlatform;
 pub mod windows;
 #[cfg(feature = "platform-windows")]
 pub use windows::WindowsPlatform;
+
+/// Select the active [`Platform`] for the host OS and enabled feature.
+///
+/// This is the one deliberate trait-object seam in the framework: choosing an
+/// implementation at runtime from `#[cfg(all(feature, target_os))]` cannot be
+/// expressed with static dispatch without duplicating every call site into
+/// `cfg` blocks. All other charter traits stay zero-cost static-dispatch bounds.
+///
+/// The arms are mutually exclusive: `platform-macos` on macOS yields
+/// `MacOSPlatform`, `platform-windows` on Windows yields `WindowsPlatform`,
+/// and a disabled feature or a non-matching OS yields the safe [`NoopPlatform`].
+#[cfg(all(feature = "platform-macos", target_os = "macos"))]
+pub fn current() -> &'static dyn Platform {
+    static P: MacOSPlatform = MacOSPlatform { keychain: None };
+    &P
+}
+
+/// Select the active [`Platform`] for the host OS and enabled feature.
+///
+/// This is the one deliberate trait-object seam in the framework: choosing an
+/// implementation at runtime from `#[cfg(all(feature, target_os))]` cannot be
+/// expressed with static dispatch without duplicating every call site into
+/// `cfg` blocks. All other charter traits stay zero-cost static-dispatch bounds.
+///
+/// The arms are mutually exclusive: `platform-macos` on macOS yields
+/// `MacOSPlatform`, `platform-windows` on Windows yields `WindowsPlatform`,
+/// and a disabled feature or a non-matching OS yields the safe [`NoopPlatform`].
+#[cfg(all(feature = "platform-windows", target_os = "windows"))]
+pub fn current() -> &'static dyn Platform {
+    static P: WindowsPlatform = WindowsPlatform { store_path: None };
+    &P
+}
+
+/// Select the active [`Platform`] for the host OS and enabled feature.
+///
+/// This is the one deliberate trait-object seam in the framework: choosing an
+/// implementation at runtime from `#[cfg(all(feature, target_os))]` cannot be
+/// expressed with static dispatch without duplicating every call site into
+/// `cfg` blocks. All other charter traits stay zero-cost static-dispatch bounds.
+///
+/// The arms are mutually exclusive: `platform-macos` on macOS yields
+/// `MacOSPlatform`, `platform-windows` on Windows yields `WindowsPlatform`,
+/// and a disabled feature or a non-matching OS yields the safe [`NoopPlatform`].
+#[cfg(not(any(
+    all(feature = "platform-macos", target_os = "macos"),
+    all(feature = "platform-windows", target_os = "windows")
+)))]
+pub fn current() -> &'static dyn Platform {
+    &NoopPlatform
+}
