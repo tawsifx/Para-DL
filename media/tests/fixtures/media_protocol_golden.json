@@ -1,0 +1,165 @@
+{
+  "protocol_id": "paradl-media/1",
+  "current_major": 1,
+  "fixed_versions": {
+    "worker_version": "0.1.0",
+    "yt_dlp_version": "2026.10.26",
+    "mutagen_version": "1.48.1",
+    "ffmpeg_version": "7.0"
+  },
+  "fixed_caps": ["ejs", "mutagen", "ffmpeg"],
+  "byte_exact_contracts": {
+    "http_headers": "values coerced to str, keys unchanged",
+    "filename": "sanitize_filename: 200-char cap, Windows reserved names",
+    "audio_format_produced": "classify_audio_production (media.py:48-72)"
+  },
+  "byte_exact": {
+    "raw_http_headers": {
+      "Referer": "https://www.youtube.com/",
+      "X-Count": 42,
+      "X-None": null
+    },
+    "coerced_http_headers": {
+      "Referer": "https://www.youtube.com/",
+      "X-Count": "42",
+      "X-None": "None"
+    },
+    "filename_input": "a/b:c*d?e\"f<g>h|i",
+    "filename_output": "a_b_c_d_e_f_g_h_i",
+    "sanitize_200_cap_len": 200,
+    "sanitize_CON": "_CON",
+    "sanitize_NUL_txt": "_NUL.txt"
+  },
+  "version_conformance": [
+    {"label": "N", "protocol": "paradl-media/1", "accepted": true, "exit_code": 0, "diagnostic": null},
+    {"label": "minor-N+1", "protocol": "paradl-media/1.1", "accepted": true, "exit_code": 0, "diagnostic": null},
+    {"label": "minor-large", "protocol": "paradl-media/1.999", "accepted": true, "exit_code": 0, "diagnostic": null},
+    {"label": "N-1", "protocol": "paradl-media/0", "accepted": false, "exit_code": 4, "diagnostic": "unsupported protocol major version"},
+    {"label": "N+1", "protocol": "paradl-media/2", "accepted": false, "exit_code": 4, "diagnostic": "unsupported protocol major version"},
+    {"label": "unknown", "protocol": "paradl-media/99", "accepted": false, "exit_code": 4, "diagnostic": "unsupported protocol major version"},
+    {"label": "missing", "protocol": null, "accepted": false, "exit_code": 4, "diagnostic": "protocol version missing"},
+    {"label": "unparseable", "protocol": "garbage", "accepted": false, "exit_code": 4, "diagnostic": "unparseable protocol version"},
+    {"label": "empty-major", "protocol": "paradl-media/", "accepted": false, "exit_code": 4, "diagnostic": "unparseable protocol version"}
+  ],
+  "error_kind_to_exit_code": {
+    "metadata": 1,
+    "download": 1,
+    "conversion": 1,
+    "dependency": 4,
+    "usage": 2,
+    "interrupted": 130
+  },
+  "worker_never_emits": 3,
+  "audio_format_production": {
+    "lossless_source_codecs": ["alac", "ape", "flac", "pcm", "pcm_f32le", "pcm_s16le", "pcm_s24le", "wav", "wv"],
+    "cases": [
+      {"requested_codec": "aac", "source_acodec": "mp4a.40.2", "conversion_mode": "passthrough_aac", "result": "passthrough AAC (from mp4a source, no re-encode)"},
+      {"requested_codec": "aac", "source_acodec": "mp4a.40.2", "conversion_mode": "alac", "result": "ALAC-wrapped lossy (transcoded from lossy mp4a source)"},
+      {"requested_codec": "alac", "source_acodec": "mp4a.40.2", "conversion_mode": "alac", "result": "ALAC-wrapped lossy (transcoded from lossy mp4a source)"},
+      {"requested_codec": "alac", "source_acodec": "alac", "conversion_mode": "alac", "result": "true lossless ALAC (from lossless alac source)"},
+      {"requested_codec": "flac", "source_acodec": "flac", "conversion_mode": "native", "result": "true lossless FLAC (from flac source)"},
+      {"requested_codec": "flac", "source_acodec": "mp4a.40.2", "conversion_mode": "native", "result": "FLAC (transcoded from lossy mp4a source)"},
+      {"requested_codec": "flac", "source_acodec": "opus", "conversion_mode": "native", "result": "FLAC (transcoded from lossy opus source)"},
+      {"requested_codec": "wav", "source_acodec": "mp3", "conversion_mode": "native", "result": "uncompressed WAV PCM (from mp3 source)"},
+      {"requested_codec": "wav", "source_acodec": "pcm_s16le", "conversion_mode": "native", "result": "uncompressed WAV PCM (from pcm_s16le source)"},
+      {"requested_codec": "mp3", "source_acodec": "mp3", "conversion_mode": "native", "result": "MP3 (from mp3 source)"},
+      {"requested_codec": "aac", "source_acodec": null, "conversion_mode": "passthrough_aac", "result": "passthrough AAC (from unknown source, no re-encode)"},
+      {"requested_codec": "aac", "source_acodec": "unknown.codec.x", "conversion_mode": "passthrough_aac", "result": "passthrough AAC (from unknown source, no re-encode)"},
+      {"requested_codec": "flac", "source_acodec": "FLAC", "conversion_mode": "native", "result": "true lossless FLAC (from flac source)"},
+      {"requested_codec": "OPUS", "source_acodec": "vorbis", "conversion_mode": "native", "result": "OPUS (from vorbis source)"}
+    ]
+  },
+  "golden_cases": [
+    {
+      "name": "claims_youtube",
+      "request": {
+        "protocol": "paradl-media/1",
+        "request_id": "claims-1",
+        "op": "claims",
+        "target": "https://www.youtube.com/watch?v=x",
+        "out_dir": "/tmp",
+        "options": {}
+      },
+      "expected_data": {
+        "filename": "",
+        "http_headers": {},
+        "audio_format_produced": null,
+        "paths": [],
+        "claims": true
+      },
+      "expected_exit": 0
+    },
+    {
+      "name": "resolve_audio_mp4a",
+      "request": {
+        "protocol": "paradl-media/1",
+        "request_id": "resolve-1",
+        "op": "resolve",
+        "target": "https://www.youtube.com/watch?v=audio",
+        "out_dir": "/tmp",
+        "options": {"audio_only": true, "format": "m4a"}
+      },
+      "mock_info": {
+        "track": "Song (Official Video)",
+        "artist": "Artist",
+        "album": "Album",
+        "upload_date": "20240115",
+        "thumbnail": "https://img.example/thumb.jpg",
+        "acodec": "mp4a.40.2",
+        "ext": "m4a",
+        "url": "https://cdn.example/audio.m4a",
+        "http_headers": {"Referer": "https://www.youtube.com/", "X-Count": 42, "X-None": null},
+        "duration": 123.0,
+        "filesize": 456789
+      },
+      "expected_data": {
+        "filename": "Artist - Song",
+        "http_headers": {"Referer": "https://www.youtube.com/", "X-Count": "42", "X-None": "None"},
+        "audio_format_produced": "passthrough AAC (from mp4a source, no re-encode)",
+        "paths": [],
+        "claims": true,
+        "managed": false,
+        "direct_url": "https://cdn.example/audio.m4a",
+        "ext": "m4a",
+        "title": "Song",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "2024",
+        "thumbnail_url": "https://img.example/thumb.jpg",
+        "source_acodec": "mp4a.40.2",
+        "duration": 123.0,
+        "filesize": 456789,
+        "is_playlist": false,
+        "webpage_url": "https://www.youtube.com/watch?v=audio"
+      },
+      "expected_exit": 0
+    },
+    {
+      "name": "dependency_missing_ytdlp",
+      "request": {
+        "protocol": "paradl-media/1",
+        "request_id": "dep-1",
+        "op": "resolve",
+        "target": "https://www.youtube.com/watch?v=audio",
+        "out_dir": "/tmp",
+        "options": {}
+      },
+      "missing_ytdlp": true,
+      "expected_error": {"kind": "dependency"},
+      "expected_exit": 4
+    },
+    {
+      "name": "usage_bad_op",
+      "request": {
+        "protocol": "paradl-media/1",
+        "request_id": "usage-1",
+        "op": "bogus",
+        "target": "https://example.com",
+        "out_dir": "/tmp",
+        "options": {}
+      },
+      "expected_error": {"kind": "usage"},
+      "expected_exit": 2
+    }
+  ]
+}

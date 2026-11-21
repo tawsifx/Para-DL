@@ -1,0 +1,18 @@
+[package]
+name = "paradl-cli"
+description = "clap command-line parser: flags, subcommands, environment variables, and dispatch trait"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-cli"
+keywords = ["paradl", "cli", "clap", "command-line"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap.workspace = true
+paradl-core = { path = "../paradl-core" }

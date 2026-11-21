@@ -1,0 +1,43 @@
+[package]
+name = "paradl-engine"
+description = "Download engine: planner, state, limiter, verification, probe, and transfer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-engine"
+keywords = ["paradl", "download", "engine", "rapids"]
+categories = ["network-programming"]
+
+[features]
+default = []
+# Opt-in DNS-over-HTTPS via hickory-resolver. With this feature off the engine
+# uses the operating system resolver only (framework charter section 5).
+doh = ["dep:hickory-resolver"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+tokio.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+md-5.workspace = true
+sha1.workspace = true
+crc32fast.workspace = true
+base64.workspace = true
+hex.workspace = true
+httpdate.workspace = true
+url.workspace = true
+futures.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+hickory-resolver = { version = "0.25", features = ["tokio", "https-ring"], optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

@@ -1,0 +1,27 @@
+[package]
+name = "paradl-platform"
+description = "Byte-exact macOS/Windows metadata and OS keychain integration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-platform"
+keywords = ["paradl", "platform", "macos", "windows", "keychain"]
+categories = ["os"]
+
+[features]
+default = []
+platform-macos = []
+platform-windows = []
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+hex = { workspace = true }

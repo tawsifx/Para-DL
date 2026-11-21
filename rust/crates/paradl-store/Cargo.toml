@@ -1,0 +1,23 @@
+[package]
+name = "paradl-store"
+description = "SQLite persistence: history.db v4 migrations, WAL, and the device+inode guard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-store"
+keywords = ["paradl", "sqlite", "history", "storage"]
+categories = ["database"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

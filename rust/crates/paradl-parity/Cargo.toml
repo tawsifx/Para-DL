@@ -1,0 +1,27 @@
+[package]
+name = "paradl-parity"
+description = "Three-lane differential harness (non-media, media, boundary); development only"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "paradl-parity"
+path = "src/main.rs"
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-media = { path = "../paradl-media" }
+paradl-events = { path = "../paradl-events" }
+# The interrupt/resume gate drives the real engine through the app entry point
+# (online `App::with_config` + cooperative cancel), never the offline shim.
+paradl-app = { path = "../paradl-app" }
+paradl-cli = { path = "../paradl-cli" }
+paradl-engine = { path = "../paradl-engine" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+sha2.workspace = true

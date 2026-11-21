@@ -1,0 +1,35 @@
+[package]
+name = "paradl-media"
+description = "Rust-side protocol client/router for the Python media worker (no extractor logic)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-media"
+keywords = ["paradl", "media", "protocol", "worker"]
+categories = ["command-line-utilities"]
+
+[features]
+default = []
+# Workspace-level opt-in flag consumed by the `paradl` binary. The client API is
+# always compiled: it has no optional system tools of its own.
+media = []
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-events = { path = "../paradl-events" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

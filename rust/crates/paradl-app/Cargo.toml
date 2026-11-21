@@ -1,0 +1,52 @@
+[package]
+name = "paradl-app"
+description = "Application orchestration wiring all framework crates for the reference binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-app"
+keywords = ["paradl", "app", "orchestration", "cli"]
+categories = ["command-line-utilities"]
+
+[features]
+default = []
+# The opt-in surfaces are forwarded from the reference binary. Every default
+# build compiles with NO optional system tools and NO Python on non-media paths.
+api = ["dep:paradl-api", "paradl-api/api", "dep:async-trait"]
+tui = ["paradl-ui/tui"]
+media = ["dep:paradl-media", "paradl-media/media"]
+platform-macos = ["paradl-platform/platform-macos"]
+platform-windows = ["paradl-platform/platform-windows"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-cli = { path = "../paradl-cli" }
+paradl-net = { path = "../paradl-net" }
+paradl-engine = { path = "../paradl-engine" }
+paradl-store = { path = "../paradl-store" }
+paradl-watchdog = { path = "../paradl-watchdog" }
+paradl-throttle = { path = "../paradl-throttle" }
+paradl-postproc = { path = "../paradl-postproc" }
+paradl-platform = { path = "../paradl-platform" }
+paradl-events = { path = "../paradl-events" }
+paradl-resilience = { path = "../paradl-resilience" }
+paradl-ui = { path = "../paradl-ui" }
+paradl-media = { path = "../paradl-media", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+url = { workspace = true }
+paradl-api = { path = "../paradl-api", optional = true }
+async-trait = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Protocol handshake is asserted in the handoff tests even when the binary's
+# `media` feature is off; the client itself has no optional system tools.
+paradl-media = { path = "../paradl-media" }
+tempfile = { workspace = true }

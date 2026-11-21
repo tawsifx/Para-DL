@@ -1,0 +1,19 @@
+{
+  "state_version": 1,
+  "part_suffix": ".pdl.part",
+  "state_suffix": ".pdl.json",
+  "sidecar_pretty_json": "{\n  \"version\": 1,\n  \"url\": \"http://x/a.bin\",\n  \"final_url\": \"http://x/a.bin\",\n  \"dest\": \"<DEST>/a.bin\",\n  \"size\": 100,\n  \"validators\": {\n    \"etag\": \"\\\"e\\\"\",\n    \"etag_host\": \"x\",\n    \"last_modified\": null\n  },\n  \"segments\": [\n    {\n      \"start\": 0,\n      \"cursor\": 10,\n      \"end\": 50\n    },\n    {\n      \"start\": 50,\n      \"cursor\": 60,\n      \"end\": 100\n    }\n  ],\n  \"content_type\": null,\n  \"checksum\": null\n}",
+  "validators": {
+    "etag": "\"e\"",
+    "etag_host": "x",
+    "last_modified": null
+  },
+  "planner": {
+    "from0": 0,
+    "to0": 104857600,
+    "from1": 52428800,
+    "to1": 104857600
+  },
+  "hash_algo": "Sha256",
+  "sha256_digest": "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
+}

@@ -1,0 +1,49 @@
+{
+  "name": "ytdlp_j_replay_resolve_audio_mp4a",
+  "protocol_id": "paradl-media/1",
+  "note": "Recorded (not invented) from media/tests/fixtures/media_protocol_golden.json::resolve_audio_mp4a with yt-dlp/mutagen/ffmpeg mocked; no live network is used by the media lane.",
+  "target": "https://cdn.example/watch?v=audio",
+  "options": {"audio_only": true, "format": "m4a"},
+  "mock_info": {
+    "track": "Song (Official Video)",
+    "artist": "Artist",
+    "album": "Album",
+    "upload_date": "20240115",
+    "thumbnail": "https://img.example/thumb.jpg",
+    "acodec": "mp4a.40.2",
+    "ext": "m4a",
+    "url": "https://cdn.example/audio.m4a",
+    "http_headers": {"Referer": "https://www.youtube.com/", "X-Count": 42, "X-None": null},
+    "duration": 123.0,
+    "filesize": 456789
+  },
+  "versions": {
+    "worker_version": "0.1.0",
+    "yt_dlp_version": "2026.10.26",
+    "mutagen_version": "1.48.1",
+    "ffmpeg_version": "7.0"
+  },
+  "caps": ["ejs", "mutagen", "ffmpeg"],
+  "ticks": [
+    {"downloaded_bytes": 0, "total_bytes": 1000, "speed_bps": 1000.0, "eta_seconds": 1.0},
+    {"downloaded_bytes": 500, "total_bytes": 1000, "speed_bps": 1000.0, "eta_seconds": 0.5},
+    {"downloaded_bytes": 1000, "total_bytes": 1000, "speed_bps": 1000.0, "eta_seconds": 0.0}
+  ],
+  "expected_data": {
+    "filename": "Artist - Song",
+    "http_headers": {"Referer": "https://www.youtube.com/", "X-Count": "42", "X-None": "None"},
+    "audio_format_produced": "passthrough AAC (from mp4a source, no re-encode)",
+    "paths": []
+  },
+  "expected_tags": {"title": "Song", "artist": "Artist", "album": "Album", "year": "2024"},
+  "expected_progress": [
+    {"event": "progress", "title": "https://cdn.example/watch?v=audio", "downloaded_bytes": 0, "total_bytes": 1000, "percent": 0.0, "speed_bps": 1000.0, "eta_seconds": 1.0},
+    {"event": "progress", "title": "https://cdn.example/watch?v=audio", "downloaded_bytes": 500, "total_bytes": 1000, "percent": 50.0, "speed_bps": 1000.0, "eta_seconds": 0.5},
+    {"event": "progress", "title": "https://cdn.example/watch?v=audio", "downloaded_bytes": 1000, "total_bytes": 1000, "percent": 100.0, "speed_bps": 1000.0, "eta_seconds": 0.0}
+  ],
+  "artifact": {
+    "filename": "artifact.m4a",
+    "size": 32,
+    "sha256": "1c26b9c8bc139042492d739a30c54595db0683f62c0fdb2928cb90b3b88dd39e"
+  }
+}

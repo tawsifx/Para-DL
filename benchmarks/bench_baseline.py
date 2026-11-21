@@ -9,8 +9,22 @@ No network access is used: every case operates on locally generated data.
 
 Usage:
     python benchmarks/bench_baseline.py --tag baseline
-    python benchmarks/bench_baseline.py --tag after
+    python benchmarks/bench_baseline.py --tag after --reps 3
     python benchmarks/bench_baseline.py --compare benchmarks/results/baseline.json
+
+Honesty rules (W4-3)
+--------------------
+* Every case is measured with >=3 reps; the reported p50 is a steady-state
+  median (one warm-up call precedes timing), not a cold-process-start number.
+  The true cold-start comparison lives in bench_rust_engine.py.
+* No network URLs are used (all data is generated locally), so the
+  "identical URLs" requirement is N/A here; it is enforced in
+  bench_rust_engine.py where both engines hit one loopback URL.
+* Warm-cache artifacts are NOT wins: the ~140,000x mirror cache-hit number in
+  PARALLEL_DL_DEV_CONTEXT.md sec.7 is a cache artifact, and the ~1.2-1.3x
+  cross-run drift on untouched cases is machine noise, not a code win.
+* Unmeasurable metrics are written as {"value": null, "reason": "..."} and are
+  never invented. Media process-startup belongs to the W4-2 media lane only.
 """
 
 from __future__ import annotations
@@ -35,6 +49,18 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+# W5-2 cutover retirement: every `from paradl...` import below targets the pure
+# Python oracle deleted in W5-1 (`src/paradl/**`). There is no Python
+# implementation left to microbenchmark, so those imports are intentionally
+# unreachable and the harness emits null+reason rows instead of crashing. The
+# honesty block (including the drift caveats) is preserved verbatim below.
+ORACLE_DIR = SRC / "paradl"
+ORACLE_RETIRED_REASON = (
+    "Retired in the W5-1 cutover: src/paradl/** (the Python oracle these pure-Python "
+    "microbenchmarks measure) was deleted; the Rust framework now owns these paths. "
+    "No value is reported because there is no implementation left to time."
+)
 
 # Scales: (label, size) -- small / medium / high-concurrency-stress analogue
 SCALES: list[tuple[str, int]] = [("small", 200), ("medium", 2_000), ("stress", 20_000)]
@@ -211,18 +237,27 @@ def _max_rss_mb() -> float:
     return rss / (1024 * 1024) if sys.platform == "darwin" else rss / 1024
 
 
+def _cpu_seconds() -> float:
+    import resource
+
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    return float(usage.ru_utime + usage.ru_stime)
+
+
 def measure_one(name: str, scale: int, fn, iters: int, units: int, reps: int = 3) -> dict[str, Any]:
     fn()  # warm-up / correctness smoke
     samples: list[float] = []
     total_time = 0.0
     tracemalloc.start()
     before = _max_rss_mb()
+    cpu_before = _cpu_seconds()
     for _ in range(reps):
         for _i in range(iters):
             t0 = time.perf_counter()
             fn()
             samples.append(time.perf_counter() - t0)
         total_time += sum(samples[-iters:])
+    cpu_total = _cpu_seconds() - cpu_before
     _, traced_peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     after = _max_rss_mb()
@@ -230,6 +265,7 @@ def measure_one(name: str, scale: int, fn, iters: int, units: int, reps: int = 3
         "case": name,
         "scale": scale,
         "iterations": iters * reps,
+        "reps": reps,
         "units_per_call": units,
         "p50_ms": _percentile(samples, 0.5) * 1000,
         "p95_ms": _percentile(samples, 0.95) * 1000,
@@ -238,17 +274,70 @@ def measure_one(name: str, scale: int, fn, iters: int, units: int, reps: int = 3
         "throughput_units_per_s": (units * iters * reps / total_time) if total_time else math.inf,
         "traced_peak_kb": traced_peak / 1024,
         "rss_delta_mb": after - before,
+        "cpu_seconds_total": round(cpu_total, 4),
+        "cpu_ms_per_call": (
+            round(1000 * cpu_total / (iters * reps), 4) if iters * reps else None
+        ),
     }
 
 
-def run(tag: str, only: str | None) -> dict[str, Any]:
-    result: dict[str, Any] = {"tag": tag, "python": sys.version.split()[0], "results": []}
+HONESTY = {
+    "drift": (
+        "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md "
+        "sec.7 is measurement noise, NOT a code-attributable win."
+    ),
+    "warm_cache": (
+        "Warm-cache effects are NOT wins: the ~140,000x mirror cache-hit number "
+        "in sec.7 is a cache artifact. The mirror cold cases here vary URLs to "
+        "avoid cache hits; p50 is a steady-state median, not a cold-start claim."
+    ),
+    "identical_urls": (
+        "No network URLs are used: every case operates on locally generated "
+        "data, so an identical-URL requirement is N/A for this harness. The "
+        "loopback-URL identity rule is enforced in bench_rust_engine.py."
+    ),
+    "unfair_metrics": (
+        "Metrics that cannot be measured fairly are written as "
+        "{'value': null, 'reason': '...'} and never invented."
+    ),
+    "media_process_startup": (
+        "Media process startup is measured only on the W4-2 media lane, not here."
+    ),
+}
+
+
+def run(tag: str, only: str | None, reps: int = 3) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "tag": tag,
+        "python": sys.version.split()[0],
+        "reps": reps,
+        "honesty": HONESTY,
+        "results": [],
+    }
+    if not ORACLE_DIR.is_dir():
+        result["status"] = "retired"
+        result["reason"] = ORACLE_RETIRED_REASON
+        for name in BUILDERS:
+            for label, size in SCALES:
+                result["results"].append({
+                    "case": name,
+                    "scale": size,
+                    "label": label,
+                    "value": None,
+                    "reason": ORACLE_RETIRED_REASON,
+                })
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        out = RESULTS_DIR / f"{tag}.json"
+        out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        print(f"ORACLE RETIRED (W5-1 cutover): {ORACLE_RETIRED_REASON}")
+        print(f"Saved -> {out}")
+        return result
     for name, builder in BUILDERS.items():
         if only and only not in name:
             continue
         for label, size in SCALES:
             fn, iters, units = builder(size)
-            row = measure_one(name, size, fn, iters, units)
+            row = measure_one(name, size, fn, iters, units, reps=reps)
             row["label"] = label
             result["results"].append(row)
             print(
@@ -273,7 +362,7 @@ def compare(path: Path, current: dict[str, Any]) -> None:
     print("-" * 84)
     for r in current["results"]:
         o = old.get((r["case"], r["label"]))
-        if not o or r["p50_ms"] == 0:
+        if not o or not r.get("p50_ms"):
             continue
         sp = o["p50_ms"] / r["p50_ms"]
         print(
@@ -287,8 +376,11 @@ def main() -> None:
     ap.add_argument("--tag", default="run", help="result file name (basename, .json added)")
     ap.add_argument("--only", default=None, help="run only cases whose name contains this")
     ap.add_argument("--compare", type=Path, default=None, help="compare against a baseline JSON")
+    ap.add_argument("--reps", type=int, default=3, help="measurement repetitions per case (default: 3)")
     args = ap.parse_args()
-    result = run(args.tag, args.only)
+    if args.reps < 3:
+        ap.error("--reps must be >= 3 (W4-3 cold-median criterion)")
+    result = run(args.tag, args.only, reps=args.reps)
     if args.compare:
         compare(args.compare, result)
 

@@ -1,0 +1,33 @@
+[package]
+name = "paradl-ui"
+description = "Progress display and opt-in ratatui TUI consuming paradl-events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-ui"
+keywords = ["paradl", "progress", "tui", "ratatui"]
+categories = ["command-line-utilities"]
+
+[features]
+default = []
+tui = ["dep:ratatui"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-events = { path = "../paradl-events" }
+serde_json = { workspace = true }
+ratatui = { workspace = true, optional = true }
+
+[[example]]
+name = "plain_progress"
+path = "examples/plain_progress.rs"
+
+[[example]]
+name = "tui_preview"
+path = "examples/tui_preview.rs"
+required-features = ["tui"]

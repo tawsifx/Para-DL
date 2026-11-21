@@ -1,0 +1,19 @@
+[package]
+name = "paradl-watchdog"
+description = "Anti-throttle watchdog state machine, percentiles, cooldown, learned profiles, supervision"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-watchdog"
+keywords = ["paradl", "watchdog", "anti-throttle", "percentile"]
+categories = ["network-programming"]
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }

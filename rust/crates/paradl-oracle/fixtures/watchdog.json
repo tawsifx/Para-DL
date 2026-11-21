@@ -1,0 +1,246 @@
+{
+  "watchdog_action_types": {
+    "NONE": "none",
+    "PAUSE_UNPAUSE": "tier2_pause_unpause",
+    "RESILIENCE_RECYCLE": "resilience_recycle",
+    "ADJUST_CONNECTIONS": "adjust_connections",
+    "SWITCH_IP_FAMILY": "switch_ip_family",
+    "PROCESS_RESTART": "tier3_restart",
+    "SINGLE_STREAM_FALLBACK": "single_stream_fallback"
+  },
+  "compute_percentile": {
+    "single": 100.0,
+    "p90_10": 9.1,
+    "empty": 0.0,
+    "p90_5": 16000.0
+  },
+  "watchdog_low_speed_scenario": {
+    "first_four": [
+      {
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      }
+    ],
+    "fifth": {
+      "action": "tier2_pause_unpause",
+      "reason": "Speed 500 B/s < 2.4 KB/s floor; cycling 16 RPC sockets",
+      "new_connections": 16,
+      "new_ip_family": null,
+      "threshold_bps": 2500.0,
+      "rolling_p90_bps": 5000.0,
+      "cycle": 1,
+      "event_type": null
+    },
+    "low_speed_consecutive_after_4": 4,
+    "cycle_count_after_5th": 1
+  },
+  "watchdog_straggler_scenario": {
+    "first": {
+      "action": "none",
+      "reason": "",
+      "new_connections": null,
+      "new_ip_family": null,
+      "threshold_bps": 500000.0,
+      "rolling_p90_bps": 1000000.0,
+      "cycle": 0,
+      "event_type": null
+    },
+    "second": {
+      "action": "tier2_pause_unpause",
+      "reason": "Straggler connection 48.8 KB/s < 488.3 KB/s/4; cycling 16 RPC sockets",
+      "new_connections": 16,
+      "new_ip_family": null,
+      "threshold_bps": 500000.0,
+      "rolling_p90_bps": 1000000.0,
+      "cycle": 1,
+      "event_type": null
+    },
+    "straggler_consecutive_after_first": 0,
+    "cycle_count": 1
+  },
+  "watchdog_periodic_scenario": {
+    "steps": [
+      {
+        "t": 1.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 1000,
+        "rolling_p90_bps": 0.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "t": 2.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 1000,
+        "rolling_p90_bps": 0.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "t": 3.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "t": 4.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 0,
+        "event_type": null
+      },
+      {
+        "t": 5.0,
+        "action": "tier2_pause_unpause",
+        "reason": "Periodic 5s cycle (speed 4.9 KB/s); cycling 16 RPC sockets",
+        "new_connections": 16,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 1,
+        "event_type": null
+      },
+      {
+        "t": 6.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 1,
+        "event_type": null
+      },
+      {
+        "t": 7.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 1,
+        "event_type": null
+      },
+      {
+        "t": 8.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 1,
+        "event_type": null
+      },
+      {
+        "t": 9.0,
+        "action": "none",
+        "reason": "",
+        "new_connections": null,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 1,
+        "event_type": null
+      },
+      {
+        "t": 10.0,
+        "action": "tier2_pause_unpause",
+        "reason": "Periodic 5s cycle (speed 4.9 KB/s); cycling 16 RPC sockets",
+        "new_connections": 16,
+        "new_ip_family": null,
+        "threshold_bps": 2500.0,
+        "rolling_p90_bps": 5000.0,
+        "cycle": 2,
+        "event_type": null
+      }
+    ],
+    "cycle_count": 2
+  },
+  "watchdog_resilience_scenario": {
+    "action": "resilience_recycle",
+    "reason": "[STALL] no progress for 30s",
+    "new_connections": null,
+    "new_ip_family": null,
+    "threshold_bps": 1000,
+    "rolling_p90_bps": 0.0,
+    "cycle": 1,
+    "event_type": "stall"
+  },
+  "watchdog_init": {
+    "connections": 16,
+    "mode": "v2",
+    "user_floor_bps": 1000,
+    "is_active": true,
+    "exhausted": false,
+    "disabled_reason": null,
+    "status_label": "Watchdog v2: <1000 B/s (cycles: 0, 16 streams)",
+    "current_threshold_bps": 1000
+  },
+  "watchdog_action_event_line": "{\"event\": \"watchdog_action\", \"timestamp\": 1763376000.123, \"cycle\": 1, \"mode\": \"v2\", \"action\": \"tier2_pause_unpause\", \"resilience_event\": null, \"reason\": \"5 low samples\", \"speed_bps\": 500.0, \"threshold_bps\": 1000.0, \"rolling_p90_bps\": 2000.0, \"connections\": 16}\n",
+  "watchdog_action_event_fields": [
+    "event",
+    "timestamp",
+    "cycle",
+    "mode",
+    "action",
+    "resilience_event",
+    "reason",
+    "speed_bps",
+    "threshold_bps",
+    "rolling_p90_bps",
+    "connections"
+  ]
+}

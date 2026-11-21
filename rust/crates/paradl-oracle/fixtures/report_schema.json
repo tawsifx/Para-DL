@@ -1,0 +1,131 @@
+{
+  "schema_version": "1.0",
+  "run_id": "",
+  "mode": "quick",
+  "isp": "Unknown ISP",
+  "plan_mbps": null,
+  "timestamp": "",
+  "budget": {
+    "limit_bytes": 314572800,
+    "planned_worst_case_bytes": 0,
+    "actual_used_bytes": 0,
+    "exceeded": false
+  },
+  "environment": {
+    "loopback_bps": 0.0,
+    "loopback_ok": true,
+    "active_interface": "en0",
+    "interface_type": "Ethernet",
+    "ssid": "",
+    "wifi_link_mbps": null,
+    "vpn_or_tunnel_active": false,
+    "tunnel_interfaces": [],
+    "cpu_load_1m": 0.0,
+    "competing_bytes_total": 0,
+    "competing_processes": [],
+    "on_battery": false,
+    "contaminated": false,
+    "warnings": []
+  },
+  "targets": [],
+  "modules": {
+    "m0_sanity": {
+      "loopback_bps": 0.0,
+      "loopback_ok": true,
+      "active_interface": "en0",
+      "interface_type": "Ethernet",
+      "ssid": "",
+      "wifi_link_mbps": null,
+      "vpn_or_tunnel_active": false,
+      "tunnel_interfaces": [],
+      "cpu_load_1m": 0.0,
+      "competing_bytes_total": 0,
+      "competing_processes": [],
+      "on_battery": false,
+      "contaminated": false,
+      "warnings": []
+    },
+    "m1_baseline": {
+      "resolver_dns_ms": {},
+      "targets": []
+    },
+    "m2_single_flow": [],
+    "m3_flow_scaling": [],
+    "m4_destination_independence": {
+      "host_a": "",
+      "host_b": "",
+      "solo_a_bps": 0.0,
+      "solo_b_bps": 0.0,
+      "concurrent_a_bps": 0.0,
+      "concurrent_b_bps": 0.0,
+      "concurrent_total_bps": 0.0,
+      "independence_ratio": 1.0
+    },
+    "m5_burst_bucket": [],
+    "m6_policing_shaping": [],
+    "m7_protocol_port": [],
+    "m8_time_volume_upload": {
+      "session_start_probe_bps": 0.0,
+      "session_end_probe_bps": 0.0,
+      "session_drift_ratio": 1.0,
+      "volume_tested_bytes": 0,
+      "volume_pre_step_bps": 0.0,
+      "volume_post_step_bps": 0.0,
+      "volume_step_down_at_bytes": null,
+      "download_bps": 0.0,
+      "upload_bps": 0.0,
+      "asymmetry_ratio": 1.0,
+      "samples": []
+    },
+    "m9_ground_truth": {
+      "proxy_url_redacted": null,
+      "direct_1_bps": null,
+      "proxy_1_bps": null,
+      "direct_16_bps": null,
+      "proxy_16_bps": null,
+      "proxy_speedup_ratio": null,
+      "own_server_random_bps": null,
+      "own_server_video_bps": null,
+      "own_server_port_sweep": {},
+      "udp_echo_loss_pct": null
+    },
+    "m10_local_vs_intl": {
+      "domestic_median_bps": null,
+      "international_median_bps": null,
+      "isp_cached_median_bps": null,
+      "domestic_16_bps": null,
+      "international_16_bps": null,
+      "isp_cached_16_bps": null,
+      "shared_slow_upstream_asn": null,
+      "fast_international_asns": [],
+      "slow_international_asns": [],
+      "traces": []
+    }
+  },
+  "verdicts": [],
+  "notes": [],
+  "time_of_day_status": "insufficient time data",
+  "next_best_hours": [],
+  "primary_evidence_mode": "paired_same_moment",
+  "recommended_profile": {
+    "source": "throttle-probe",
+    "domestic_connections": 16,
+    "international_connections": 8,
+    "default_connections": 16,
+    "recycle_interval_sec": 15.0,
+    "use_mirrors": true,
+    "try_http3": false,
+    "try_tunnel": false,
+    "ip_family": "auto",
+    "recovery_action": "tier2_pause_unpause",
+    "explanation": []
+  },
+  "isp_evidence_summary": {
+    "isp": "Unknown ISP",
+    "dates": [],
+    "targets_tested": [],
+    "methodology": [],
+    "measured_numbers": [],
+    "neutral_questions": []
+  }
+}

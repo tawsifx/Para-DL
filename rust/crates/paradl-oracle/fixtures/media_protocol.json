@@ -1,0 +1,254 @@
+{
+  "protocol_id": "paradl-media/1",
+  "current_major": 1,
+  "request_fields": [
+    "protocol",
+    "request_id",
+    "op",
+    "target",
+    "out_dir",
+    "options"
+  ],
+  "options_fields": [
+    "audio_only",
+    "format",
+    "cookies_from_browser"
+  ],
+  "progress_fields": [
+    "protocol",
+    "request_id",
+    "frame",
+    "downloaded_bytes",
+    "total_bytes",
+    "speed_bps",
+    "eta_seconds"
+  ],
+  "result_fields": [
+    "protocol",
+    "request_id",
+    "frame",
+    "ok",
+    "versions",
+    "caps",
+    "data"
+  ],
+  "error_fields": [
+    "protocol",
+    "request_id",
+    "frame",
+    "ok",
+    "error",
+    "versions"
+  ],
+  "versions_fields": [
+    "worker_version",
+    "yt_dlp_version",
+    "mutagen_version",
+    "ffmpeg_version"
+  ],
+  "data_fields": [
+    "filename",
+    "http_headers",
+    "audio_format_produced",
+    "paths"
+  ],
+  "ops": [
+    "resolve",
+    "download_managed",
+    "finalize",
+    "claims"
+  ],
+  "frames": [
+    "progress",
+    "result",
+    "error"
+  ],
+  "caps": [
+    "ejs",
+    "mutagen",
+    "ffmpeg"
+  ],
+  "error_kinds": [
+    "metadata",
+    "download",
+    "conversion",
+    "dependency",
+    "usage",
+    "interrupted"
+  ],
+  "error_kind_to_exit_code": {
+    "metadata": 1,
+    "download": 1,
+    "conversion": 1,
+    "dependency": 4,
+    "usage": 2,
+    "interrupted": 130
+  },
+  "worker_never_emits": 3,
+  "byte_exact_contracts": {
+    "http_headers": "values coerced to str, keys unchanged",
+    "filename": "sanitize_filename: 200-char cap, Windows reserved names",
+    "audio_format_produced": "classify_audio_production (media.py:48-72)"
+  },
+  "audio_format_production": {
+    "lossless_source_codecs": [
+      "alac",
+      "ape",
+      "flac",
+      "pcm",
+      "pcm_f32le",
+      "pcm_s16le",
+      "pcm_s24le",
+      "wav",
+      "wv"
+    ],
+    "cases": [
+      {
+        "requested_codec": "aac",
+        "source_acodec": "mp4a.40.2",
+        "conversion_mode": "passthrough_aac",
+        "result": "passthrough AAC (from mp4a source, no re-encode)"
+      },
+      {
+        "requested_codec": "aac",
+        "source_acodec": "mp4a.40.2",
+        "conversion_mode": "alac",
+        "result": "ALAC-wrapped lossy (transcoded from lossy mp4a source)"
+      },
+      {
+        "requested_codec": "alac",
+        "source_acodec": "mp4a.40.2",
+        "conversion_mode": "alac",
+        "result": "ALAC-wrapped lossy (transcoded from lossy mp4a source)"
+      },
+      {
+        "requested_codec": "alac",
+        "source_acodec": "alac",
+        "conversion_mode": "alac",
+        "result": "true lossless ALAC (from lossless alac source)"
+      },
+      {
+        "requested_codec": "flac",
+        "source_acodec": "flac",
+        "conversion_mode": "native",
+        "result": "true lossless FLAC (from flac source)"
+      },
+      {
+        "requested_codec": "flac",
+        "source_acodec": "mp4a.40.2",
+        "conversion_mode": "native",
+        "result": "FLAC (transcoded from lossy mp4a source)"
+      },
+      {
+        "requested_codec": "flac",
+        "source_acodec": "opus",
+        "conversion_mode": "native",
+        "result": "FLAC (transcoded from lossy opus source)"
+      },
+      {
+        "requested_codec": "wav",
+        "source_acodec": "mp3",
+        "conversion_mode": "native",
+        "result": "uncompressed WAV PCM (from mp3 source)"
+      },
+      {
+        "requested_codec": "wav",
+        "source_acodec": "pcm_s16le",
+        "conversion_mode": "native",
+        "result": "uncompressed WAV PCM (from pcm_s16le source)"
+      },
+      {
+        "requested_codec": "mp3",
+        "source_acodec": "mp3",
+        "conversion_mode": "native",
+        "result": "MP3 (from mp3 source)"
+      },
+      {
+        "requested_codec": "aac",
+        "source_acodec": null,
+        "conversion_mode": "passthrough_aac",
+        "result": "passthrough AAC (from unknown source, no re-encode)"
+      },
+      {
+        "requested_codec": "aac",
+        "source_acodec": "unknown.codec.x",
+        "conversion_mode": "passthrough_aac",
+        "result": "passthrough AAC (from unknown source, no re-encode)"
+      },
+      {
+        "requested_codec": "flac",
+        "source_acodec": "FLAC",
+        "conversion_mode": "native",
+        "result": "true lossless FLAC (from flac source)"
+      },
+      {
+        "requested_codec": "OPUS",
+        "source_acodec": "vorbis",
+        "conversion_mode": "native",
+        "result": "OPUS (from vorbis source)"
+      }
+    ]
+  },
+  "version_conformance": [
+    {
+      "label": "N",
+      "protocol": "paradl-media/1",
+      "accepted": true,
+      "exit_code": 0
+    },
+    {
+      "label": "minor-N+1",
+      "protocol": "paradl-media/1.1",
+      "accepted": true,
+      "exit_code": 0
+    },
+    {
+      "label": "minor-large",
+      "protocol": "paradl-media/1.999",
+      "accepted": true,
+      "exit_code": 0
+    },
+    {
+      "label": "N-1",
+      "protocol": "paradl-media/0",
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "unsupported protocol major version"
+    },
+    {
+      "label": "N+1",
+      "protocol": "paradl-media/2",
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "unsupported protocol major version"
+    },
+    {
+      "label": "unknown",
+      "protocol": "paradl-media/99",
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "unsupported protocol major version"
+    },
+    {
+      "label": "missing",
+      "protocol": null,
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "protocol version missing"
+    },
+    {
+      "label": "unparseable",
+      "protocol": "garbage",
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "unparseable protocol version"
+    },
+    {
+      "label": "empty-major",
+      "protocol": "paradl-media/",
+      "accepted": false,
+      "exit_code": 4,
+      "diagnostic": "unparseable protocol version"
+    }
+  ]
+}

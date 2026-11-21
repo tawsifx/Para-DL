@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "asdict": {
+    "schema_version": 2,
+    "connections": 16,
+    "output_dir": ".",
+    "audio_codec": "aac",
+    "video_quality": "best",
+    "auto_extract": false,
+    "auto_adb_push": false,
+    "bin_dir": "/Users/tawsifx/.local/bin",
+    "adb_music_dir": "/storage/emulated/0/Music",
+    "adb_download_dir": "/storage/emulated/0/Download",
+    "max_download_limit": null,
+    "history_limit": 50,
+    "anti_throttle": "4MBps",
+    "anti_throttle_grace": 5,
+    "watchdog": "v2",
+    "ytdlp_player_client": null,
+    "caffeinate": true,
+    "net_watch": true,
+    "stall_timeout": 30.0,
+    "require_ac": false,
+    "pause_on_low_power": false,
+    "isp": "auto",
+    "doh_endpoint": null,
+    "engine": "rust"
+  }
+}

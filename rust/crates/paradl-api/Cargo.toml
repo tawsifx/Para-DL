@@ -1,0 +1,37 @@
+[package]
+name = "paradl-api"
+description = "Opt-in axum HTTP server: seven endpoints, serde validation, and the task runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-api"
+keywords = ["paradl", "api", "axum", "http", "tasks"]
+categories = ["command-line-utilities"]
+
+[features]
+default = []
+# The whole HTTP surface and every dependency it needs are gated behind `api`.
+api = [
+    "dep:axum", "dep:tokio", "dep:paradl-core", "dep:paradl-events",
+    "dep:serde", "dep:serde_json", "dep:async-trait", "dep:uuid", "dep:chrono",
+]
+
+[dependencies]
+paradl-core = { path = "../paradl-core", optional = true }
+paradl-events = { path = "../paradl-events", optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }

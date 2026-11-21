@@ -1,0 +1,209 @@
+usage: parallel-dl [-h] [-a] [-v] [-l] [--no-lossless] [--mp3]
+                   [--audio-codec {lossless,native,mp3,flac,opus,wav,aac}]
+                   [-Q {best,4k,1440p,1080p,720p,480p}] [--playlist] [--subs]
+                   [--no-thumbnail]
+                   [--cookies-from-browser COOKIES_FROM_BROWSER]
+                   [--sponsorblock] [--ejs-remote] [-c CONNECTIONS]
+                   [--engine {aria2,rust}] [-o OUTPUT] [-i INPUT_FILE] [-x]
+                   [--checksum CHECKSUM] [--verify] [-f FORMAT] [-q] [--json]
+                   [--non-interactive] [-y] [--verbose] [--debug]
+                   [--limit-rate LIMIT_RATE] [--anti-throttle [ANTI_THROTTLE]]
+                   [--no-anti-throttle]
+                   [--anti-throttle-grace ANTI_THROTTLE_GRACE]
+                   [--watchdog WATCHDOG] [--no-caffeinate] [--no-net-watch]
+                   [--stall-timeout STALL_TIMEOUT] [--require-ac]
+                   [--no-require-ac] [--pause-on-low-power] [--mirror MIRRORS]
+                   [--when-fast [WHEN_FAST]] [--at START_AT]
+                   [--priority PRIORITY] [--all] [--interval INTERVAL]
+                   [--duration DURATION] [--http3-probe] [--http3]
+                   [--no-http3] [--proxy URL] [--push] [--asset ASSET]
+                   [--all-assets] [--select] [--source] [--branch BRANCH]
+                   [--install INSTALL_TARGET] [--info INFO_TARGET]
+                   [--hash HASH_FILE] [--history]
+                   [--history-limit HISTORY_LIMIT] [--search SEARCH]
+                   [--type {direct,stream,search,github,huggingface,ipsw,pypi,brew,torrent}]
+                   [--success] [--failed] [--clear-history]
+                   [--from-history ID] [--clean] [--diagnose] [--doctor]
+                   [--sign] [--no-xattr] [--notify] [--from-curl [FROM_CURL]]
+                   [--clipboard] [--version] [--host HOST] [--port PORT]
+                   [--reload]
+                   [targets ...]
+
+High-Performance Parallel Multichannel Downloader Suite [paradl / parallel-dl].
+
+positional arguments:
+  targets               Subcommand (install/info/hash/extract/history/clean/co
+                        nfig/diagnose/netprobe/bench) or download targets.
+
+options:
+  -h, --help            show this help message and exit
+  -a, --audio           Extract audio track for media streams (default: True).
+  -v, --video           Download complete high-res video (1080p/4K) instead of
+                        audio.
+  -l, --lossless        CoreAudio M4A/ALAC stream packaging (default: True).
+  --no-lossless         Disable ALAC mastering, keep standard AAC.
+  --mp3                 Shortcut for --audio-codec mp3.
+  --audio-codec {lossless,native,mp3,flac,opus,wav,aac}
+                        Audio codec/format to export ('native' preserves
+                        original stream without re-encoding).
+  -Q {best,4k,1440p,1080p,720p,480p}, --quality {best,4k,1440p,1080p,720p,480p}
+                        Video quality resolution preset.
+  --playlist            Download entire playlist instead of a single media
+                        item.
+  --subs                Download and embed subtitles into media.
+  --no-thumbnail        Do not embed or write thumbnail image.
+  --cookies-from-browser COOKIES_FROM_BROWSER
+                        Extract cookies from browser for yt-dlp (e.g. safari,
+                        chrome, firefox).
+  --sponsorblock        Remove SponsorBlock segments via yt-dlp.
+  --ejs-remote          Opt-in to fetching remote yt-dlp EJS challenge solver
+                        scripts from GitHub (--remote-components ejs:github).
+  -c CONNECTIONS, --connections CONNECTIONS
+                        Parallel connection streams for aria2c (1-16, maximum
+                        allowed: 16, default: 16).
+  --engine {aria2,rust}
+                        HTTP(S) transfer backend: 'rust' (default, in-process
+                        rapids) or 'aria2' (legacy JSON-RPC fallback).
+  -o OUTPUT, --output OUTPUT
+                        Output destination directory (default: '.').
+  -i INPUT_FILE, --input-file INPUT_FILE
+                        File containing list of URLs/queries (one per line).
+  -x, --extract         Automatically unpack downloaded archives (.zip,
+                        .tar.gz, .dmg, etc.).
+  --checksum CHECKSUM   Expected cryptographic checksum in format
+                        [algo:]<hash> to verify upon completion.
+  --verify              Automatically discover and verify companion
+                        .sha256/.md5 checksum files.
+  -f FORMAT, --format FORMAT
+                        Custom yt-dlp format specification.
+  -q, --quiet           Quiet mode, suppress banner and progress display.
+  --json                Emit structured JSON-lines (JSONL) events to stdout
+                        for script and LLM callers.
+  --non-interactive     Forbid all interactive prompts regardless of TTY
+                        state.
+  -y, --yes             Automatic yes to confirmation prompts (e.g. installing
+                        unverified release binaries).
+  --verbose             Enable verbose informational logging on stderr.
+  --debug               Enable debug logging on stderr.
+  --limit-rate LIMIT_RATE
+                        Maximum download speed limit (e.g. 10MB/s, 80Mbps,
+                        500K).
+  --anti-throttle [ANTI_THROTTLE]
+                        Auto-recycle connections when download speed drops
+                        below threshold (default: 4MBps).
+  --no-anti-throttle    Disable anti-throttle connection recycling.
+  --anti-throttle-grace ANTI_THROTTLE_GRACE
+                        Grace period in seconds before checking speed
+                        threshold (default: 5).
+  --watchdog WATCHDOG   Anti-throttle watchdog version: 'v1', 'v2', or 'off'
+                        (or comma-separated list for 'pdl bench', default:
+                        v2).
+  --no-caffeinate       Disable macOS 'caffeinate -i -w <pid>' idle-sleep
+                        assertion during downloads.
+  --no-net-watch        Disable macOS network-change watcher (scutil / route /
+                        scutil --nwi).
+  --stall-timeout STALL_TIMEOUT
+                        Seconds without byte progress before triggering a
+                        stall connection recycle (0 to disable, default: 30).
+  --require-ac          Fail early unless the system is connected to AC power
+                        (via 'pmset -g batt').
+  --no-require-ac       Disable AC power requirement (e.g. for queued jobs
+                        which default to --require-ac).
+  --pause-on-low-power  Pause or defer downloads while macOS Low Power Mode is
+                        active.
+  --mirror MIRRORS      Alternate mirror URL for the download target
+                        (repeatable).
+  --when-fast [WHEN_FAST]
+                        Start or continue large jobs only when a short speed
+                        test exceeds threshold (e.g. 5MB/s).
+  --at START_AT         Schedule start time in 24-hour HH:MM format (e.g.
+                        02:30).
+  --priority PRIORITY   Priority for queued jobs (higher integer runs first,
+                        default: 0).
+  --all                 Apply queue/resume action to all jobs (e.g. 'pdl
+                        resume --all').
+  --interval INTERVAL   StartInterval in seconds for 'pdl queue launchd-plist'
+                        when --at is not set (default: 900).
+  --duration DURATION   Duration in seconds for 'pdl netprobe' or 'pdl bench'
+                        (default: 60).
+  --http3-probe         Probe optional HTTP/3 support via curl during 'pdl
+                        netprobe'.
+  --http3               Enable HTTP/3 (QUIC) for aria2c transfers when
+                        supported by the server (default: on).
+  --no-http3            Disable HTTP/3 (QUIC) for aria2c transfers.
+  --proxy URL, --via-proxy URL
+                        Proxy URL for aria2c transfers (--all-proxy), e.g.
+                        socks5://127.0.0.1:1080 or http://user:pass@host:port.
+  --push, --adb         Automatically push completed files to connected
+                        Android phone via ADB.
+  --asset ASSET         Filter release/HF asset by pattern/extension (e.g.
+                        dmg, tar.gz, arm64, *.gguf).
+  --all-assets          Download all assets in the release concurrently.
+  --select              Interactive table to choose which asset or model file
+                        to download (TTY only).
+  --source              Force download repo source archive instead of release
+                        binary.
+  --branch BRANCH       Specify branch when downloading GitHub directory or
+                        repository archive.
+  --install INSTALL_TARGET
+                        Download, verify, extract, and install GitHub release
+                        binary into local bin path.
+  --info INFO_TARGET    Inspect target metadata without downloading.
+  --hash HASH_FILE      Compute cryptographic hashes (MD5, SHA1, SHA256,
+                        SHA512, BLAKE2b) for a file.
+  --history             Display recent download history.
+  --history-limit HISTORY_LIMIT
+                        Number of history entries to show (default: 15).
+  --search SEARCH       Filter history entries by substring match on filename
+                        or target.
+  --type {direct,stream,search,github,huggingface,ipsw,pypi,brew,torrent}
+                        Filter history entries by download type.
+  --success             Show only successful history entries.
+  --failed              Show only failed history entries.
+  --clear-history       Clear the download history log.
+  --from-history ID     Re-download a previous history entry by its ID (used
+                        with 'pdl resume').
+  --clean               Clean orphaned temporary download files (.aria2,
+                        .part).
+  --diagnose            Print system toolchain diagnostics and installed
+                        engines.
+  --doctor              Run comprehensive system doctor, toolchain, and macOS
+                        security diagnostics.
+  --sign                Apply ad-hoc code signature ('codesign --force --sign
+                        -') to installed binary during 'pdl install'.
+  --no-xattr            Disable writing source URL to
+                        com.apple.metadata:kMDItemWhereFroms extended
+                        attribute.
+  --notify              Display native macOS notifications on download
+                        completion, failure, watchdog give-up, and queue
+                        summary.
+  --from-curl [FROM_CURL]
+                        Download from a 'Copy as cURL' command string, file
+                        path, or stdin ('-').
+  --clipboard           Read 'Copy as cURL' input directly from the macOS
+                        clipboard via pbpaste.
+  --version             show program's version number and exit
+  --host HOST           API server bind host (default: 127.0.0.1). Use 0.0.0.0
+                        to listen on all interfaces.
+  --port PORT           API server bind port (default: 8000).
+  --reload              Enable auto-reload for API development (requires
+                        watchfiles).
+
+Recipes:
+  paradl "Song Title Artist Name" -o ~/Music
+  paradl --mp3 "Artist Name Track" -o ~/Music
+  paradl --audio-codec native "Artist Name Track" -o ~/Music
+  paradl --quality 4k "https://www.youtube.com/watch?v=..."
+  paradl gh:BurntSushi/ripgrep
+  paradl install astral-sh/uv
+  paradl pip install requests
+  paradl brew install wget
+  paradl hf:TheBloke/Llama-2-7B-GGUF --asset "*Q4_K_M.gguf"
+  paradl ipsw:iPhone14,5 -c 16 -o ~/Downloads
+  paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -c 16
+  paradl netprobe "https://example.com/huge-file.iso"
+  paradl bench "https://example.com/huge-file.iso" --watchdog v1,v2,off --duration 60
+  paradl info "https://example.com/huge-file.iso"
+  paradl hash ./downloaded.tar.gz
+  paradl history
+        

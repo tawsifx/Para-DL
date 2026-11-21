@@ -1,0 +1,30 @@
+[package]
+name = "paradl"
+description = "Thin reference binary owning the `paradl` and `parallel-dl` commands"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl"
+keywords = ["paradl", "parallel-dl", "download", "binary"]
+categories = ["command-line-utilities"]
+
+[features]
+default = []
+api = ["paradl-app/api"]
+tui = ["paradl-app/tui"]
+media = ["paradl-app/media"]
+platform-macos = ["paradl-app/platform-macos"]
+platform-windows = ["paradl-app/platform-windows"]
+
+[dependencies]
+paradl-app = { path = "../paradl-app" }
+paradl-cli = { path = "../paradl-cli" }
+
+[[bin]]
+name = "paradl"
+path = "src/main.rs"
