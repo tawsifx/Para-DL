@@ -24,8 +24,7 @@ use paradl_core::{Error, PDLConfig};
 use paradl_engine::ResumeState;
 
 use crate::diff::{
-    DiffReport, Difference, diff_snapshots, normalize_jsonl, normalize_stdout_timestamps,
-    snapshot_dir,
+    DiffReport, Difference, diff_snapshots, normalize_jsonl, normalize_stdout_fields, snapshot_dir,
 };
 
 /// A deterministic loopback HTTP server shared by both sides of a case.
@@ -338,7 +337,7 @@ pub fn run_nonmedia_case(
         case.rows.join(", ")
     ));
     report.note("both sides use the same loopback server; stdin/args/env matched");
-    report.note("stdout/stderr/files/sidecars/exit byte-exact except JSONL timestamp values -> <TS>");
+    report.note("byte-exact except timestamp/duration/avg_speed_bps/file_path -> <TS>/<DURATION>/<SPEED>/<PATH>");
     report.note("Rust side: PARADL_ASSERT_NO_PYTHON=1 + poisoned PATH (X05/X06)");
     if let Some(reason) = &case.deferred {
         report.note(format!("deferred: {reason}"));
@@ -402,11 +401,11 @@ pub fn run_nonmedia_case(
         &python_exit.to_string().into_bytes(),
         &rust_exit.to_string().into_bytes(),
     );
-    // Raw stdout stays byte-exact EXCEPT for live wall-clock `timestamp`
-    // values, which are replaced by a stable token. For non-JSONL output the
-    // normalizer is a byte-for-byte no-op.
-    let python_stdout = normalize_stdout_timestamps(&python_side.stdout);
-    let rust_stdout = normalize_stdout_timestamps(&rust_side.stdout);
+    // Raw stdout stays byte-exact EXCEPT for the four named run-dependent
+    // fields (timestamp/duration/avg_speed_bps/file_path), replaced by stable
+    // tokens. For non-JSONL output the normalizer is a byte-for-byte no-op.
+    let python_stdout = normalize_stdout_fields(&python_side.stdout);
+    let rust_stdout = normalize_stdout_fields(&rust_side.stdout);
     report.compare("stdout", &python_stdout, &rust_stdout);
     report.compare("stderr", &python_side.stderr, &rust_side.stderr);
     if guard.triggered() {
@@ -602,4 +601,41 @@ pub fn run_interrupt_resume_gate(body: Vec<u8>) -> Result<DiffReport, Error> {
 
 fn preview_events(events: &str) -> String {
     events.chars().take(200).collect()
+}
+
+/// Result of the complete non-media gate (the five corpus cases plus the
+/// interrupt/resume case). Clean only when every report is clean.
+#[derive(Debug)]
+pub struct NonMediaGate {
+    /// One report per case, in execution order.
+    pub reports: Vec<DiffReport>,
+}
+
+impl NonMediaGate {
+    /// Whether every case is clean.
+    pub fn is_clean(&self) -> bool {
+        self.reports.iter().all(DiffReport::is_clean)
+    }
+
+    /// Render every case report into one concise string.
+    pub fn render(&self) -> String {
+        self.reports
+            .iter()
+            .map(DiffReport::render)
+            .collect::<Vec<_>>()
+            .join("")
+    }
+}
+
+/// Run the complete non-media gate against the worktree oracle and the real
+/// Rust binary. This is the reusable entry point used by both the CLI and the
+/// `full_non_media_gate_is_clean` regression test.
+pub fn run_full_nonmedia_gate(root: &Path) -> Result<NonMediaGate, Error> {
+    let server = LoopbackServer::start(b"paradl-parity-loopback-golden-bytes".to_vec())?;
+    let mut reports = Vec::new();
+    for case in corpus() {
+        reports.push(run_nonmedia_case(&case, root, &server)?.report);
+    }
+    reports.push(run_interrupt_resume_gate(interrupt_payload())?);
+    Ok(NonMediaGate { reports })
 }

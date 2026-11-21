@@ -124,15 +124,173 @@ pub fn diff_text(field: impl Into<String>, expected: &str, actual: &str) -> Opti
     diff_bytes(field, expected.as_bytes(), actual.as_bytes())
 }
 
-/// Replace the numeric value of every JSON `timestamp` field with the stable
-/// token `"<TS>"`, leaving **all other bytes untouched**.
+/// A JSON field whose value is inherently run-dependent and therefore replaced
+/// by a stable token before comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NormalizedField {
+    /// Exact JSON key name (matched as `"key"` in the raw text scan).
+    pub key: &'static str,
+    /// Stable replacement token, without JSON quotes.
+    pub token: &'static str,
+    /// Why this field cannot be compared byte-for-byte.
+    pub reason: &'static str,
+}
+
+/// The four named fields normalized in **both** the raw-stdout and structural
+/// JSONL channels. Every other field stays byte-exact.
 ///
-/// This is used on the raw-stdout channel for JSONL-mode cases: both the Python
-/// oracle and the Rust binary emit live wall-clock values, so a byte compare of
-/// the unmodified streams would flag a difference on every event. The scan is
-/// deliberately textual (not a JSON re-serialization) so field order, spacing,
-/// and every other byte remain byte-exact. Non-UTF-8 output and streams without
-/// a numeric `timestamp` field are returned unchanged.
+/// - `timestamp`: live wall-clock time (`round(time.time(), 3)`).
+/// - `duration`: measured wall-clock transfer duration.
+/// - `avg_speed_bps`: derived from `duration`, hence wall-clock dependent.
+/// - `file_path`: per-side output directory plus `/private/var` vs `/var`.
+pub const NONDETERMINISTIC_FIELDS: [NormalizedField; 4] = [
+    NormalizedField {
+        key: "timestamp",
+        token: "<TS>",
+        reason: "live wall-clock time",
+    },
+    NormalizedField {
+        key: "duration",
+        token: "<DURATION>",
+        reason: "measured wall-clock transfer duration",
+    },
+    NormalizedField {
+        key: "avg_speed_bps",
+        token: "<SPEED>",
+        reason: "derived from wall-clock duration",
+    },
+    NormalizedField {
+        key: "file_path",
+        token: "<PATH>",
+        reason: "per-side out dir and /private/var vs /var symlink form",
+    },
+];
+
+/// Return the length of the JSON scalar starting at `text[start..]`, if it is a
+/// value we normalize (a quoted string or a number). Boolean/null/object/array
+/// values are deliberately left untouched.
+fn scalar_value_len(text: &str, start: usize) -> Option<usize> {
+    let rest = &text[start..];
+    let first = *rest.as_bytes().first()?;
+    if first == b'"' {
+        // JSON string: scan to the unescaped closing quote.
+        let mut escaped = false;
+        for (index, byte) in rest.bytes().enumerate().skip(1) {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                return Some(index + 1);
+            }
+        }
+        None
+    } else if first.is_ascii_digit() || matches!(first, b'-' | b'+' | b'.') {
+        let length = rest
+            .bytes()
+            .take_while(|byte| {
+                byte.is_ascii_digit() || matches!(byte, b'-' | b'+' | b'.' | b'e' | b'E')
+            })
+            .count();
+        (length > 0).then_some(length)
+    } else {
+        None
+    }
+}
+
+/// Replace the values of every named field in [`NONDETERMINISTIC_FIELDS`] with
+/// stable JSON string tokens, leaving **all other bytes untouched**.
+///
+/// The scan is deliberately textual (not a JSON re-serialization) so field
+/// order, spacing and every other byte remain byte-exact. It targets only the
+/// exact key names, so a genuine difference in any other field still fails.
+/// Non-UTF-8 output is returned unchanged.
+///
+/// ```
+/// use paradl_parity::normalize_stdout_fields;
+/// let a = br#"{"event":"result","timestamp":1.1,"duration":0.4,"avg_speed_bps":121.1,"file_path":"/a/origin.bin"}"#;
+/// let b = br#"{"event":"result","timestamp":9.9,"duration":0.0,"avg_speed_bps":1845.6,"file_path":"/b/origin.bin"}"#;
+/// assert_eq!(normalize_stdout_fields(a), normalize_stdout_fields(b));
+/// let c = br#"{"event":"result","timestamp":9.9,"duration":0.0,"avg_speed_bps":1845.6,"file_path":"/b/origin.bin","success":false}"#;
+/// assert_ne!(normalize_stdout_fields(a), normalize_stdout_fields(c));
+/// ```
+pub fn normalize_stdout_fields(bytes: &[u8]) -> Vec<u8> {
+    let text = match std::str::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(_) => return bytes.to_vec(),
+    };
+    if !NONDETERMINISTIC_FIELDS
+        .iter()
+        .any(|field| text.contains(&format!("\"{}\"", field.key)))
+    {
+        return bytes.to_vec();
+    }
+
+    // Single left-to-right pass; whichever named key occurs earliest is
+    // replaced next. Whitespace after the key/colon is preserved verbatim.
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0;
+    while cursor < text.len() {
+        let mut best: Option<(usize, usize, &'static NormalizedField)> = None;
+        for field in &NONDETERMINISTIC_FIELDS {
+            let needle = format!("\"{}\"", field.key);
+            if let Some(relative) = text[cursor..].find(&needle) {
+                let start = cursor + relative;
+                if best.is_none_or(|(earliest, _, _)| start < earliest) {
+                    best = Some((start, start + needle.len(), field));
+                }
+            }
+        }
+        let Some((start, key_end, field)) = best else {
+            break;
+        };
+        let after_key = &text[key_end..];
+        let replacement = after_key
+            .find(':')
+            .and_then(|colon| {
+                if !after_key[..colon]
+                    .chars()
+                    .all(|ch: char| ch.is_ascii_whitespace())
+                {
+                    return None;
+                }
+                let after_colon = &after_key[colon + 1..];
+                let whitespace = after_colon
+                    .len()
+                    - after_colon
+                        .trim_start_matches(|ch: char| ch.is_ascii_whitespace())
+                        .len();
+                let value_at = colon + 1 + whitespace;
+                scalar_value_len(after_key, value_at).map(|len| (value_at, len))
+            });
+
+        match replacement {
+            Some((value_at, value_len)) => {
+                out.push_str(&text[cursor..start]);
+                out.push_str(&text[start..key_end]);
+                out.push_str(&after_key[..value_at]);
+                out.push('"');
+                out.push_str(field.token);
+                out.push('"');
+                cursor = key_end + value_at + value_len;
+            }
+            None => {
+                // Key present but no scalar value: copy through unchanged so a
+                // real difference in that value is still detected.
+                out.push_str(&text[cursor..key_end]);
+                cursor = key_end;
+            }
+        }
+    }
+    out.push_str(&text[cursor..]);
+    out.into_bytes()
+}
+
+/// Backward-compatible alias for [`normalize_stdout_fields`].
+///
+/// Historically this normalized only `timestamp`; it now applies the full set
+/// of [`NONDETERMINISTIC_FIELDS`] so every caller gets identical treatment in
+/// the raw-stdout channel.
 ///
 /// ```
 /// use paradl_parity::normalize_stdout_timestamps;
@@ -143,73 +301,44 @@ pub fn diff_text(field: impl Into<String>, expected: &str, actual: &str) -> Opti
 /// assert_ne!(normalize_stdout_timestamps(a), normalize_stdout_timestamps(c));
 /// ```
 pub fn normalize_stdout_timestamps(bytes: &[u8]) -> Vec<u8> {
-    const KEY: &str = "\"timestamp\"";
-    let text = match std::str::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(_) => return bytes.to_vec(),
-    };
-    if !text.contains(KEY) {
-        return bytes.to_vec();
-    }
-    let mut out = String::with_capacity(text.len());
-    let mut cursor = 0;
-    while let Some(relative) = text[cursor..].find(KEY) {
-        let start = cursor + relative;
-        let key_end = start + KEY.len();
-        let after_key = &text[key_end..];
-        let replaced = after_key
-            .find(':')
-            .and_then(|colon| {
-                let before_colon = &after_key[..colon];
-                if !before_colon.chars().all(|ch: char| ch.is_ascii_whitespace()) {
-                    return None;
-                }
-                let after_colon = &after_key[colon + 1..];
-                let whitespace = after_colon
-                    .len()
-                    - after_colon
-                        .trim_start_matches(|ch: char| ch.is_ascii_whitespace())
-                        .len();
-                let number_at = colon + 1 + whitespace;
-                let number = &after_key[number_at..];
-                let length = number
-                    .bytes()
-                    .take_while(|byte| {
-                        byte.is_ascii_digit() || matches!(byte, b'-' | b'+' | b'.' | b'e' | b'E')
-                    })
-                    .count();
-                (length > 0).then_some((number_at, length))
-            });
-        match replaced {
-            Some((number_at, length)) => {
-                out.push_str(&text[cursor..key_end]);
-                out.push_str(&after_key[..number_at]);
-                out.push_str("\"<TS>\"");
-                cursor = key_end + number_at + length;
-            }
-            None => {
-                out.push_str(&text[cursor..key_end]);
-                cursor = key_end;
-            }
-        }
-    }
-    out.push_str(&text[cursor..]);
-    out.into_bytes()
+    normalize_stdout_fields(bytes)
 }
 
-/// Parse newline-delimited JSONL, replacing each `timestamp` with `0.0`.
-///
-/// Wall-clock timestamps are inherently nondeterministic; the harness compares
-/// the *shape and payload* of events, never the instant they were emitted.
+/// Parse newline-delimited JSONL and replace the values of
+/// [`NONDETERMINISTIC_FIELDS`] with stable tokens, recursively inside event
+/// objects. This is the structural counterpart of [`normalize_stdout_fields`].
 pub fn normalize_jsonl(text: &str) -> Result<Vec<Value>, serde_json::Error> {
     text.lines()
         .filter(|line| !line.trim().is_empty())
         .map(|line| {
             let mut value: Value = serde_json::from_str(line)?;
-            strip_timestamp(&mut value);
+            strip_nondeterministic_fields(&mut value);
             Ok(value)
         })
         .collect()
+}
+
+/// Replace the values of [`NONDETERMINISTIC_FIELDS`] in a parsed JSON value
+/// (recursing into nested objects/arrays) with stable string tokens.
+pub fn strip_nondeterministic_fields(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            for field in &NONDETERMINISTIC_FIELDS {
+                if map.contains_key(field.key) {
+                    map.insert(field.key.to_owned(), Value::String(field.token.to_owned()));
+                }
+            }
+            for nested in map.values_mut() {
+                strip_nondeterministic_fields(nested);
+            }
+        }
+        Value::Array(values) => {
+            for nested in values {
+                strip_nondeterministic_fields(nested);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Remove the `timestamp` field from an event value so goldens compare cleanly.
@@ -296,14 +425,48 @@ mod tests {
     }
 
     #[test]
-    fn normalize_jsonl_removes_timestamps() {
+    fn normalize_jsonl_replaces_timestamps_with_tokens() {
         let normalized = normalize_jsonl(
             "{\"event\":\"x\",\"timestamp\":1.5,\"n\":1}\n{\"event\":\"y\",\"timestamp\":2.0}\n",
         )
         .unwrap();
         assert_eq!(normalized.len(), 2);
-        assert!(normalized[0].get("timestamp").is_none());
+        assert_eq!(normalized[0]["timestamp"], "<TS>");
         assert_eq!(normalized[0]["n"], 1);
+    }
+
+    #[test]
+    fn normalize_both_channels_replace_all_four_named_fields() {
+        // (a) Only the three run-dependent fields differ -> CLEAN in both
+        //     the raw-stdout and the parsed-JSONL channels.
+        let python = br#"{"event":"result","timestamp":1.1,"duration":0.382,"avg_speed_bps":121.17,"file_path":"/var/folders/x/python/origin.bin","success":true}"#;
+        let rust = br#"{"event":"result","timestamp":9.9,"duration":0.042,"avg_speed_bps":1845.64,"file_path":"/private/var/folders/x/rust/origin.bin","success":true}"#;
+        assert_eq!(normalize_stdout_fields(python), normalize_stdout_fields(rust));
+
+        let a = normalize_jsonl(std::str::from_utf8(python).unwrap()).unwrap();
+        let b = normalize_jsonl(std::str::from_utf8(rust).unwrap()).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a[0]["duration"], "<DURATION>");
+        assert_eq!(a[0]["avg_speed_bps"], "<SPEED>");
+        assert_eq!(a[0]["file_path"], "<PATH>");
+
+        // (b) A genuine difference in a NON-normalized field still fails in
+        //     both channels.
+        let rust_different = br#"{"event":"result","timestamp":9.9,"duration":0.042,"avg_speed_bps":1845.64,"file_path":"/private/var/folders/x/rust/origin.bin","success":false}"#;
+        assert_ne!(
+            normalize_stdout_fields(python),
+            normalize_stdout_fields(rust_different),
+        );
+        let c = normalize_jsonl(std::str::from_utf8(rust_different).unwrap()).unwrap();
+        assert_ne!(a, c);
+
+        // Nested values are normalized too (events can carry nested payloads).
+        let nested = br#"{"event":"result","properties":{"duration":0.1,"file_path":"/a"},"list":[{"avg_speed_bps":1.0}]}"#;
+        let normalized = String::from_utf8(normalize_stdout_fields(nested)).unwrap();
+        assert!(normalized.contains("\"duration\":\"<DURATION>\""), "{normalized}");
+        let parsed = normalize_jsonl(std::str::from_utf8(nested).unwrap()).unwrap();
+        assert_eq!(parsed[0]["properties"]["duration"], "<DURATION>");
+        assert_eq!(parsed[0]["list"][0]["avg_speed_bps"], "<SPEED>");
     }
 
     #[test]

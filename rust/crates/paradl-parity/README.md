@@ -42,12 +42,27 @@ the same URL. It captures and compares, byte-for-byte:
 - produced files and `.pdl.part` / `.pdl.json` sidecars (hex snapshot),
 - exit codes.
 
-The raw stdout bytes are compared byte-for-byte **except** that the numeric
-value of each JSON `timestamp` field is replaced by the stable token `"<TS>"`
-(`normalize_stdout_timestamps`). This is a textual substitution: field order,
-spacing and every other byte remain exact, and non-JSONL output is untouched.
-JSONL is additionally compared structurally with `timestamp` removed. No other
-field is normalized.
+**Normalized fields (both channels).** Raw stdout and parsed JSONL are compared
+byte-for-byte **except** for exactly four named, inherently run-dependent
+fields, whose JSON values are replaced with stable string tokens. The same
+substitution is applied in the raw text channel (`normalize_stdout_fields`,
+with `normalize_stdout_timestamps` kept as a compatible alias) and in the
+structural channel (`normalize_jsonl` / `strip_nondeterministic_fields`):
+
+| Field | Token | Why it cannot be byte-compared |
+|---|---|---|
+| `timestamp` | `"<TS>"` | live wall-clock time (`round(time.time(), 3)`) |
+| `duration` | `"<DURATION>"` | measured wall-clock transfer duration |
+| `avg_speed_bps` | `"<SPEED>"` | derived from `duration`, hence wall-clock dependent |
+| `file_path` | `"<PATH>"` | per-side out dir (`.../python` vs `.../rust`) and `/private/var` vs `/var` symlink form |
+
+The raw-text replacement is a key-name-targeted textual scan (it matches the
+exact JSON key, then skips only the following string or number scalar): field
+order, spacing and every other byte remain exact, non-JSONL output is a no-op,
+and a genuine difference in any **other** field still fails. Values are never
+fabricated — each side's value is replaced by the same token purely for
+comparison; the original stdout/stderr is still captured in the report on a
+DIFF. No other field is normalized.
 
 **Process policy (X05/X06).** The Rust side runs with
 `PARADL_ASSERT_NO_PYTHON=1` *and* a `PATH` whose `python`/`python3` are poison
@@ -108,24 +123,23 @@ asserts. All other clean cases return `0`. See
 
 ## Honesty caveats (no warm-cache/drift victories claimed)
 
-- **Current non-media result:** `--version`, `--help`, the gated `download`
-  file/sidecar channels, and the interrupt/resume gate are CLEAN. The lane
-  still reports **real** parity differences in `doctor --json` (Python emits
-  an extra `diagnose` event and richer tool/auth fields; Rust emits one
-  `doctor` event) and `info --json` / `download` JSONL (event sets and field
-  shapes differ, e.g. Python's `target_classified`/`progress` vs Rust's
-  `result`-only). These are genuine W4-1 event-contract gaps, reported
-  verbatim; nothing is normalized away or hidden to force green.
+- **Current non-media result (round 3):** the full gate is CLEAN — all six
+  cases (`version`, `help`, `doctor-json`, `info-json`, gated `download`, and
+  `download-interrupt-resume`) report 0 differences and the lane exits 0.
+  W4-1 round 2 aligned the doctor/info/download event sequences and field
+  sets; the only remaining download differences were the four named
+  run-dependent fields above, which are now tokenized in both channels.
 - **No-Python proof is scoped:** the poison-`PATH` canary proves the Rust
   process does not spawn `python`/`python3`; it does not trace arbitrary
   `execve` of a renamed interpreter.
 - **Media startup:** only the Python worker's spawn overhead is measured
   (`startup_ms`), and only on this lane. A warm interpreter is not a
   throughput win; no cold/warm number here supports a performance claim.
-- **Timestamps and ports:** JSONL `timestamp` is removed in the structural
-  comparison and replaced by `<TS>` in the raw-stdout comparison; no other
-  field is normalized. The loopback port is equal for both sides within a case
-  but not across runs.
+- **Tokenized fields are not "wins":** replacing `duration`/`avg_speed_bps`/
+  `file_path`/`timestamp` removes only measurement noise; it says nothing
+  about speed or correctness of either implementation. No cold/warm or drift
+  claim is made from them. The loopback port is equal for both sides within a
+  case but not across runs.
 - **Bytes/tags are Python-owned:** Rust deliberately has no extractor. The
   media lane proves the bridge preserves the golden protocol payload, JSONL,
   bytes, and tags; it does not claim Rust produced them.

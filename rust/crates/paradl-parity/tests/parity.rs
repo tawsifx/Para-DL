@@ -11,7 +11,8 @@ use std::process::{Command, Stdio};
 
 use paradl_parity::{
     BoundaryCase, DiffReport, LoopbackServer, PythonGuard, boundary_process_exit_code, diff_bytes,
-    diff_snapshots, interrupt_payload, normalize_stdout_timestamps, run_boundary_case,
+    diff_snapshots, interrupt_payload, normalize_jsonl, normalize_stdout_fields,
+    normalize_stdout_timestamps, run_boundary_case, run_full_nonmedia_gate,
     run_interrupt_resume_gate, run_media_replay,
 };
 use serde_json::Value;
@@ -26,6 +27,13 @@ fn fixtures_dir() -> PathBuf {
 
 fn worktree() -> PathBuf {
     crate_dir().join("../..").canonicalize().unwrap()
+}
+
+/// Correct repository root (the legacy `worktree()` helper resolves to `rust/`,
+/// a deferred item deliberately left unchanged this round). Used only by the
+/// full-gate test, which needs `.venv/bin/python` and `parallel-dl.py`.
+fn repo_root() -> PathBuf {
+    crate_dir().join("../../..").canonicalize().unwrap()
 }
 
 fn python() -> PathBuf {
@@ -239,6 +247,32 @@ fn raw_stdout_diff_ignores_only_timestamps() {
 }
 
 #[test]
+fn result_event_run_dependent_fields_compare_clean_but_other_fields_fail() {
+    // (a) Two otherwise-identical streams differing ONLY in the three named
+    //     run-dependent fields compare clean in BOTH channels.
+    let python = br#"{"event":"result","timestamp":1.1,"duration":0.382,"avg_speed_bps":121.17,"file_path":"/var/folders/x/python/origin.bin","success":true}"#;
+    let rust = br#"{"event":"result","timestamp":9.9,"duration":0.042,"avg_speed_bps":1845.64,"file_path":"/private/var/folders/x/rust/origin.bin","success":true}"#;
+    let mut clean = DiffReport::new("non-media", "run-dependent-only");
+    clean.compare("stdout", &normalize_stdout_fields(python), &normalize_stdout_fields(rust));
+    assert!(clean.is_clean(), "{}", clean.render());
+    let a = normalize_jsonl(std::str::from_utf8(python).unwrap()).unwrap();
+    let b = normalize_jsonl(std::str::from_utf8(rust).unwrap()).unwrap();
+    assert_eq!(a, b, "structural JSONL must ignore the three fields too");
+
+    // (b) A genuine difference in a NON-normalized field still fails.
+    let rust_different = br#"{"event":"result","timestamp":9.9,"duration":0.042,"avg_speed_bps":1845.64,"file_path":"/private/var/folders/x/rust/origin.bin","bytes_downloaded":34}"#;
+    let mut dirty = DiffReport::new("non-media", "non-normalized-diff");
+    dirty.compare(
+        "stdout",
+        &normalize_stdout_fields(python),
+        &normalize_stdout_fields(rust_different),
+    );
+    assert!(!dirty.is_clean(), "a bytes_downloaded difference must fail");
+    let c = normalize_jsonl(std::str::from_utf8(rust_different).unwrap()).unwrap();
+    assert_ne!(a, c, "structural JSONL must keep other-field differences");
+}
+
+#[test]
 fn loopback_server_serves_deterministic_bytes() {
     let server = LoopbackServer::start(b"paradl-loopback-golden".to_vec()).unwrap();
     let authority = server.url().strip_prefix("http://").unwrap();
@@ -251,6 +285,14 @@ fn loopback_server_serves_deterministic_bytes() {
     let response = String::from_utf8_lossy(&response);
     assert!(response.contains("paradl-loopback-golden"), "{response}");
     assert!(response.contains("200 OK"));
+}
+
+#[test]
+fn full_non_media_gate_is_clean() {
+    // (c) The complete gate (5 corpus cases + interrupt/resume) must exit 0.
+    let gate = run_full_nonmedia_gate(&repo_root()).unwrap();
+    assert_eq!(gate.reports.len(), 6, "five corpus cases + interrupt case");
+    assert!(gate.is_clean(), "full non-media gate is not clean:\n{}", gate.render());
 }
 
 #[test]

@@ -16,11 +16,10 @@ use std::path::PathBuf;
 
 use paradl_parity::{
     BoundaryCase, DiffReport, boundary_process_exit_code, run_boundary_case,
-    run_interrupt_resume_gate, run_media_replay, run_nonmedia_case,
+    run_full_nonmedia_gate, run_media_replay,
 };
 use paradl_parity::diff::Difference;
 use paradl_parity::media::find_media_python;
-use paradl_parity::nonmedia::corpus;
 
 fn worktree() -> PathBuf {
     if let Ok(value) = std::env::var("PARADL_WORKTREE") {
@@ -98,39 +97,16 @@ fn run_boundary(args: &[String]) -> i32 {
 
 fn run_nonmedia(args: &[String]) -> i32 {
     let root = flag(args, "--worktree").map(PathBuf::from).unwrap_or_else(worktree);
-    let body = b"paradl-parity-loopback-golden-bytes".to_vec();
-    let Ok(server) = paradl_parity::nonmedia::LoopbackServer::start(body) else {
-        eprintln!("cannot start loopback server");
-        return 1;
-    };
-    let mut dirty = false;
-    for case in corpus() {
-        match run_nonmedia_case(&case, &root, &server) {
-            Ok(outcome) => {
-                print!("{}", outcome.report.render());
-                if !outcome.report.is_clean() {
-                    dirty = true;
-                }
-            }
-            Err(error) => {
-                eprintln!("[non-media/{}] error: {error}", case.name);
-                dirty = true;
-            }
-        }
-    }
-    match run_interrupt_resume_gate(paradl_parity::interrupt_payload()) {
-        Ok(report) => {
-            print!("{}", report.render());
-            if !report.is_clean() {
-                dirty = true;
-            }
+    match run_full_nonmedia_gate(&root) {
+        Ok(gate) => {
+            print!("{}", gate.render());
+            if gate.is_clean() { 0 } else { 1 }
         }
         Err(error) => {
-            eprintln!("[non-media/download-interrupt-resume] error: {error}");
-            dirty = true;
+            eprintln!("non-media lane error: {error}");
+            1
         }
     }
-    if dirty { 1 } else { 0 }
 }
 
 fn run_media(args: &[String]) -> i32 {
