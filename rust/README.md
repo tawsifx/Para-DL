@@ -125,7 +125,6 @@ Formula automate exactly this layout (native binary in `bin/`, media venv in
 | `crates/paradl-media` | Rust protocol client only — no extractor logic |
 | `crates/paradl-cli` / `paradl-app` / `paradl` | parser, orchestration, thin binary |
 | `crates/paradl-oracle` / `paradl-parity` | dev-only golden fixtures and 3-lane harness |
-| `rapids/`, `paradl-rs/` | legacy crates retained until their port was promoted; publish disabled |
 
 ## Build / test
 

@@ -17,7 +17,7 @@
 
 | Feature | What it does |
 |---------|--------------|
-| **16-Channel Parallel Engine** | Native in-process Rust (`rapids`) engine splits HTTP(S) transfers into up to 16 concurrent range streams. A legacy aria2 backend is available via `--engine aria2`. |
+| **16-Channel Parallel Engine** | Native in-process Rust (`paradl-engine`) engine splits HTTP(S) transfers into up to 16 concurrent range streams. A legacy aria2 backend is available via `--engine aria2`. |
 | **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in-process (no daemon restart) to restore full speed. On no-Range single-stream servers it stays active for telemetry but does not cycle sockets. |
 | **SHA-256 Verification** | Cryptographically validates every download before writing to disk. |
 | **Cross-Platform** | Native Windows 10/11 and macOS (Intel & Apple Silicon) support. |
@@ -260,7 +260,7 @@ Features: task list with progress bars, pause/resume/delete, categories, search,
 
 `paradl` picks a transfer backend per target:
 
-- **HTTP(S)** uses the native Rust `rapids` engine by default (`--engine rust`).
+- **HTTP(S)** uses the native Rust engine (`paradl-engine`) by default (`--engine rust`).
 - `--engine aria2` selects the legacy JSON-RPC daemon backend.
 - **Torrents, magnets, and metalinks** are always delegated to aria2, regardless of selection.
 
@@ -282,16 +282,14 @@ Brew, or other non-media routes.
 
 ## Contributor setup
 
-The framework is a Cargo workspace under `rust/` (public `paradl-*` crates plus
-the legacy `rapids` core / `paradl-rs` PyO3 member). A Python 3.12 interpreter is
-only needed so the legacy PyO3 member can resolve; the new framework crates do
-not depend on it:
+The framework is a Cargo workspace under `rust/`. No Python is required for the
+Rust build or tests:
 
 ```bash
 cd rust
-PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo build --all
-PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo test --all
-PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo clippy --all -- -D warnings
+cargo build --all
+cargo test --all
+cargo clippy --all -- -D warnings
 ```
 
 Media worker tests live in the retained `media/` package:
@@ -299,9 +297,6 @@ Media worker tests live in the retained `media/` package:
 ```bash
 PYTHONPATH=media .venv/bin/python -m pytest media/tests -q
 ```
-
-The root `pyproject.toml` is a legacy tooling stub only; neither the Python
-application (`src/paradl/`) nor the bulk Python test suite exists anymore.
 
 ---
 
