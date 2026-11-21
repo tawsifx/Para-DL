@@ -18,7 +18,8 @@ use paradl_cli::{
     NetprobeCommand, PipCommand, ProfilesAction, ProfilesCommand, QueueAction, QueueCommand,
     ResumeCommand, ServerCommand,
 };
-use paradl_core::{Error, PDLConfig, SystemClock, WatchdogMode, format_speed, parse_rate};
+use paradl_core::{Error, PDLConfig, WatchdogMode, format_speed, parse_rate};
+use paradl_engine::ProgressSink;
 use paradl_events::{
     ApiServerStartedEvent, AuthRemoveEvent, AuthSetEvent, AuthStatusEvent, BenchEvent, CleanEvent,
     ConfigEvent, ConfigResetEvent, ConfigUpdatedEvent, ErrorEvent, Event, HashesEvent, HistoryEvent,
@@ -32,7 +33,7 @@ use paradl_postproc::{PostProcessor, checksum};
 use paradl_resilience::auth::{InMemorySecretStore, OsEnv, Service, TokenSource, lookup_token};
 use paradl_store::{QueueJob, SqliteStore, Store, TransferRecord};
 use paradl_ui::{ProgressDisplay, event_summary};
-use paradl_watchdog::{ThroughputSample, WatchdogController, py_round};
+use paradl_watchdog::{WatchdogAction, WatchdogActionType, WatchdogConfig, py_round};
 use serde_json::{Value, json};
 
 use crate::diagnostics::DoctorReport;
@@ -146,6 +147,76 @@ struct ProgressTelemetry {
     downloaded: u64,
     total: Option<u64>,
     speed_bps: u64,
+}
+
+/// Progress sink used by real transfers: renders the bar/percentage in plain
+/// mode and forwards watchdog decisions to the single JSONL emitter.
+struct AppProgressSink {
+    title: String,
+    output: OutputSink,
+    captured: Arc<Mutex<Option<ProgressTelemetry>>>,
+    known_total: Option<u64>,
+    render: bool,
+    json: bool,
+}
+
+impl ProgressSink for AppProgressSink {
+    fn on_progress(&mut self, snapshot: &paradl_engine::Snapshot) {
+        {
+            let mut guard = self.captured.lock().unwrap();
+            if guard.is_none() {
+                *guard = Some(ProgressTelemetry {
+                    downloaded: snapshot.downloaded,
+                    total: snapshot.total,
+                    speed_bps: snapshot.speed_bps,
+                });
+            }
+        }
+        if !self.render {
+            return;
+        }
+        let downloaded = i64::try_from(snapshot.downloaded).unwrap_or(i64::MAX);
+        let total = snapshot
+            .total
+            .or(self.known_total)
+            .and_then(|value| i64::try_from(value).ok());
+        let percent = total
+            .filter(|&value| value > 0)
+            .map(|value| py_round(downloaded as f64 * 100.0 / value as f64, 1));
+        let eta = match (total, snapshot.speed_bps) {
+            (Some(value), speed) if value > 0 && speed > 0 => {
+                Some(py_round((value - downloaded).max(0) as f64 / speed as f64, 1))
+            }
+            _ => None,
+        };
+        let event = ProgressEvent::new(
+            now_timestamp(),
+            self.title.clone(),
+            downloaded,
+            total,
+            percent,
+            Some(snapshot.speed_bps as f64),
+            eta,
+            Some(snapshot.connections as i32),
+            None,
+            None,
+            None,
+            None,
+        );
+        let rendered = ProgressDisplay::new().renderable(&event);
+        (self.output)(&format!("{rendered}\n"));
+    }
+
+    fn on_watchdog_action(&mut self, action: &WatchdogAction) {
+        if action.action == WatchdogActionType::None {
+            return;
+        }
+        if self.json {
+            (self.output)(&emit_jsonl(&Event::WatchdogAction(action.to_event())));
+        } else if self.render {
+            (self.output)(&format!("watchdog: {} — {}\n", action.action, action.reason));
+        }
+    }
 }
 
 /// Normalised outcome of one real engine transfer.
@@ -503,8 +574,7 @@ impl App {
         let mut watchdog_config =
             watchdog_config_for(&self.config, local_hour, &host, cli.connections as i32, 0.0, true);
         watchdog_config.network_id = Some(isp.to_owned());
-        let mut watchdog = WatchdogController::with_clock(watchdog_config, Arc::new(SystemClock));
-        let hour_bucket = watchdog.state().hour_bucket;
+        let hour_bucket = watchdog_config.hour_bucket.unwrap_or(-1);
 
         let outcome = if self.offline {
             EngineOutcome {
@@ -517,7 +587,7 @@ impl App {
                 progress: None,
             }
         } else {
-            self.run_engine(target, cli, &dest)?
+            self.run_engine(target, cli, &dest, watchdog_config.clone())?
         };
         let EngineOutcome {
             success,
@@ -528,13 +598,6 @@ impl App {
             avg_speed_bps: avg_speed,
             progress,
         } = outcome;
-
-        // Exercise the v1/v2 controller with the observed transfer speed so the
-        // wired configuration is actually consumed on the production path.
-        let _action = watchdog.observe(ThroughputSample::new(
-            started.elapsed().as_secs_f64().max(0.001),
-            avg_speed,
-        ));
 
         self.last_transfer = Some(TransferSetup {
             isp: isp.to_owned(),
@@ -661,65 +724,12 @@ impl App {
         Ok(exit_code)
     }
 
-    /// Build the engine's progress sink. It always captures the first snapshot
-    /// as transfer telemetry (used by the single JSON `progress` event), and in
-    /// plain mode also renders each tick as a live bar through the output sink.
-    /// JSON and `--quiet` runs render nothing here so stdout stays parseable.
-    fn make_progress_sink(
-        title: String,
-        output: OutputSink,
-        captured: Arc<Mutex<Option<ProgressTelemetry>>>,
-        render: bool,
-    ) -> impl FnMut(&paradl_engine::Snapshot) {
-        move |snapshot| {
-            {
-                let mut guard = captured.lock().unwrap();
-                if guard.is_none() {
-                    *guard = Some(ProgressTelemetry {
-                        downloaded: snapshot.downloaded,
-                        total: snapshot.total,
-                        speed_bps: snapshot.speed_bps,
-                    });
-                }
-            }
-            if !render {
-                return;
-            }
-            let downloaded = i64::try_from(snapshot.downloaded).unwrap_or(i64::MAX);
-            let total = snapshot.total.and_then(|value| i64::try_from(value).ok());
-            let percent = total
-                .filter(|&value| value > 0)
-                .map(|value| py_round(downloaded as f64 * 100.0 / value as f64, 1));
-            let eta = match (total, snapshot.speed_bps) {
-                (Some(value), speed) if value > 0 && speed > 0 => {
-                    Some(py_round((value - downloaded).max(0) as f64 / speed as f64, 1))
-                }
-                _ => None,
-            };
-            let event = ProgressEvent::new(
-                now_timestamp(),
-                title.clone(),
-                downloaded,
-                total,
-                percent,
-                Some(snapshot.speed_bps as f64),
-                eta,
-                Some(snapshot.connections as i32),
-                None,
-                None,
-                None,
-                None,
-            );
-            let rendered = ProgressDisplay::new().renderable(&event);
-            (output)(&format!("{rendered}\n"));
-        }
-    }
-
     fn run_engine(
         &mut self,
         target: &str,
         cli: &Cli,
         dest: &Path,
+        watchdog_config: WatchdogConfig,
     ) -> Result<EngineOutcome, Error> {
         use paradl_engine::{DownloadEngine, NdEngine, Target as EngineTarget};
         use url::Url;
@@ -732,6 +742,7 @@ impl App {
             connections: paradl_engine::clamp_connections(cli.connections.max(0) as u32),
             http3: cli.effective_http3(),
             cancel: self.cancel.clone(),
+            watchdog: Some(watchdog_config),
             ..EngineTarget::default()
         };
         engine_target.mirrors = cli
@@ -751,11 +762,16 @@ impl App {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| target.to_owned());
-        let mut sink = Self::make_progress_sink(title, output, Arc::clone(&captured), render_progress);
-        let outcome = runtime.block_on(async {
-            let plan = engine.plan(&engine_target).await?;
-            engine.download(plan, &mut sink).await
-        })?;
+        let plan = runtime.block_on(async { engine.plan(&engine_target).await })?;
+        let mut sink = AppProgressSink {
+            title,
+            output,
+            captured: Arc::clone(&captured),
+            known_total: plan.size,
+            render: render_progress,
+            json: cli.json,
+        };
+        let outcome = runtime.block_on(async { engine.download(plan, &mut sink).await })?;
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
         let path = outcome.file_path.map(|path| path.to_string_lossy().into_owned());
         let success = outcome.success;
@@ -1579,7 +1595,7 @@ impl Capture {
 #[cfg(test)]
 mod progress_sink_tests {
     use super::*;
-    use paradl_engine::{Snapshot, State};
+    use paradl_engine::{ProgressSink, Snapshot, State};
 
     fn snapshot(downloaded: u64) -> Snapshot {
         Snapshot {
@@ -1604,14 +1620,16 @@ mod progress_sink_tests {
     fn plain_progress_sink_renders_a_bar_and_captures_first_snapshot() {
         let captured = Arc::new(Mutex::new(None));
         let (output, lines) = capturing_output();
-        let mut sink = App::make_progress_sink(
-            "file.zip".to_owned(),
+        let mut sink = AppProgressSink {
+            title: "file.zip".to_owned(),
             output,
-            Arc::clone(&captured),
-            true,
-        );
-        sink(&snapshot(100));
-        sink(&snapshot(500));
+            captured: Arc::clone(&captured),
+            known_total: None,
+            render: true,
+            json: false,
+        };
+        sink.on_progress(&snapshot(100));
+        sink.on_progress(&snapshot(500));
         let rendered = lines.lock().unwrap().clone();
         assert!(
             rendered.contains('█') || rendered.contains('░'),
@@ -1637,11 +1655,59 @@ mod progress_sink_tests {
     fn json_progress_sink_emits_no_plain_output() {
         let captured = Arc::new(Mutex::new(None));
         let (output, lines) = capturing_output();
-        let mut sink = App::make_progress_sink("file.zip".to_owned(), output, captured, false);
-        sink(&snapshot(100));
+        let mut sink = AppProgressSink {
+            title: "file.zip".to_owned(),
+            output,
+            captured,
+            known_total: None,
+            render: false,
+            json: true,
+        };
+        sink.on_progress(&snapshot(100));
         assert!(
             lines.lock().unwrap().is_empty(),
             "JSON mode must not print plain progress lines"
         );
+    }
+
+    fn watchdog_action_sink(json: bool) -> (AppProgressSink, Arc<Mutex<String>>) {
+        let lines = Arc::new(Mutex::new(String::new()));
+        let sink_lines = Arc::clone(&lines);
+        let output: OutputSink = Arc::new(move |text| sink_lines.lock().unwrap().push_str(text));
+        (
+            AppProgressSink {
+                title: "file.zip".to_owned(),
+                output,
+                captured: Arc::new(Mutex::new(None)),
+                known_total: Some(1000),
+                render: !json,
+                json,
+            },
+            lines,
+        )
+    }
+
+    #[test]
+    fn watchdog_action_is_emitted_as_jsonl_line() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_action_sink(true);
+        let mut action = WatchdogAction::new(WatchdogActionType::PauseUnpause);
+        action.reason = "low speed".to_owned();
+        action.timestamp = 1.0;
+        sink.on_watchdog_action(&action);
+        let text = lines.lock().unwrap().clone();
+        assert!(
+            text.contains("\"event\": \"watchdog_action\""),
+            "missing watchdog_action event: {text:?}"
+        );
+        assert!(text.contains("tier2_pause_unpause"), "missing action literal: {text:?}");
+    }
+
+    #[test]
+    fn none_watchdog_action_is_not_emitted() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_action_sink(true);
+        sink.on_watchdog_action(&WatchdogAction::new(WatchdogActionType::None));
+        assert!(lines.lock().unwrap().is_empty());
     }
 }
