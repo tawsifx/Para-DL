@@ -84,7 +84,7 @@ fn make_progress_sink(
             None,
         );
         let rendered = ProgressDisplay::new().renderable(&event);
-        (output)(&format!("\r{rendered}"));
+        (output)(&format!("{rendered}\n"));
     }
 }
 
@@ -445,9 +445,6 @@ impl App {
             render_progress,
         );
         let outcome = runtime.block_on(async { engine.download(plan, &mut sink).await })?;
-        if render_progress {
-            (self.output)("\n");
-        }
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
         let path = outcome.file_path.map(|path| path.to_string_lossy().into_owned());
         let success = outcome.success;
@@ -520,6 +517,8 @@ mod progress_tests {
         assert!(rendered.contains('█') || rendered.contains('░'), "no bar: {rendered:?}");
         assert!(rendered.contains("10.0%"), "first tick must show a real percentage: {rendered:?}");
         assert!(rendered.contains("50.0%"), "later ticks must update the percentage: {rendered:?}");
+        assert!(!rendered.contains('\r'), "no carriage-return overwrites: {rendered:?}");
+        assert!(rendered.ends_with('\n'), "each tick must end its own line: {rendered:?}");
         assert_eq!(captured.lock().unwrap().unwrap().downloaded, 100);
     }
 
