@@ -314,7 +314,7 @@ def run(tag: str, only: str | None, reps: int = 3) -> dict[str, Any]:
         "honesty": HONESTY,
         "results": [],
     }
-    if not ORACLE_DIR.is_dir():
+    if not (ORACLE_DIR / "__init__.py").is_file():
         result["status"] = "retired"
         result["reason"] = ORACLE_RETIRED_REASON
         for name in BUILDERS:
