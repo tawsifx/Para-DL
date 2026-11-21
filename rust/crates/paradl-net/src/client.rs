@@ -4,6 +4,25 @@
 //! The pure helpers ([`parse_content_disposition_filename`],
 //! [`extract_etag_sha256`], [`extract_verified_sha256`], [`sha256_hex_of`])
 //! mirror `src/paradl/net/client.py` byte-for-byte and are network-free.
+//!
+//! # Two HTTP probes — kept separate intentionally
+//!
+//! This `probe_http_url()` and `paradl_engine::probe::probe()` are NOT behaviourally
+//! identical. They are kept separate intentionally; see the post-review hardening
+//! design, C4. Do not consolidate them.
+//!
+//! | Dimension | net `probe_http_url()` (this crate) | engine `probe()` |
+//! |---|---|---|
+//! | HTTP method | HEAD, then `Range: bytes=0-0` fallback on 400/403/405/501/transport error/no range confirmation (2 retries) | one GET, `Range` removed, body not read |
+//! | Timeout | caller-supplied `Duration` (`app.rs` passes `max(1.0, cli.duration)`) | fixed `PROBE_TIMEOUT` = 15s via `tokio::time::timeout` |
+//! | Client | `HttpClient` wrapper (`Arc`-backed, retry config) | `reqwest::Client` from `build_client` (proxy, IP family, `doh`) |
+//! | Result | `HttpProbeResult` drives the `netprobe` event | `ProbeInfo` drives planner, workers and socket recycles |
+//! | Headers/cookie | `User-Agent` + `Accept-Encoding: identity` via `probe_request_headers`; no cookie field | raw cookie on original URL; reqwest redirect stripping + `scope_headers` at worker/recycle sites |
+//! | Filename/validators | `parse_content_disposition_filename`, `extract_etag_sha256`, `extract_verified_sha256` | RFC 6266 `filename*`/`filename`, percent-decode, URL tail, `Validators::from_response`, `Hash::from_headers` |
+//!
+//! Consolidating into `paradl-net` would change the engine's probe method, timeout
+//! semantics, final-URL capture and validator/hash outputs, moving away from the
+//! oracle. Revisit only if a future change makes the two contracts literally the same.
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -687,5 +706,23 @@ mod tests {
     fn find_digest_respects_word_boundaries() {
         assert_eq!(find_sha256_hex("xxabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"), None);
         assert!(find_sha256_hex("sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789").is_some());
+    }
+
+    /// C4 characterization guard: the net probe is HEAD then Range fallback.
+    /// Pins the browser-like User-Agent and the forced `Accept-Encoding:
+    /// identity` that keep the response byte-stable for digest extraction.
+    /// Kept separate from the engine GET probe on purpose; see the post-review
+    /// hardening design, C4.
+    #[test]
+    fn net_probe_contract_is_head_then_range() {
+        assert_eq!(
+            PROBE_USER_AGENT,
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        );
+        let headers = probe_request_headers(&HashMap::new());
+        assert_eq!(
+            headers.get("Accept-Encoding").map(String::as_str),
+            Some("identity")
+        );
     }
 }
