@@ -15,6 +15,24 @@ fn parse(args: &[&str]) -> Cli {
 }
 
 #[test]
+fn retired_flags_are_rejected() {
+    for flag in ["--http3", "--no-http3", "--accept-ranges", "--total",
+                 "--install", "--info", "--hash"] {
+        let argv = vec![flag.to_string(), "x".to_string()];
+        let err = Cli::parse_command_line(argv).expect_err("retired flag must not parse");
+        assert_eq!(err.exit_code(), ExitCode::Usage, "argv: {flag}");
+        assert!(err.to_string().contains("unrecognized arguments:"), "{flag}: {err}");
+    }
+}
+
+#[test]
+fn http3_probe_flag_is_retained() {
+    let cli = parse(&["netprobe", "https://example.com/f", "--http3-probe"]);
+    assert!(cli.http3_probe, "F59 flag must survive");
+    assert!(!parse(&["https://example.com/f"]).http3_probe);
+}
+
+#[test]
 fn help_text_is_byte_exact_oracle_output() {
     let fixture = include_str!("fixtures/help.txt");
     assert_eq!(HELP_TEXT, fixture, "embedded help constant drifted from oracle");
@@ -73,7 +91,7 @@ fn defaults_match_pdlconfig_oracle() {
     assert!(cli.thumbnail);
     assert!(cli.caffeinate);
     assert!(cli.net_watch);
-    assert!(cli.http3);
+    assert!(!cli.http3_probe);
 }
 
 #[test]
@@ -85,14 +103,10 @@ fn engine_choice_and_connection_clamp_input_parse() {
 }
 
 #[test]
-fn dropped_and_alias_flags_are_accepted() {
+fn alias_flags_are_accepted() {
     let cli = parse(&[
         "--doh-endpoint",
         "https://dns.example/dns-query",
-        "--accept-ranges",
-        "--total",
-        "12345",
-        "--http3",
         "--header",
         "X-Test: 1",
         "--cookies",
@@ -104,16 +118,12 @@ fn dropped_and_alias_flags_are_accepted() {
         "/tmp/out",
     ]);
     assert_eq!(cli.doh_endpoint.as_deref(), Some("https://dns.example/dns-query"));
-    assert_eq!(cli.accept_ranges.as_deref(), Some("true"));
-    assert_eq!(cli.total.as_deref(), Some("12345"));
-    assert!(cli.effective_http3());
     assert_eq!(cli.headers, vec!["X-Test: 1"]);
     assert_eq!(cli.cookies.as_deref(), Some("sid=1"));
     assert!(cli.audio_only && cli.embed_metadata && cli.embed_thumbnail);
     assert_eq!(cli.output.as_deref(), Some("/tmp/out"));
 
-    let cli = parse(&["--no-http3", "--no-anti-throttle", "--no-require-ac", "--failed"]);
-    assert!(!cli.effective_http3());
+    let cli = parse(&["--no-anti-throttle", "--no-require-ac", "--failed"]);
     assert_eq!(cli.effective_anti_throttle(), None);
     assert_eq!(cli.effective_require_ac(), Some(false));
     assert_eq!(cli.effective_history_success(), Some(false));
@@ -195,15 +205,11 @@ fn subcommand_usage_messages_are_byte_exact() {
 }
 
 #[test]
-fn download_and_hash_fast_paths_classify() {
+fn download_and_hash_subcommand_classify() {
     let cli = parse(&["https://example.com/f.zip"]);
     assert!(matches!(Command::from_cli(&cli).unwrap(), Command::Download(_)));
-
-    let cli = parse(&["--hash", "local.bin"]);
-    match Command::from_cli(&cli).unwrap() {
-        Command::Hash(h) => assert_eq!(h.file, "local.bin"),
-        other => panic!("expected Hash, got {other:?}"),
-    }
+    let cli = parse(&["hash", "local.bin"]);
+    assert!(matches!(Command::from_cli(&cli).unwrap(), Command::Hash(h) if h.file == "local.bin"));
 }
 
 #[test]

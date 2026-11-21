@@ -61,6 +61,15 @@ const CASES: &[(&str, &[&str], ExitCode, Option<&str>)] = &[
 ];
 
 #[test]
+fn netprobe_http3_probe_flag_is_retained_in_event() {
+    let (code, output) = dispatch(&[
+        "netprobe", "https://example.com/f", "--http3-probe", "--json",
+    ]);
+    assert_eq!(code, ExitCode::Ok);
+    assert!(output.contains("\"http3_supported\":"), "F59 field must survive: {output}");
+}
+
+#[test]
 fn every_subcommand_has_a_wired_handler() {
     for (name, argv, _bound, event) in CASES {
         let mut args = argv.to_vec();

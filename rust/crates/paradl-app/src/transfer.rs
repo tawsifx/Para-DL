@@ -355,7 +355,6 @@ impl App {
             url,
             dest: dest.to_path_buf(),
             connections: paradl_engine::clamp_connections(cli.connections.max(0) as u32),
-            http3: cli.effective_http3(),
             cancel: self.cancel.clone(),
             ..EngineTarget::default()
         };

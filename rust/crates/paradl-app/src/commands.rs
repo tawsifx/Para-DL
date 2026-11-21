@@ -90,7 +90,7 @@ impl App {
             16,
             "none".to_string(),
             if result.ok { "pass" } else { "fail" }.to_string(),
-            cli.http3_probe && cli.effective_http3(),
+            cli.http3_probe,
             format!("status={}", result.status_code),
             result.ok,
         ))

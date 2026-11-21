@@ -309,9 +309,6 @@ impl Command {
         // reaches here never represents a version request.
         let targets = &cli.targets;
         let Some(first) = targets.first() else {
-            if let Some(file) = &cli.hash_file {
-                return Ok(Self::Hash(HashCommand { file: file.clone() }));
-            }
             return Ok(Self::Download(cli.clone()));
         };
 
