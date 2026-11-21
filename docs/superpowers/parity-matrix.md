@@ -90,9 +90,7 @@ Seeded representative rows F01–F12 preserved. F13–F90 below enumerate **ever
 | F06 | `--require-ac`, `--no-require-ac`, `--pause-on-low-power` | W2-4 | guard tests |
 | F07 | `--sign`, `--no-xattr`, `--notify`, `--no-caffeinate`, `--no-net-watch` | W2-2/W2-4 | `install_security_check` golden |
 | F08 | `--header`, `--cookies-from-browser`, `--cookies` | W1-4/W3-4 | cross-host credential non-leak |
-| F09 | `--http3` (accepted, logged drop) | W1-4 | DoH/HTTP3 honesty note |
 | F10 | `--doh-endpoint <URL>` (implement via hickory-dns) | W1-4 | DoH test |
-| F11 | `--accept-ranges`, `--total` (accepted-then-discarded in PyO3; keep flags) | W3-1 | CLI help golden |
 | F12 | `--audio-only`, `--format`, `--embed-metadata`, `--embed-thumbnail` (media) | W3-4 | media golden fixtures |
 | F13 | `targets` (positional, `nargs="*"`; `parser.py:112`) | W3-1 | CLI help golden |
 | F14 | `-a`/`--audio` (`store_true`, default True; `:117`) | W3-4 | media golden fixtures |
@@ -141,7 +139,6 @@ Seeded representative rows F01–F12 preserved. F13–F90 below enumerate **ever
 | F57 | `--interval SEC` (int, default 900; `:370`) | W2-4 | `launchd_plist_generated` golden |
 | F58 | `--duration SEC` (float, default 60.0; `:376`) | W4-1 | `netprobe`/`bench` goldens |
 | F59 | `--http3-probe` (`store_true`; `:382`) | W1-4 | `netprobe.http3_supported` golden |
-| F60 | `--http3` / `--no-http3` (default True; `:388`,`:395`) | W1-4 | DoH/HTTP3 honesty note |
 | F61 | `--proxy` / `--via-proxy` (dest `proxy`, metavar URL; `:401`) | W1-4 | cross-host credential non-leak |
 | F62 | `--push` / `--adb` (dest `push_adb`, default `config.auto_adb_push`; `:408`) | W2-2 | ADB golden |
 | F63 | `--asset` (pattern/extension filter; `:418`) | W2-3 | `test_github_acceleration.py` |
@@ -175,7 +172,15 @@ Seeded representative rows F01–F12 preserved. F13–F90 below enumerate **ever
 | F91 | `throttle` parser: `--host` (default 127.0.0.1), `--port` (default 8765), `--udp-port` (default 8766), `--duration`, `--json`, `-y`/`--yes`, `--non-interactive` (`cli.py:189–234`) | W2-1/W2-4 | VPS server golden |
 | F92 | `throttle` parser positionals: `subcommand` (`nargs="?"`, choices = C29–C37, default `quick`), `extra_args` (`nargs="*"`) — `throttle/cli.py:73–84` | W2-1 | CLI help golden |
 
-> Seeded F01/F08/F09/F10/F11/F12 describe the *target Rust surface* (aliases `--output-dir`, `--header`, `--cookies`, `--doh-endpoint`, `--accept-ranges`, `--total`, `--audio-only`, `--embed-metadata`, `--embed-thumbnail`) that do not all exist verbatim in the current Python parser; they remain as acceptance rows for W3-1/W3-4. F13–F91 are the byte-exact current Python parser surface.
+### Retired CLI flag rows (W5-3)
+
+| Row | Retired flag(s) | Reason |
+|---|---|---|
+| F09 | `--http3` (accepted, logged drop) | retired at W5-3; Python oracle deleted |
+| F11 | `--accept-ranges`, `--total` | retired at W5-3; Python oracle deleted |
+| F60 | `--http3` / `--no-http3` | retired at W5-3; Python oracle deleted |
+
+> Seeded F01/F08/F10/F12 describe the *target Rust surface* (aliases `--output-dir`, `--header`, `--cookies`, `--doh-endpoint`, `--audio-only`, `--embed-metadata`, `--embed-thumbnail`) that do not all exist verbatim in the current Python parser; they remain as acceptance rows for W3-1/W3-4. F13–F91 are the byte-exact current Python parser surface. F09, F11 and F60 are retired at W5-3; Python oracle deleted — see the retired-rows table above.
 
 ---
 
@@ -373,7 +378,7 @@ Seeded L01–L15 preserved; L16+ enumerate the remaining exact strings/numbers/f
 | L39 | power guard: free disk `>= remaining + margin`, `margin = max(5% remaining, min(10% remaining, 64 MiB), 1 KiB)` → `ExitCode.FAILURE(1)`; `--require-ac` on battery → 1 (`DEV_CONTEXT §3`) | W2-4 | guard tests |
 | L40 | Watchdog v2 constants: `threshold = max(user_floor, 0.5*rolling_p90)` at ≥3 samples; `grace_period = 5s` (min 2); 5 low samples / 5s periodic; 2s min cooldown; 4-hour hour buckets `00-03..20-23`; staleness 70% of `speed_after` (`DEV_CONTEXT §3`) | W1-3 | `test_watchdog.py` |
 
-> F08/F09/F10/F11 in §2 similarly record target-Rust flags absent from today's Python parser; they stay as acceptance rows, not as claims about current source.
+> F08/F10 in §2 similarly record target-Rust flags absent from today's Python parser; they stay as acceptance rows, not as claims about current source. F09 and F11 are retired at W5-3 — see the retired-rows table above.
 
 ---
 

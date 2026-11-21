@@ -48,8 +48,10 @@ becomes `MediaClaim::DirectFallback`.
 - `doh` (opt-in) — DNS-over-HTTPS via the hickory-dns project's
   `hickory-resolver` client library, used by `--doh-endpoint`. Without it the
   system resolver is used and the endpoint is accepted but ignored.
-- No HTTP/3 feature exists. The legacy `--http3` flag is kept compatible by
-  `note_http3_drop()`, which logs `HTTP3_DROP_REASON`.
+- No HTTP/3 feature exists. `note_http3_drop()` / `HTTP3_DROP_REASON` remain a
+  public compatibility shim for downstream adapters (still exercised by
+  `routing_oracle.rs` and `examples/resolve_target.rs`); the canonical CLI no
+  longer accepts `--http3`.
 
 ## ISP handoff (W0-3)
 

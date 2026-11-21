@@ -1324,7 +1324,28 @@ async fn cancel_persists_sidecars_for_resume() {
         ..StartOptions::default()
     };
     let dl = Download::start(opts).await.unwrap();
-    tokio::time::sleep(Duration::from_millis(60)).await; // mid-stream
+    // The sidecar touched at start is the zero snapshot (no committed bytes yet).
+    let initial = ResumeState::load(&state_path(&dest)).unwrap().downloaded();
+    assert_eq!(initial, 0, "a fresh download must start from a zero sidecar");
+    // Throttle the transfer so it is still in flight when the periodic 2 s sidecar
+    // save fires; a 60 ms run would never refresh the sidecar at all.
+    dl.set_limit(Some(4096)).unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(8);
+    let mut refreshed = initial;
+    while std::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        refreshed = ResumeState::load(&state_path(&dest))
+            .map(|s| s.downloaded())
+            .unwrap_or(0);
+        if refreshed > initial {
+            break;
+        }
+    }
+    assert!(
+        refreshed > initial,
+        "the real transfer path must refresh the sidecar with committed progress \
+         (initial={initial}, got={refreshed})"
+    );
     dl.cancel().unwrap();
     let res = tokio::time::timeout(Duration::from_secs(5), dl.wait())
         .await

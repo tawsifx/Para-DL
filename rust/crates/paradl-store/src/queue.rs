@@ -2,6 +2,7 @@
 
 use crate::{QueueJob, now_str};
 use rusqlite::{Connection, OptionalExtension, params};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::map_err;
 
@@ -9,14 +10,24 @@ use crate::map_err;
 ///
 /// Obtained from [`crate::Store::open_queue`]. Each operation mirrors the
 /// SQL of `QueueManager` in `src/paradl/resilience/queue.py` byte-for-byte.
+/// The queue shares the store's single `Mutex<Connection>` so operations from
+/// both handles serialize against the same connection.
 #[derive(Debug)]
 pub struct Queue {
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl Queue {
-    pub(crate) fn new(conn: Connection) -> Self {
+    pub(crate) fn new(conn: Arc<Mutex<Connection>>) -> Self {
         Self { conn }
+    }
+
+    /// Lock the shared connection, recovering from a poisoned mutex rather than
+    /// failing the operation.
+    fn lock_conn(&self) -> MutexGuard<'_, Connection> {
+        self.conn
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Insert a job and return the stored row (with `id` and timestamps set).
@@ -32,8 +43,9 @@ impl Queue {
         let options_json = serde_json::to_string(&job.options).map_err(|e| {
             crate::Error::failure(format!("failed to serialize queue options: {e}"))
         })?;
-        self.conn
-            .execute(
+        let id = {
+            let conn = self.lock_conn();
+            conn.prepare_cached(
                 "INSERT INTO queue_jobs (
                     target, target_type, out_dir, filename, mirrors_json,
                     priority, connections, status, require_ac, pause_on_low_power,
@@ -41,36 +53,41 @@ impl Queue {
                     category, bytes_downloaded, error, options_json, created_at, updated_at
                  )
                  VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)",
-                params![
-                    job.target.trim(),
-                    job.target_type,
-                    job.out_dir,
-                    job.filename,
-                    mirrors_json,
-                    job.priority,
-                    connections,
-                    i64::from(job.require_ac),
-                    i64::from(job.pause_on_low_power),
-                    job.when_fast_bps,
-                    job.start_at,
-                    job.expected_length,
-                    job.expected_digest,
-                    job.category,
-                    options_json,
-                    now,
-                    now,
-                ],
             )
+            .map_err(map_err)?
+            .execute(params![
+                job.target.trim(),
+                job.target_type,
+                job.out_dir,
+                job.filename,
+                mirrors_json,
+                job.priority,
+                connections,
+                i64::from(job.require_ac),
+                i64::from(job.pause_on_low_power),
+                job.when_fast_bps,
+                job.start_at,
+                job.expected_length,
+                job.expected_digest,
+                job.category,
+                options_json,
+                now,
+                now,
+            ])
             .map_err(map_err)?;
-        let id = self.conn.last_insert_rowid();
+            conn.last_insert_rowid()
+        }; // guard drops here, before get_job locks the same mutex
         self.get_job(id)?
             .ok_or_else(|| crate::Error::failure("inserted queue job disappeared"))
     }
 
     /// Return a job by id, or `None` when it does not exist.
     pub fn get_job(&self, id: i64) -> crate::Result<Option<QueueJob>> {
-        self.conn
-            .query_row("SELECT * FROM queue_jobs WHERE id = ?1", [id], row_to_job)
+        let conn = self.lock_conn();
+        let mut stmt = conn
+            .prepare_cached("SELECT * FROM queue_jobs WHERE id = ?1")
+            .map_err(map_err)?;
+        stmt.query_row([id], row_to_job)
             .optional()
             .map_err(map_err)
     }
@@ -81,7 +98,8 @@ impl Queue {
             Some(_) => "SELECT * FROM queue_jobs WHERE status = ?1 ORDER BY priority DESC, id ASC",
             None => "SELECT * FROM queue_jobs ORDER BY priority DESC, id ASC",
         };
-        let mut stmt = self.conn.prepare(sql).map_err(map_err)?;
+        let conn = self.lock_conn();
+        let mut stmt = conn.prepare_cached(sql).map_err(map_err)?;
         let rows = match status {
             Some(value) => stmt.query_map([value], row_to_job),
             None => stmt.query_map([], row_to_job),
@@ -109,27 +127,34 @@ impl Queue {
         };
         let bytes = bytes_downloaded.unwrap_or(existing.bytes_downloaded);
         let fname = filename.map(str::to_string).or(existing.filename);
-        self.conn
-            .execute(
-                "UPDATE queue_jobs SET status = ?, bytes_downloaded = ?, error = ?, filename = ?, updated_at = ? WHERE id = ?",
-                params![status, bytes, error, fname, now_str(), id],
-            )
-            .map_err(map_err)?;
+        // get_job above already released its guard; lock only after it returns
+        // so the two statement-scoped locks never overlap.
+        let conn = self.lock_conn();
+        conn.prepare_cached(
+            "UPDATE queue_jobs SET status = ?, bytes_downloaded = ?, error = ?, filename = ?, updated_at = ? WHERE id = ?",
+        )
+        .map_err(map_err)?
+        .execute(params![status, bytes, error, fname, now_str(), id])
+        .map_err(map_err)?;
         Ok(())
     }
 
     /// Remove jobs by id, or every job when `remove_all` is true. Returns the
     /// number of deleted rows.
     pub fn remove_jobs(&self, ids: &[i64], remove_all: bool) -> crate::Result<usize> {
+        let conn = self.lock_conn();
         let changed = if remove_all {
-            self.conn.execute("DELETE FROM queue_jobs", []).map_err(map_err)?
+            conn.prepare_cached("DELETE FROM queue_jobs")
+                .map_err(map_err)?
+                .execute([])
+                .map_err(map_err)?
         } else if ids.is_empty() {
             return Ok(0);
         } else {
             let placeholders = vec!["?"; ids.len()].join(",");
             let sql = format!("DELETE FROM queue_jobs WHERE id IN ({placeholders})");
             let params: Vec<i64> = ids.to_vec();
-            self.conn.execute(&sql, rusqlite::params_from_iter(params)).map_err(map_err)?
+            conn.execute(&sql, rusqlite::params_from_iter(params)).map_err(map_err)?
         };
         Ok(changed)
     }
@@ -137,13 +162,14 @@ impl Queue {
     /// Pause unfinished jobs. Returns the number of changed rows.
     pub fn pause_jobs(&self, ids: &[i64], pause_all: bool) -> crate::Result<usize> {
         let now = now_str();
+        let conn = self.lock_conn();
         let changed = if pause_all {
-            self.conn
-                .execute(
-                    "UPDATE queue_jobs SET status = 'paused', updated_at = ? WHERE status IN ('queued', 'running')",
-                    [now],
-                )
-                .map_err(map_err)?
+            conn.prepare_cached(
+                "UPDATE queue_jobs SET status = 'paused', updated_at = ? WHERE status IN ('queued', 'running')",
+            )
+            .map_err(map_err)?
+            .execute([now])
+            .map_err(map_err)?
         } else if ids.is_empty() {
             return Ok(0);
         } else {
@@ -153,8 +179,7 @@ impl Queue {
             );
             let mut params: Vec<String> = vec![now];
             params.extend(ids.iter().map(ToString::to_string));
-            self.conn
-                .execute(&sql, rusqlite::params_from_iter(params))
+            conn.execute(&sql, rusqlite::params_from_iter(params))
                 .map_err(map_err)?
         };
         Ok(changed)
@@ -163,13 +188,14 @@ impl Queue {
     /// Re-queue paused, crashed or failed jobs. Returns the number of changed rows.
     pub fn resume_jobs(&self, ids: &[i64], resume_all: bool) -> crate::Result<usize> {
         let now = now_str();
+        let conn = self.lock_conn();
         let changed = if resume_all {
-            self.conn
-                .execute(
-                    "UPDATE queue_jobs SET status = 'queued', error = NULL, updated_at = ? WHERE status IN ('paused', 'running', 'failed')",
-                    [now],
-                )
-                .map_err(map_err)?
+            conn.prepare_cached(
+                "UPDATE queue_jobs SET status = 'queued', error = NULL, updated_at = ? WHERE status IN ('paused', 'running', 'failed')",
+            )
+            .map_err(map_err)?
+            .execute([now])
+            .map_err(map_err)?
         } else if ids.is_empty() {
             return Ok(0);
         } else {
@@ -179,8 +205,7 @@ impl Queue {
             );
             let mut params: Vec<String> = vec![now];
             params.extend(ids.iter().map(ToString::to_string));
-            self.conn
-                .execute(&sql, rusqlite::params_from_iter(params))
+            conn.execute(&sql, rusqlite::params_from_iter(params))
                 .map_err(map_err)?
         };
         Ok(changed)
@@ -188,16 +213,16 @@ impl Queue {
 
     /// Transition jobs left in `running` after a crash back to `queued`.
     pub fn recover_crashed_jobs(&self) -> crate::Result<usize> {
-        let changed = self
-            .conn
-            .execute(
+        let conn = self.lock_conn();
+        let changed = conn
+            .prepare_cached(
                 "UPDATE queue_jobs SET status = 'queued', updated_at = ? WHERE status = 'running'",
-                [now_str()],
             )
+            .map_err(map_err)?
+            .execute([now_str()])
             .map_err(map_err)?;
         Ok(changed)
     }
-
 }
 
 fn row_to_job(row: &rusqlite::Row<'_>) -> rusqlite::Result<QueueJob> {

@@ -49,6 +49,7 @@ pub mod app;
 pub mod diagnostics;
 pub(crate) mod events;
 pub mod handoffs;
+pub(crate) mod platform_store;
 
 pub use app::{ApiBridge, ApiResolve, App, Capture, OutputSink, TransferSetup};
 pub use diagnostics::{

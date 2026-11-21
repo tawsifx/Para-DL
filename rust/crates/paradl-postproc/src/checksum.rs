@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufReader, Read};
 use std::path::Path;
+use std::sync::LazyLock;
 
 use blake2::Blake2b512;
 use blake2::Digest as _;
@@ -24,6 +25,14 @@ use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 
 use crate::{ChecksumSource, Result, Verification};
+
+/// Single compiled BSD checksum regex, shared across every `parse_checksum_text` call.
+static BSD_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)^(MD5|SHA1|SHA256|SHA-256|SHA512|SHA-512|BLAKE2b)\s*\(([^)]+)\)\s*=\s*([0-9a-fA-F]+)$",
+    )
+    .expect("static BSD checksum regex")
+});
 
 /// Algorithms supported by the Python oracle (`checksum.py:19`).
 pub const SUPPORTED_ALGOS: &[&str] = &["md5", "sha1", "sha256", "sha512", "blake2b"];
@@ -258,10 +267,7 @@ pub fn parse_checksum_text(
         return None;
     }
 
-    let bsd = Regex::new(
-        r"(?i)^(MD5|SHA1|SHA256|SHA-256|SHA512|SHA-512|BLAKE2b)\s*\(([^)]+)\)\s*=\s*([0-9a-fA-F]+)$",
-    )
-    .expect("static BSD checksum regex");
+    let bsd = &*BSD_RE;
 
     // Pass 1: match the target filename when one was supplied.
     for line in &lines {
@@ -347,5 +353,26 @@ mod tests {
         assert_eq!(Algorithm::from_hex_len(64), Some(Algorithm::Sha256));
         assert_eq!(Algorithm::from_hex_len(128), Some(Algorithm::Sha512));
         assert_eq!(Algorithm::from_hex_len(48), None);
+    }
+
+    #[test]
+    fn bsd_regex_static_still_parses_all_variants() {
+        let a: &Regex = &BSD_RE;
+        let b: &Regex = &BSD_RE;
+        assert!(std::ptr::eq(a, b), "BSD_RE must be one shared static, not per-call");
+        for (name, hex, expected) in [
+            ("MD5",     "0".repeat(32),  Algorithm::Md5),
+            ("SHA1",    "1".repeat(40),  Algorithm::Sha1),
+            ("SHA256",  "2".repeat(64),  Algorithm::Sha256),
+            ("SHA-256", "3".repeat(64),  Algorithm::Sha256),
+            ("SHA512",  "4".repeat(128), Algorithm::Sha512),
+            ("SHA-512", "5".repeat(128), Algorithm::Sha512),
+            ("BLAKE2b", "6".repeat(64),  Algorithm::Blake2b),
+        ] {
+            let text = format!("{name} (a.bin) = {hex}\n");
+            let (algo, digest) = parse_checksum_text(&text, Some("a.bin")).unwrap();
+            assert_eq!(algo, expected, "algorithm for {name}");
+            assert_eq!(digest, hex);
+        }
     }
 }

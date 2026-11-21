@@ -427,7 +427,7 @@ def self_test_pin() -> int:
     rejected via AssertionError.  Called with --self-test-pin; raw output is
     captured in the task-4 report as the RED/GREEN proof.
     """
-    if not ORACLE_DIR.is_dir():
+    if not (ORACLE_DIR / "__init__.py").is_file():
         print(f"SKIP: oracle retired in W5-1 cutover: {ORACLE_RETIRED_REASON}")
         return 0
     t = _target_info("http://127.0.0.1/file")
@@ -504,7 +504,7 @@ def _execute(engine: str, url: str, out_dir: Path) -> Any:
 
 
 def worker(kind: str, url: str = "") -> None:
-    if not ORACLE_DIR.is_dir():
+    if not (ORACLE_DIR / "__init__.py").is_file():
         print("RESULT_ERROR=oracle retired in W5-1 cutover; no Python engine to benchmark")
         return
     if kind == "import_aria2":
@@ -1044,7 +1044,7 @@ def compute_variance(runs: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def run_benchmark_suite(root: Path) -> dict[str, Any]:
-    if not ORACLE_DIR.is_dir():
+    if not (ORACLE_DIR / "__init__.py").is_file():
         # Retired post-cutover. Honesty block and drift caveats are byte-for-byte
         # the same texts used by the live suite below; only measurements change.
         unavailable = _unmeasurable(ORACLE_RETIRED_REASON)

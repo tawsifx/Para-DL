@@ -1,12 +1,26 @@
 # Workspace for the paraDL Rust framework.
 #
-# The entire Python application becomes Rust EXCEPT the media subsystem, which
-# stays a Python package invoked as `python -m paradl_media` over the
-# `paradl-media/1` JSON-lines protocol. New public crates live in `crates/`;
-# `rapids` (engine core) and `paradl-rs` (legacy PyO3 bindings) remain members
-# until their functionality is promoted into `paradl-engine` and `paradl-cli`.
+# The media subsystem is the only remaining Python component; all other code is Rust in `crates/`.
 [workspace]
-members = ["crates/*", "rapids", "paradl-rs"]
+members = ["crates/*"]
+default-members = [
+    "crates/paradl",
+    "crates/paradl-api",
+    "crates/paradl-app",
+    "crates/paradl-cli",
+    "crates/paradl-core",
+    "crates/paradl-engine",
+    "crates/paradl-events",
+    "crates/paradl-media",
+    "crates/paradl-net",
+    "crates/paradl-platform",
+    "crates/paradl-postproc",
+    "crates/paradl-resilience",
+    "crates/paradl-store",
+    "crates/paradl-throttle",
+    "crates/paradl-ui",
+    "crates/paradl-watchdog",
+]
 resolver = "2"
 
 [workspace.package]

@@ -1,5 +1,23 @@
 //! Range probe, HTTP client construction, host-scoped headers, and opt-in DoH.
 //!
+//! # Two HTTP probes — kept separate intentionally
+//!
+//! This `probe()` and `paradl_net::client::probe_http_url()` are NOT behaviourally
+//! identical. They are kept separate intentionally; see the post-review hardening
+//! design, C4. Do not consolidate them.
+//!
+//! | Dimension | engine `probe()` (this crate) | net `probe_http_url()` |
+//! |---|---|---|
+//! | HTTP method | one GET, `Range` removed, body not read | HEAD, then `Range: bytes=0-0` fallback on 400/403/405/501/transport error/no range confirmation (2 retries) |
+//! | Timeout | fixed `PROBE_TIMEOUT` = 15s via `tokio::time::timeout` | caller-supplied `Duration` (`app.rs` passes `max(1.0, cli.duration)`) |
+//! | Client | `reqwest::Client` from `build_client` (proxy, IP family, `doh`) | `HttpClient` wrapper (`Arc`-backed, retry config) |
+//! | Result | `ProbeInfo` drives planner, workers and socket recycles | `HttpProbeResult` drives the `netprobe` event |
+//! | Headers/cookie | raw cookie on original URL; reqwest redirect stripping + `scope_headers` at worker/recycle sites | `User-Agent` + `Accept-Encoding: identity` via `probe_request_headers`; no cookie field |
+//! | Filename/validators | RFC 6266 `filename*`/`filename`, percent-decode, URL tail, `Validators::from_response`, `Hash::from_headers` | `parse_content_disposition_filename`, `extract_etag_sha256`, `extract_verified_sha256` |
+//!
+//! Consolidating into `paradl-net` would change the probe method, timeout semantics,
+//! final-URL capture and validator/hash outputs, moving away from the oracle. Revisit
+//! only if a future change makes the two contracts literally the same.
 // Modifications: a focused GET-only probe that records the *final* (post-redirect) URL.
 // This is the control-plane fix for docs/diagnostics/watchdog-cycle-aria2-bug.md: the
 // redirected URI is captured once and kept in the URI pool for the whole download, including
@@ -7,6 +25,7 @@
 //
 // W1-2 addition: optional DNS-over-HTTPS behind the `doh` feature.
 
+use std::borrow::Cow;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
@@ -103,20 +122,20 @@ pub fn headers_from_pairs(pairs: Option<&std::collections::HashMap<String, Strin
 /// to policy over, so the same rule must be applied here explicitly. This mirrors
 /// reqwest's own sensitive-header set; benign headers (User-Agent, X-Trace-Id, …)
 /// pass through untouched.
-pub fn scope_headers(
-    headers: &HeaderMap,
+pub fn scope_headers<'a>(
+    headers: &'a HeaderMap,
     allowed_host: Option<&str>,
     target_host: Option<&str>,
-) -> HeaderMap {
+) -> Cow<'a, HeaderMap> {
     let same_host = matches!((allowed_host, target_host), (Some(a), Some(t)) if a.eq_ignore_ascii_case(t));
     if same_host {
-        return headers.clone();
+        return Cow::Borrowed(headers);
     }
     let mut out = headers.clone();
     let _ = out.remove(reqwest::header::AUTHORIZATION);
     let _ = out.remove(reqwest::header::COOKIE);
     let _ = out.remove(reqwest::header::PROXY_AUTHORIZATION);
-    out
+    Cow::Owned(out)
 }
 
 /// What a one-request look at a URL tells us before downloading.
@@ -335,4 +354,53 @@ fn build_doh_resolver(endpoint: &str) -> Result<DohResolver> {
     config.add_name_server(ns);
     let inner = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
     Ok(DohResolver { inner })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::borrow::Cow;
+    use reqwest::header::{AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION};
+
+    #[test]
+    fn scope_headers_borrows_same_host_and_owns_cross_host() {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer secret"));
+        headers.insert(COOKIE, HeaderValue::from_static("sid=1"));
+        headers.insert(PROXY_AUTHORIZATION, HeaderValue::from_static("Basic x"));
+        headers.insert("x-trace", HeaderValue::from_static("t"));
+
+        let same = scope_headers(&headers, Some("Example.COM"), Some("example.com"));
+        assert!(matches!(same, Cow::Borrowed(_)), "same host (case-insensitive) must not clone");
+        assert_eq!(same.get(AUTHORIZATION).unwrap(), "Bearer secret");
+
+        let cross = scope_headers(&headers, Some("a.example"), Some("b.example"));
+        assert!(matches!(cross, Cow::Owned(_)), "cross host must clone and strip");
+        for sensitive in [AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION] {
+            assert!(cross.get(sensitive).is_none(), "sensitive header leaked cross-host");
+        }
+        assert_eq!(cross.get("x-trace").unwrap(), "t");
+        assert!(headers.get(AUTHORIZATION).is_some(), "caller's map must be untouched");
+
+        // No host on either side keeps the existing (stripping) behavior.
+        let unknown = scope_headers(&headers, None, None);
+        assert!(matches!(unknown, Cow::Owned(_)));
+        assert!(unknown.get(AUTHORIZATION).is_none());
+    }
+
+    /// C4 characterization guard: the engine probe is a single bounded GET. It
+    /// pins the fixed 15s timeout and the cross-host sensitive-header stripping
+    /// that the worker/recycle path relies on. Kept separate from the net
+    /// HEAD/Range probe on purpose; see the post-review hardening design, C4.
+    #[test]
+    fn engine_probe_contract_is_a_bounded_get() {
+        assert_eq!(PROBE_TIMEOUT, Duration::from_secs(15));
+        let mut h = HeaderMap::new();
+        h.insert(
+            reqwest::header::AUTHORIZATION,
+            HeaderValue::from_static("secret"),
+        );
+        let scoped = scope_headers(&h, Some("a.test"), Some("b.test"));
+        assert!(scoped.get(reqwest::header::AUTHORIZATION).is_none());
+    }
 }

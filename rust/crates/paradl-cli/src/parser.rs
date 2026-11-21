@@ -6,7 +6,7 @@
 //! `--version`, parsing, and usage errors stay byte-compatible with the oracle.
 //!
 //! Option groups in the oracle that write to the same namespace field
-//! (`--require-ac`/`--no-require-ac`, `--success`/`--failed`, `--http3`/`--no-http3`,
+//! (`--require-ac`/`--no-require-ac`, `--success`/`--failed`,
 //! `--anti-throttle`/`--no-anti-throttle`) are represented as separate booleans here
 //! with effective-value accessors, which is lossless and avoids clap argument
 //! conflicts.
@@ -287,12 +287,6 @@ pub struct Cli {
     /// Probe optional HTTP/3 support during `netprobe`.
     #[arg(long, action = ArgAction::SetTrue)]
     pub http3_probe: bool,
-    /// Enable HTTP/3 (default: on; accepted for adapter parity).
-    #[arg(long, action = ArgAction::SetTrue, default_value_t = true)]
-    pub http3: bool,
-    /// Disable HTTP/3 (accepted for adapter parity).
-    #[arg(long, action = ArgAction::SetTrue)]
-    pub no_http3: bool,
     /// Proxy URL for transfers.
     #[arg(long, alias = "via-proxy", value_name = "URL")]
     pub proxy: Option<String>,
@@ -316,15 +310,6 @@ pub struct Cli {
     #[arg(long)]
     pub branch: Option<String>,
 
-    /// Download, verify, extract, and install a GitHub release binary.
-    #[arg(long = "install")]
-    pub install_target: Option<String>,
-    /// Inspect target metadata without downloading.
-    #[arg(long = "info")]
-    pub info_target: Option<String>,
-    /// Compute cryptographic hashes for a file.
-    #[arg(long = "hash")]
-    pub hash_file: Option<String>,
     /// Display recent download history.
     #[arg(long, action = ArgAction::SetTrue)]
     pub history: bool,
@@ -384,16 +369,10 @@ pub struct Cli {
     #[arg(long, action = ArgAction::SetTrue)]
     pub reload: bool,
 
-    // ---- Dropped/legacy flags kept compatible (plan Global Constraints) ----
+    // ---- Implemented compatibility flags (plan Global Constraints) ----
     /// DNS-over-HTTPS endpoint (implemented by `paradl-net`'s `doh` feature).
     #[arg(long = "doh-endpoint", value_name = "URL")]
     pub doh_endpoint: Option<String>,
-    /// Accepted and discarded for adapter parity.
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub accept_ranges: Option<String>,
-    /// Accepted and discarded for adapter parity.
-    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
-    pub total: Option<String>,
 
     // ---- Target-Rust acceptance aliases (parity note below F92) ----
     /// Custom request header (repeatable).
@@ -515,11 +494,6 @@ impl Cli {
         }
     }
 
-    /// Effective HTTP/3 setting (`--no-http3` wins over `--http3`).
-    pub fn effective_http3(&self) -> bool {
-        self.http3 && !self.no_http3
-    }
-
     /// Return the exact oracle help text.
     ///
     /// `clap::Command::render_help` trims the oracle's trailing whitespace-only
@@ -530,7 +504,7 @@ impl Cli {
 }
 
 /// The exact `usage:` block argparse prints before an error: the prefix of
-/// [`HELP_TEXT`] through the `[targets ...]` line (1,978 bytes).
+/// [`HELP_TEXT`] through the `[targets ...]` line (1,850 bytes).
 pub fn usage_block() -> &'static str {
     let split = HELP_TEXT
         .find("\n\n")

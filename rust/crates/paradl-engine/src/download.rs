@@ -362,7 +362,11 @@ impl Shared {
 
     /// Crash-safe periodic sidecar write: `ResumeState::save` fsyncs the part first, then
     /// atomically renames the sidecar, so a saved cursor never claims bytes not on disk.
-    fn maybe_save(&self) {
+    ///
+    /// All blocking work runs on Tokio's blocking pool. Both mutex guards are dropped
+    /// before the `.await`: only owned `Send + 'static` values cross into the closure.
+    /// Per-chunk writes are the deliberate exception and stay on the executor; see [`write_at`].
+    async fn maybe_save(&self) {
         let now = Instant::now();
         {
             let mut last = self.last_save.lock().unwrap();
@@ -372,11 +376,31 @@ impl Shared {
             *last = now;
         }
         let saved = self.planner.lock().unwrap().save();
-        if let Some(rs) = self.resume_state.lock().unwrap().as_mut() {
-            let p = state_path(&self.dest);
-            let _ = rs.save(&p, saved, &self.part);
-        }
+        // Snapshot the state under a short guard: the shared copy is only read later for
+        // checksum/validators, and segments are always re-sourced from the planner.
+        let state = {
+            let guard = self.resume_state.lock().unwrap();
+            guard.clone()
+        };
+        let Some(state) = state else { return };
+        // `try_clone` is a descriptor `dup` on the async thread, not an fsync.
+        let Ok(part) = self.part.try_clone() else { return };
+        let path = state_path(&self.dest);
+        let _ =
+            tokio::task::spawn_blocking(move || save_sidecar_blocking(state, path, saved, part))
+                .await;
     }
+}
+
+/// Owned sidecar write for `spawn_blocking`: the signature takes no `&Shared` or
+/// `MutexGuard`, so no lock can be held across the fsync it performs.
+pub(crate) fn save_sidecar_blocking(
+    mut state: ResumeState,
+    path: PathBuf,
+    segments: Vec<SavedSegment>,
+    part: std::fs::File,
+) -> io::Result<()> {
+    state.save(&path, segments, &part)
 }
 
 #[allow(dead_code)] // payloads document the end condition; supervisor only needs the variant
@@ -391,6 +415,16 @@ enum WorkerEnd {
 
 /// Write `buf` at `offset` in the (sparse) part file. `pwrite` on Unix avoids seeks racing
 /// between workers; the portable fallback clones the descriptor (independent file cursor).
+///
+/// This deliberately stays on the Tokio executor instead of hopping through `spawn_blocking`.
+/// A worker first claims the exact byte range it writes from the planner and commits only after
+/// the call returns, so it touches only bytes it owns and no lock is held across the write: there
+/// is no shared cursor to serialize on. `write_all_at` and the cloned-descriptor fallback are
+/// page-cache-hit syscalls, so dispatching one blocking task per chunk would cost more than the
+/// write itself at up to 16 concurrent workers. The genuinely disk-blocking work is the part
+/// fsync and temp-file rename in the sidecar ([`save_sidecar_blocking`]), the final part-file
+/// rename ([`finalize_blocking`]), and the completed-file hash ([`verify_file`]); those are the
+/// operations A1 and `verify_file` offload.
 fn write_at(file: &std::fs::File, buf: &[u8], offset: u64) -> io::Result<()> {
     #[cfg(unix)]
     {
@@ -460,7 +494,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
         // These are DIRECT requests (no redirect for reqwest to strip on): scope
         // the caller's sensitive headers to the original host on every request.
         let headers = probe::scope_headers(&shared.headers, shared.header_host.as_deref(), uri.host_str());
-        let mut req = shared.client.get(uri.clone()).headers(headers);
+        let mut req = shared.client.get(uri.clone()).headers(headers.into_owned());
         if !stream_plain {
             req = req.header(RANGE, format!("bytes={pos}-{want_end}"));
         }
@@ -591,7 +625,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
                 shared.progress.fetch_add(n as u64, Ordering::Relaxed);
                 *shared.last_progress.lock().unwrap() = Instant::now();
                 pos = end;
-                shared.maybe_save();
+                shared.maybe_save().await;
                 if let Some(end) = done {
                     return WorkerEnd::SegmentDone(end);
                 }
@@ -615,7 +649,7 @@ async fn worker(shared: Arc<Shared>, w: WorkerId, assignment: Assignment) -> Wor
             shared.progress.fetch_add(n as u64, Ordering::Relaxed);
                 *shared.last_progress.lock().unwrap() = Instant::now();
             pos = end;
-            shared.maybe_save(); // crash-safe progress, throttled to SAVE_INTERVAL
+            shared.maybe_save().await; // crash-safe progress, throttled to SAVE_INTERVAL
             if n < chunk.len() {
                 // A split cut this chunk short; the remainder is re-requested from `pos`.
                 short = true;
@@ -826,14 +860,17 @@ async fn supervise(
     }
 
     shared.set_state(State::Verifying);
-    // Persist the final segment table before renaming the part file into place.
-    {
-        let saved: Vec<SavedSegment> = shared.planner.lock().unwrap().save();
-        if let Some(rs) = shared.resume_state.lock().unwrap().as_mut() {
-            let p = state_path(&shared.dest);
-            let _ = rs.save(&p, saved, &shared.part);
-        }
-    }
+    // Snapshot the final state/segments on the async thread; the blocking task owns
+    // them from here. Both guards are short-lived and dropped before any await.
+    let state = shared.resume_state.lock().unwrap().clone();
+    let segments: Vec<SavedSegment> = shared.planner.lock().unwrap().save();
+    let final_args = FinalizeArgs {
+        part_path: shared.part_path.clone(),
+        dest: shared.dest.clone(),
+        sidecar: state_path(&shared.dest),
+        state,
+        segments,
+    };
 
     // F1: verify the PART file (where the bytes actually are), THEN rename. Verifying
     // `dest` before the rename either fails on a fresh download or hashes a stale file.
@@ -854,10 +891,11 @@ async fn supervise(
         }
     }
 
-    std::fs::rename(&shared.part_path, &shared.dest)?;
-    // The download is complete: remove the sidecar so a later run does not "resume" it.
-    let sp = state_path(&shared.dest);
-    let _ = std::fs::remove_file(sp);
+    // Persist the final segment table and rename the part file off the async threads.
+    tokio::task::spawn_blocking(move || finalize_blocking(final_args))
+        .await
+        .map_err(|e| error::verification(format!("finalize task failed: {e}")))?
+        .map_err(Error::from)?;
     shared.progress.store(total, Ordering::Relaxed);
     shared.finished.store(true, Ordering::Relaxed);
     shared.set_state(State::Done);
@@ -877,6 +915,33 @@ fn shared_resume_checksum(shared: &Shared) -> Option<Hash> {
         .unwrap()
         .as_ref()
         .and_then(|s| s.checksum.clone())
+}
+
+/// Owned inputs for the final sidecar save and part-file rename. No borrow of `Shared`
+/// can be stored here, so a lock guard cannot accompany the blocking work.
+struct FinalizeArgs {
+    part_path: PathBuf,
+    dest: PathBuf,
+    sidecar: PathBuf,
+    state: Option<ResumeState>,
+    segments: Vec<SavedSegment>,
+}
+
+/// Persist the final segment table, rename the verified part into place, then drop the
+/// sidecar so a later run does not "resume" a finished download.
+fn finalize_blocking(args: FinalizeArgs) -> io::Result<()> {
+    if let Some(mut state) = args.state {
+        // `save` flushes the part before the atomic sidecar rename. Re-open the part
+        // descriptor here: only owned data crosses into the blocking task.
+        let part = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&args.part_path)?;
+        let _ = state.save(&args.sidecar, args.segments, &part);
+    }
+    std::fs::rename(&args.part_path, &args.dest)?;
+    let _ = std::fs::remove_file(&args.sidecar);
+    Ok(())
 }
 
 /// Hash a completed file off the async threads: `spawn_blocking` keeps a Tokio worker free.
@@ -918,7 +983,7 @@ impl Download {
             // credentials to it during the probe either (reqwest only strips on
             // redirects, not on a direct GET to an alternate host).
             let scoped = probe::scope_headers(&opts.headers, opts.url.host_str(), candidate.host_str());
-            match probe::probe(client, candidate.clone(), scoped, cookie).await {
+            match probe::probe(client, candidate.clone(), scoped.into_owned(), cookie).await {
                 Ok(i) => {
                     info = Some(i);
                     break;
@@ -1179,5 +1244,65 @@ impl Download {
     /// Number of URIs in the pool (final URL plus mirrors).
     pub fn uri_pool_len(&self) -> usize {
         self.shared.uris.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Compile-time proof that the inputs to `save_sidecar_blocking` are owned
+    /// `Send + 'static` values, so they can cross into `spawn_blocking` without
+    /// dragging a `MutexGuard` along. Behavioural proof: the owned data alone
+    /// writes a byte-exact, loadable sidecar.
+    #[test]
+    fn sidecar_blocking_helper_is_owned_send_static_and_writes_loadable_sidecar() {
+        fn assert_send_static<T: Send + 'static>(_: T) {}
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("a.bin");
+        let part = std::fs::File::create(dir.path().join("a.bin.pdl.part")).unwrap();
+        let url: url::Url = "http://x/a.bin".parse().unwrap();
+        let state = crate::state::ResumeState::new(
+            url.clone(), url, dest.clone(), 4, crate::state::Validators::default(),
+        );
+        let segments = vec![crate::planner::SavedSegment { start: 0, cursor: 4, end: 4 }];
+        let path = crate::naming::state_path(&dest);
+        let mut expected = state.clone();
+        expected.segments = segments.clone(); // save() records the segments it was given
+
+        // Compile-time proof the inputs can cross into spawn_blocking.
+        assert_send_static(state.clone());
+        assert_send_static(segments.clone());
+        assert_send_static(path.clone());
+        assert_send_static(part.try_clone().unwrap());
+
+        // Behavioural proof: owned data alone writes a byte-exact sidecar.
+        crate::download::save_sidecar_blocking(
+            state.clone(), path.clone(), segments.clone(), part,
+        ).unwrap();
+        let loaded = crate::state::ResumeState::load(&path).unwrap();
+        assert_eq!(loaded, expected);
+        assert_eq!(loaded.segments, segments);
+    }
+
+    /// Same owned inputs executed on Tokio's real blocking pool, exactly as
+    /// `Shared::maybe_save` does. The helper signature has no `&Mutex`/`&Shared`
+    /// parameter, so holding a guard across the fsync is structurally impossible.
+    #[tokio::test]
+    async fn sidecar_write_via_spawn_blocking_is_loadable() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("a.bin");
+        let part = std::fs::File::create(dir.path().join("a.bin.pdl.part")).unwrap();
+        let url: url::Url = "http://x/a.bin".parse().unwrap();
+        let state = crate::state::ResumeState::new(
+            url.clone(), url, dest.clone(), 4, crate::state::Validators::default(),
+        );
+        let segments = vec![crate::planner::SavedSegment { start: 0, cursor: 4, end: 4 }];
+        let path = crate::naming::state_path(&dest);
+
+        let handle = tokio::task::spawn_blocking(move || {
+            crate::download::save_sidecar_blocking(state, path.clone(), segments, part)?;
+            Ok::<_, std::io::Error>(path)
+        });
+        let path = handle.await.unwrap().unwrap();
+        assert_eq!(crate::state::ResumeState::load(&path).unwrap().downloaded(), 4);
     }
 }
