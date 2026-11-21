@@ -41,6 +41,20 @@ fn help_text_is_byte_exact_oracle_output() {
 }
 
 #[test]
+fn help_does_not_advertise_retired_flags() {
+    let usage = usage_block();
+    for token in ["[--http3]", "[--no-http3]", "[--install ", "[--info ", "[--hash "] {
+        assert!(!usage.contains(token), "usage block still lists {token}");
+    }
+    assert!(HELP_TEXT.contains("--http3-probe"), "F59 flag must stay documented");
+    for line in HELP_TEXT.lines().map(str::trim_start) {
+        for stale in ["--http3 ", "--no-http3 ", "--install ", "--info ", "--hash "] {
+            assert!(!line.starts_with(stale), "option line still lists {stale}: {line}");
+        }
+    }
+}
+
+#[test]
 fn version_text_is_byte_exact_oracle_output() {
     const ORACLE_VERSION: &str = "parallel-dl (paradl) v1.0.0\n";
     assert_eq!(VERSION_TEXT, ORACLE_VERSION);
@@ -444,7 +458,7 @@ fn argparse_error_output_is_byte_exact_for_additional_choices_and_types() {
         ),
     ];
     let usage = usage_block();
-    assert_eq!(usage.len(), 1978);
+    assert_eq!(usage.len(), 1850);
     for (argv, message) in cases {
         let expected = format!("{usage}{message}");
         assert_eq!(parse_error(argv).to_string(), expected, "argv: {argv:?}");
