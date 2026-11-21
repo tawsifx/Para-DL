@@ -7,11 +7,12 @@
 //! [`RouteDecision::DelegateToWorker`] for the Python media worker.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use paradl_core::{TargetType, sanitize_filename};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -245,8 +246,18 @@ fn classify_image(url: &str, probe: Option<&HttpProbeResult>, fallback_name: Str
     }
 }
 
+/// Bare repository shorthand (`owner/repo`). Dots are excluded so file paths
+/// and URLs cannot be swallowed; dotted names use the explicit `gh:` prefix.
+static BARE_REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[A-Za-z0-9_]+/[A-Za-z0-9_]+$").expect("bare repo regex must compile")
+});
+
 fn shortcut_type(lower: &str) -> Option<TargetType> {
-    if lower.starts_with("gh:") || lower.starts_with("github:") || lower.contains("github.com/") {
+    if lower.starts_with("gh:")
+        || lower.starts_with("github:")
+        || lower.contains("github.com/")
+        || BARE_REPO_RE.is_match(lower)
+    {
         Some(TargetType::Github)
     } else if lower.starts_with("hf:")
         || lower.starts_with("huggingface:")
@@ -737,5 +748,47 @@ mod tests {
     fn probe_error_status_descriptions() {
         assert!(status_description(402).contains("Payment Required"));
         assert!(status_description(404).contains("Not Found"));
+    }
+
+    #[test]
+    fn bare_owner_repo_is_github() {
+        let decision = classify_target("cli/cli", None, &PureClaimsChecker);
+        assert!(
+            matches!(
+                decision,
+                RouteDecision::Site {
+                    target_type: TargetType::Github,
+                    ..
+                }
+            ),
+            "{decision:?}"
+        );
+
+        // A github.com URL is a site shortcut via the existing URL check; the
+        // bare shorthand must not swallow it (the original target survives).
+        let url = classify_target("github.com/cli/cli", None, &PureClaimsChecker);
+        assert!(
+            matches!(
+                url,
+                RouteDecision::Site {
+                    target_type: TargetType::Github,
+                    ref clean_url,
+                } if clean_url == "github.com/cli/cli"
+            ),
+            "{url:?}"
+        );
+
+        // Dotted / path-like names are not bare shorthand; they stay search.
+        let dotted = classify_target("foo/bar.py", None, &PureClaimsChecker);
+        assert!(
+            matches!(
+                dotted,
+                RouteDecision::DelegateToWorker {
+                    target_type: TargetType::Search,
+                    ..
+                }
+            ),
+            "{dotted:?}"
+        );
     }
 }
