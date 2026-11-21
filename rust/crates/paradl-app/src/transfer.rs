@@ -15,9 +15,10 @@ use chrono::Timelike;
 
 use paradl_cli::{Cli, ExitCode};
 use paradl_core::{Error, SystemClock, WatchdogMode, format_speed, parse_rate};
-use paradl_events::{Event, ResultEvent, emit_jsonl, now_timestamp};
+use paradl_events::{Event, ProgressEvent, ResultEvent, emit_jsonl, now_timestamp};
 use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
 use paradl_store::{SqliteStore, Store, TransferRecord};
+use paradl_ui::ProgressDisplay;
 use paradl_watchdog::{ThroughputSample, WatchdogController, py_round};
 
 use crate::events::{ProgressRow, ResultRow, TargetClassifiedRow};
@@ -26,6 +27,66 @@ use crate::handoffs::{resolve_isp, watchdog_config_for};
 use crate::handoffs::map_media_error_kind;
 
 use super::{App, naming::{classification_info, decision_filename, decision_name, destination, url_host}};
+
+/// Build the engine's progress sink. It always captures the first snapshot as
+/// transfer telemetry (used by the single JSON `progress` event), and in plain
+/// mode renders each tick as a live bar with a percentage. When a snapshot has
+/// no total yet (typical of the first tick), the plan's `Content-Length` is used
+/// so the percentage and bar are real from the start. JSON and `--quiet` runs
+/// render nothing here, keeping stdout parseable.
+fn make_progress_sink(
+    title: String,
+    output: crate::app::OutputSink,
+    captured: Arc<Mutex<Option<ProgressTelemetry>>>,
+    known_total: Option<u64>,
+    render: bool,
+) -> impl FnMut(&paradl_engine::Snapshot) {
+    move |snapshot| {
+        {
+            let mut guard = captured.lock().unwrap();
+            if guard.is_none() {
+                *guard = Some(ProgressTelemetry {
+                    downloaded: snapshot.downloaded,
+                    total: snapshot.total,
+                    speed_bps: snapshot.speed_bps,
+                });
+            }
+        }
+        if !render {
+            return;
+        }
+        let downloaded = i64::try_from(snapshot.downloaded).unwrap_or(i64::MAX);
+        let total = snapshot
+            .total
+            .or(known_total)
+            .and_then(|value| i64::try_from(value).ok());
+        let percent = total
+            .filter(|&value| value > 0)
+            .map(|value| py_round(downloaded as f64 * 100.0 / value as f64, 1));
+        let eta = match (total, snapshot.speed_bps) {
+            (Some(value), speed) if value > 0 && speed > 0 => {
+                Some(py_round((value - downloaded).max(0) as f64 / speed as f64, 1))
+            }
+            _ => None,
+        };
+        let event = ProgressEvent::new(
+            now_timestamp(),
+            title.clone(),
+            downloaded,
+            total,
+            percent,
+            Some(snapshot.speed_bps as f64),
+            eta,
+            Some(snapshot.connections as i32),
+            None,
+            None,
+            None,
+            None,
+        );
+        let rendered = ProgressDisplay::new().renderable(&event);
+        (output)(&format!("\r{rendered}"));
+    }
+}
 
 /// Observable inputs used for the most recent transfer.
 ///
@@ -367,26 +428,26 @@ impl App {
         engine_target.doh_endpoint = cli.doh_endpoint.clone();
 
         let engine = NdEngine::default();
+        let output = Arc::clone(&self.output);
         let runtime = self.runtime();
         let captured: Arc<Mutex<Option<ProgressTelemetry>>> = Arc::new(Mutex::new(None));
-        let sink = {
-            let captured = Arc::clone(&captured);
-            move |snapshot: &paradl_engine::Snapshot| {
-                let mut guard = captured.lock().unwrap();
-                if guard.is_none() {
-                    *guard = Some(ProgressTelemetry {
-                        downloaded: snapshot.downloaded,
-                        total: snapshot.total,
-                        speed_bps: snapshot.speed_bps,
-                    });
-                }
-            }
-        };
-        let mut sink = sink;
-        let outcome = runtime.block_on(async {
-            let plan = engine.plan(&engine_target).await?;
-            engine.download(plan, &mut sink).await
-        })?;
+        let render_progress = !cli.json && !cli.quiet;
+        let title = dest
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| target.to_owned());
+        let plan = runtime.block_on(async { engine.plan(&engine_target).await })?;
+        let mut sink = make_progress_sink(
+            title,
+            output,
+            Arc::clone(&captured),
+            plan.size,
+            render_progress,
+        );
+        let outcome = runtime.block_on(async { engine.download(plan, &mut sink).await })?;
+        if render_progress {
+            (self.output)("\n");
+        }
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
         let path = outcome.file_path.map(|path| path.to_string_lossy().into_owned());
         let success = outcome.success;
@@ -419,5 +480,55 @@ fn media_error_kind(error: &Error) -> &str {
         Error::Usage(_) => "usage",
         Error::Interrupted(_) => "interrupted",
         _ => "download",
+    }
+}
+
+#[cfg(test)]
+mod progress_tests {
+    use super::*;
+    use paradl_engine::{Snapshot, State};
+
+    fn snapshot(downloaded: u64, total: Option<u64>) -> Snapshot {
+        Snapshot {
+            state: State::Downloading,
+            downloaded,
+            total,
+            speed_bps: 500,
+            connections: 4,
+            error: None,
+            path: None,
+        }
+    }
+
+    fn capturing_output() -> (crate::app::OutputSink, Arc<Mutex<String>>) {
+        let lines = Arc::new(Mutex::new(String::new()));
+        let sink_lines = Arc::clone(&lines);
+        let sink: crate::app::OutputSink =
+            Arc::new(move |text| sink_lines.lock().unwrap().push_str(text));
+        (sink, lines)
+    }
+
+    #[test]
+    fn plain_progress_renders_bar_and_percentage_from_plan_total() {
+        let captured = Arc::new(Mutex::new(None));
+        let (output, lines) = capturing_output();
+        // First tick has no snapshot total; the plan's Content-Length supplies it.
+        let mut sink = make_progress_sink("file.zip".to_owned(), output, Arc::clone(&captured), Some(1000), true);
+        sink(&snapshot(100, None));
+        sink(&snapshot(500, Some(1000)));
+        let rendered = lines.lock().unwrap().clone();
+        assert!(rendered.contains('█') || rendered.contains('░'), "no bar: {rendered:?}");
+        assert!(rendered.contains("10.0%"), "first tick must show a real percentage: {rendered:?}");
+        assert!(rendered.contains("50.0%"), "later ticks must update the percentage: {rendered:?}");
+        assert_eq!(captured.lock().unwrap().unwrap().downloaded, 100);
+    }
+
+    #[test]
+    fn json_and_quiet_runs_render_no_plain_progress() {
+        let captured = Arc::new(Mutex::new(None));
+        let (output, lines) = capturing_output();
+        let mut sink = make_progress_sink("file.zip".to_owned(), output, captured, Some(1000), false);
+        sink(&snapshot(500, Some(1000)));
+        assert!(lines.lock().unwrap().is_empty());
     }
 }
