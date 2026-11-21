@@ -58,7 +58,7 @@ pub const THROTTLE_TABLES: [&str; 3] = ["throttle_samples", "throttle_runs", "as
 
 /// The authoritative persistence interface (framework charter §2).
 ///
-/// Every method opens a fresh managed connection, so implementations are
+/// Implementations share one mutex-guarded connection per store, so they are
 /// `Send + Sync` even though rusqlite connections themselves are not `Sync`.
 pub trait Store: Send + Sync {
     /// Insert one transfer-history row, applying the configured history cap.
