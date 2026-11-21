@@ -1,13 +1,15 @@
 # parallel-dl (`paradl`)
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Rust 1.98+](https://img.shields.io/badge/rust-1.98+-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform: Windows & macOS](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20macOS-brightgreen.svg)]()
 [![Architecture: x64 & ARM64](https://img.shields.io/badge/arch-x64%20%7C%20ARM64-blue.svg)]()
 
 > Fast, multi-channel download accelerator that bypasses ISP throttling with 16 parallel streams, adaptive watchdog recovery, and cryptographic verification — on Windows and macOS.
 
-`parallel-dl` (invokable as `paradl` or `parallel-dl`) saturates your connection by splitting downloads across concurrent range channels, then automatically resets throttled flows with an adaptive p90 watchdog. Every file is verified with SHA-256 checksums before it lands on disk.
+`parallel-dl` (invokable as `paradl` or `parallel-dl`) is a **single native Rust binary**. It saturates your connection by splitting downloads across concurrent range channels, then automatically resets throttled flows with an adaptive p90 watchdog. Every file is verified with SHA-256 checksums before it lands on disk.
+
+**Python is not required for normal downloads.** The only Python component is an optional media worker (`yt-dlp`-based audio/video extraction) that the binary talks to over the versioned `paradl-media/1` protocol; media routes need Python 3.11+ and are enabled separately via a private virtual environment.
 
 ---
 
@@ -24,48 +26,94 @@
 | **Media & Audio** | YouTube/yt-dlp downloads with ID3 tagging, cover art, and 256kbps AAC extraction. |
 | **Hugging Face Models** | `hf:` prefixed downloads for GGUF weights, safetensors, and AI models. |
 | **Apple IPSW Firmware** | `ipsw:` prefixed downloads with TSS signature verification. |
-| **REST API** | `paradl server` — FastAPI server with task CRUD (mirrors Gopeed's MCP set). |
-| **Terminal UI** | `paradl tui` — Textual-based download manager with progress bars and categories. |
+| **REST API** | `paradl server` — built-in Rust API server (opt-in `api` feature) with task CRUD (mirrors Gopeed's MCP set). |
+| **Terminal UI** | `paradl tui` — built-in Rust terminal download manager (opt-in `tui` feature) with progress bars and categories. |
 | **Download History** | `paradl history` — searchable, filterable SQLite-backed download log. |
 
 ---
 
 ## Installation
 
-### Option 1: Via `uv` (recommended)
+`paradl` and `parallel-dl` are **the same native binary** — there is no Python
+package, console script, or `pip`/`uv tool` install for the application itself.
 
-```bash
-uv tool install git+https://github.com/tawsifx/Para-DL.git
-```
-
-### Option 2: Via `pipx`
-
-```bash
-pipx install git+https://github.com/tawsifx/Para-DL.git
-```
-
-### Option 3: Via Homebrew (macOS)
+### Option 1: Via Homebrew (macOS)
 
 ```bash
 brew tap tawsifx/tap
 brew install parallel-dl
 ```
 
+This builds the Rust binary into `bin/` and installs an **optional** media venv
+under `libexec/`. Add `--without-python@3.12` for a media-free install; every
+non-media route still works.
+
+### Option 2: Local install script (macOS / Linux / Windows)
+
+```bash
+# macOS / Linux — builds the binary, plus an optional media venv
+./scripts/install-local.sh
+
+# Media-free install: no Python or uv needed
+PARADL_SKIP_MEDIA=1 ./scripts/install-local.sh
+
+# Windows (PowerShell):
+#   .\scripts\install-local.ps1
+#   $env:PARADL_SKIP_MEDIA = "1"; .\scripts\install-local.ps1
+```
+
+Both scripts install `paradl` and the `parallel-dl` alias into
+`PARADL_BIN_DIR` (default `~/.local/bin`, or `%USERPROFILE%\.local\bin` on
+Windows).
+
+### Option 3: Build from source
+
+Requires the Rust toolchain (1.98+):
+
+```bash
+cd rust
+cargo build --release --bin paradl
+# binary: rust/target/release/paradl
+```
+
 ### Prerequisites
 
-HTTP(S) downloads use the **native Rust `rapids` engine** built into `paradl` — no external download daemon is needed for the default path. [`aria2`](https://aria2.github.io/) is only required if you force `--engine aria2` or download torrents/magnets/metalinks, and [`ffmpeg`](https://ffmpeg.org/) is optional for media extraction:
+HTTP(S) downloads use the native Rust engine built into the binary — no Python
+and no external download daemon are needed. [`aria2`](https://aria2.github.io/)
+is only required if you force `--engine aria2` or download torrents/magnets/
+metalinks. [`ffmpeg`](https://ffmpeg.org/) is optional and only used by media
+routes:
 
 - **Windows:** `winget install Gyan.FFmpeg` (add `aria2.aria2` only for the legacy engine / torrents)
 - **macOS:** `brew install ffmpeg` (add `aria2` only for the legacy engine / torrents)
 
-If the native extension is not built, `paradl` gracefully falls back to aria2 for HTTP(S). Build it with `maturin develop --release` from `rust/paradl-rs` (see the [contributor setup](#contributor-setup) section).
-
-Verify the install:
+Verify the install (works with **no Python installed or configured**):
 
 ```bash
 paradl --version
 paradl doctor
 ```
+
+### Optional: enable media routes (YouTube, audio extraction)
+
+Media extraction is the one remaining Python component. It is a one-shot worker
+invoked as `python -m paradl_media`, installed into its own venv so it never
+pollutes system Python. Run the install scripts above (which create this venv),
+or set it up manually:
+
+```bash
+python3.12 -m venv ~/.local/share/paradl/media-venv
+VENV=~/.local/share/paradl/media-venv
+"$VENV/bin/python" -m pip install -U pip
+"$VENV/bin/python" -m pip install "yt-dlp[default]" mutagen
+# From a source checkout, also install the retained media package:
+"$VENV/bin/python" -m pip install ./media
+export PARADL_MEDIA_PY="$VENV/bin/python"   # persist this in your shell profile
+```
+
+`paradl doctor` reports the media package, protocol, and `yt-dlp` versions.
+Without `PARADL_MEDIA_PY`, media routes report the dependency as missing while
+all other routes keep working.
 
 ---
 
@@ -155,10 +203,11 @@ paradl resume --from-history 42 -o ~/Downloads
 
 ## REST API Server
 
-Start a local API server for programmatic control:
+Start the built-in local API server for programmatic control. It is an opt-in
+Rust feature — build with `cargo build --release --features api` (or use a
+release that enables it):
 
 ```bash
-pip install "parallel-dl[api]"
 paradl server
 ```
 
@@ -188,10 +237,10 @@ curl -X POST http://127.0.0.1:8000/tasks \
 
 ## Terminal UI
 
-A visual download manager inside your terminal:
+A visual download manager inside your terminal (built-in Rust `tui` feature;
+build with `cargo build --release --features tui`):
 
 ```bash
-pip install "parallel-dl[tui]"
 paradl tui
 ```
 
@@ -207,7 +256,9 @@ Features: task list with progress bars, pause/resume/delete, categories, search,
 - `--engine aria2` selects the legacy JSON-RPC daemon backend.
 - **Torrents, magnets, and metalinks** are always delegated to aria2, regardless of selection.
 
-If the compiled extension is unavailable, HTTP(S) transfers automatically fall back to aria2. Check which engine is active with `paradl doctor`.
+The native engine is compiled into the binary; `paradl doctor` reports engine
+status. Python is never spawned on HTTP(S), GitHub, Hugging Face, IPSW, PyPI,
+Brew, or other non-media routes.
 
 ---
 
@@ -217,31 +268,44 @@ If the compiled extension is unavailable, HTTP(S) transfers automatically fall b
 |----------------------|-------------|---------|
 | `PARADL_HOME` | Config & data directory | `~/.config/paradl` (macOS/Linux) <br> `%LOCALAPPDATA%\paradl` (Windows) |
 | `PARADL_GITHUB_ARCHIVE_MIRROR` | Range-capable mirror prefix for GitHub `/archive/` URLs (empty disables acceleration) | `https://gh-proxy.com/` |
+| `PARADL_MEDIA_PY` | Interpreter for the **optional** media worker venv; only consulted on media routes | auto-discovered from the install's `libexec/` venv |
 
 ---
 
 ## Contributor setup
 
-To build the native `rapids` engine from source (Rust 1.98+ and `maturin` required):
+The framework is a Cargo workspace under `rust/` (public `paradl-*` crates plus
+the legacy `rapids` core / `paradl-rs` PyO3 member). A Python 3.12 interpreter is
+only needed so the legacy PyO3 member can resolve; the new framework crates do
+not depend on it:
 
 ```bash
-cd rust/paradl-rs
-maturin develop --release
-cp python/paradl/_rust_engine*.so ../../src/paradl/
-cd ../..
-python -m pytest -q
+cd rust
+PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo build --all
+PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo test --all
+PYO3_PYTHON="$(pwd)/../.venv/bin/python" cargo clippy --all -- -D warnings
 ```
 
-The workspace lives under `rust/` (`rapids` core + `paradl-rs` PyO3 bindings). Run `cargo test --all` and `cargo clippy --all -- -D warnings` from `rust/` to verify the Rust side.
+Media worker tests live in the retained `media/` package:
+
+```bash
+PYTHONPATH=media .venv/bin/python -m pytest media/tests -q
+```
+
+The root `pyproject.toml` is a legacy tooling stub only; neither the Python
+application (`src/paradl/`) nor the bulk Python test suite exists anymore.
 
 ---
 
 ## CLI Entry Points
 
-Both commands invoke the same application:
+Both commands are the **same native Rust binary** — there are no Python console
+scripts and no `parallel-dl.py` shim:
 
 - `paradl` — primary command
-- `parallel-dl` — full package name
+- `parallel-dl` — full-name alias (symlink to the same binary)
+
+`paradl --version` prints `parallel-dl (paradl) v1.0.0` for either name.
 
 ---
 

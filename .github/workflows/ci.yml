@@ -6,86 +6,15 @@ on:
   pull_request:
     branches: [main]
 
-# The framework is now Rust-first: native cargo build/test/clippy/fmt jobs are
-# the primary gate. The Python jobs below are kept as the read-only behavioral
-# oracle until the Wave 5 cutover. Media stays a Python package
-# (`python -m paradl_media`) spoken to over the `paradl-media/1` protocol;
-# it is never embedded in the Rust binary.
+# The framework is Rust-first. Native cargo build/test/clippy/fmt jobs are the
+# primary gate; the Python application and bulk Python tests were removed in the
+# W5-1 cutover, so the old Python lint/test/bench jobs are gone. Media stays a
+# standalone Python package (`python -m paradl_media`) spoken to over the
+# versioned `paradl-media/1` protocol; the media-package job exercises it and
+# the cross-boundary job gates the handshake and negative cases. The native
+# binary owns both `paradl` and `parallel-dl`; no Python console scripts exist.
 
 jobs:
-  lint-and-type:
-    name: Lint & Type Check (Python oracle)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Install dev dependencies
-        run: uv sync --group dev
-
-      - name: Run ruff (lint + format check)
-        run: uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
-
-      - name: Run mypy (type check)
-        run: uv run mypy src/paradl/
-
-  test-macos:
-    name: Tests (macOS, Python oracle)
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: brew install aria2 ffmpeg
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
-
-  test-windows:
-    name: Tests (Windows, Python oracle)
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          winget install aria2.aria2 Gyan.FFmpeg || true
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Run test suite
-        run: uv run pytest tests/ -v --cov=src/paradl --cov-report=term-missing
-
   rust-native:
     name: Rust native (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -125,7 +54,11 @@ jobs:
         working-directory: rust
         env:
           PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
-        run: cargo test --all
+        # The W4-2 non-media differential gate needs the Python oracle
+        # (`src/paradl/**` + `parallel-dl.py`) deleted in W5-1. Its GREEN
+        # evidence is captured pre-cutover at c4e271a. Skip ONLY that test;
+        # every other crate test (including the boundary lane) still runs.
+        run: cargo test --all -- --skip full_non_media_gate_is_clean
 
       - name: Clippy (deny warnings)
         working-directory: rust
@@ -133,7 +66,7 @@ jobs:
           PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo clippy --all -- -D warnings
 
-      # Scoped to the new framework crates: the legacy `rapids`/`paradl-rs`
+      # Scoped to the framework crates: the legacy `rapids`/`paradl-rs`
       # sources are formatted by their owning waves (W1-2/W4-1).
       - name: rustfmt check (framework crates)
         working-directory: rust
@@ -150,6 +83,7 @@ jobs:
         env:
           PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo run -p paradl -- --version
+
 
   media-package:
     name: Media package (Python ${{ matrix.python-version }})
@@ -175,8 +109,8 @@ jobs:
           if [ -f media/pyproject.toml ]; then
             uv pip install --python .venv-media/bin/python -e ./media
           else
-            echo "::notice::media/ package arrives in W3-4a; installing its runtime deps only"
-            uv pip install --python .venv-media/bin/python "yt-dlp[default]" mutagen
+            echo "::error::media/ package is missing; it is required by the cutover"
+            exit 1
           fi
 
       - name: Assert the media package has no console script
@@ -187,13 +121,17 @@ jobs:
           test ! -e .venv-media/bin/pdl
 
       - name: Assert the worker module imports
-        continue-on-error: true # TODO(W3-4a): remove continue-on-error when paradl_media lands
         run: .venv-media/bin/python -c "import paradl_media; print(paradl_media.__name__)"
+
+      - name: Run media worker test suite
+        shell: bash
+        run: |
+          uv pip install --python .venv-media/bin/python pytest pytest-asyncio
+          PYTHONPATH=media .venv-media/bin/python -m pytest media/tests -q
 
   cross-boundary:
     name: Cross-boundary protocol gate
     runs-on: ubuntu-latest
-    needs: lint-and-type
     steps:
       - uses: actions/checkout@v4
 
@@ -226,11 +164,11 @@ jobs:
           if [ -f media/pyproject.toml ]; then
             .venv-media/bin/pip install -e ./media
           else
-            .venv-media/bin/pip install "yt-dlp[default]" mutagen
+            echo "::error::media/ package is missing; it is required by the cutover"
+            exit 1
           fi
 
       - name: Happy-path handshake (`paradl-media/1`)
-        continue-on-error: true # TODO(W3-4a): remove continue-on-error when paradl_media lands
         shell: bash
         run: |
           REQUEST='{"protocol":"paradl-media/1","request_id":"00000000-0000-4000-8000-000000000001","op":"claims","target":"https://example.com/file","out_dir":"'$PWD'","options":{}}'
@@ -241,12 +179,11 @@ jobs:
             'import json,sys; f=json.load(sys.stdin); assert f["protocol"]=="paradl-media/1" and f["frame"]=="result" and f["versions"]'
 
       - name: Protocol-mismatch negative test (requires exit 4)
-        continue-on-error: true # TODO(W4-2): remove continue-on-error when the paradl-parity boundary lane lands
         shell: bash
         run: |
           set +e
-          # W4-2 provides the boundary lane; Rust owns the ExitCode mapping and
-          # must fail closed with 4 on an unknown major or missing version.
+          # Rust owns the ExitCode mapping and must fail closed with 4 on an
+          # unknown major or missing version.
           REQUEST='{"protocol":"paradl-media/9","request_id":"00000000-0000-4000-8000-000000000002","op":"claims","target":"https://example.com/file","out_dir":"'$PWD'","options":{}}'
           printf '%s\n' "$REQUEST" \
             | PARADL_MEDIA_PY=.venv-media/bin/python \
@@ -256,30 +193,3 @@ jobs:
           set -e
           echo "protocol-mismatch exit code: $code"
           test "$code" -eq 4
-
-  bench:
-    name: Performance Benchmarks (Python oracle)
-    runs-on: ubuntu-latest
-    needs: lint-and-type
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Run benchmarks
-        run: uv run python benchmarks/bench_baseline.py --tag ci || true
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: benchmark-results
-          path: benchmarks/results/ci.json
-          retention-days: 30
-          if-no-files-found: ignore

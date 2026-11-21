@@ -7,12 +7,13 @@ class ParallelDl < Formula
   license "MIT"
   head "https://github.com/tawsifx/Para-DL.git", branch: "main"
 
-  # The native binary is built from Rust; the media subsystem remains a Python
-  # package installed into a binary-managed venv under libexec. There is no
-  # default aria2 dependency and no Python console script.
+  # The native Rust binary owns BOTH `paradl` and `parallel-dl`. Python is only
+  # needed for the OPTIONAL media worker (python -m paradl_media), which lives
+  # in a venv under libexec; there is no Python console script, no default
+  # aria2 dependency, and no Python on any non-media path.
   depends_on "rust" => :build
-  depends_on "python@3.12"
-  depends_on "ffmpeg"
+  depends_on "python@3.12" => :recommended # media routes only
+  depends_on "ffmpeg"                      # media routes only
 
   # Optional JavaScript runtime for YouTube challenge solving.
   depends_on "deno" => :recommended
@@ -31,25 +32,36 @@ class ParallelDl < Formula
     bin.install "rust/target/release/paradl" => "paradl"
     bin.install_symlink bin/"paradl" => "parallel-dl" unless (bin/"parallel-dl").exist?
 
-    # yt-dlp is pip-installed into the venv, never frozen into the binary
-    # (parity row P12). The worker is invoked as `python -m paradl_media`.
-    system python, "-m", "venv", media_venv.to_s
+    # OPTIONAL media venv: only media routes need Python. Installations built
+    # without python@3.12 skip this block; point PARADL_MEDIA_PY at any external
+    # venv to enable media routes later. yt-dlp is pip-installed into the venv,
+    # never frozen into the binary (parity row P12), and the worker is invoked
+    # as `python -m paradl_media`.
     worker_python = media_venv/"bin/python"
-    system worker_python, "-m", "pip", "install", "--upgrade", "pip"
-    system worker_python, "-m", "pip", "install", "yt-dlp[default]", "mutagen"
-    if (buildpath/"media/pyproject.toml").exist?
-      system worker_python, "-m", "pip", "install", "./media"
-    end
+    if python.exist?
+      system python, "-m", "venv", media_venv.to_s
+      system worker_python, "-m", "pip", "install", "--upgrade", "pip"
+      system worker_python, "-m", "pip", "install", "yt-dlp[default]", "mutagen"
+      if (buildpath/"media/pyproject.toml").exist?
+        system worker_python, "-m", "pip", "install", "./media"
+      end
 
-    (libexec/"media-python").write "#{worker_python}\n"
+      (libexec/"media-python").write "#{worker_python}\n"
+    else
+      opoo "python@3.12 disabled: media routes need an external venv via PARADL_MEDIA_PY"
+    end
   end
 
   def caveats
     <<~EOS
-      Media routes run a Python worker from:
+      `paradl` and `parallel-dl` are the same native binary. No Python is
+      required for non-media routes.
+
+      Media routes (yt-dlp / audio extraction) optionally use a Python worker:
         #{media_venv}
-      Set PARADL_MEDIA_PY to override the interpreter. Non-media routes never
-      spawn Python.
+      Set PARADL_MEDIA_PY to override that interpreter. If the media venv was
+      skipped, install Python 3.11+ with yt-dlp[default] + mutagen and export
+      PARADL_MEDIA_PY to enable media routes.
     EOS
   end
 
@@ -58,8 +70,9 @@ class ParallelDl < Formula
     assert_match "parallel-dl", shell_output("#{bin}/parallel-dl --version")
     assert_match "ready", shell_output("#{bin}/paradl doctor")
 
-    # The media package is pip-installed at install time (W3-4a). Until then
-    # the handshake is deferred; --version and doctor above stay mandatory.
+    # The media worker is optional: --version and doctor above stay mandatory
+    # and must pass with NO Python. The handshake is exercised only when the
+    # media venv is actually present.
     worker = (media_venv/"bin/python").to_s
     if system(worker, "-c", "import paradl_media", out: File::NULL, err: File::NULL)
       request = {
@@ -76,7 +89,7 @@ class ParallelDl < Formula
       assert_equal "result", frame["frame"]
       assert_kind_of Hash, frame["versions"]
     else
-      puts "media worker not installed; handshake deferred to W3-4a"
+      puts "media worker not installed; media handshake skipped (optional)"
     end
   end
 end

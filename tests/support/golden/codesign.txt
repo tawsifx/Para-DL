@@ -1,2 +1,0 @@
-/tmp/pdl-fake.app: valid on disk
-/tmp/pdl-fake.app: satisfies its Designated Requirement
