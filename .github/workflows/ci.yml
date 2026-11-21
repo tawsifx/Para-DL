@@ -25,15 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # PyO3 0.27 rejects Python 3.15 (the Homebrew system Python on some
-      # runners). Pin 3.12 for the legacy `paradl-rs` workspace member;
-      # the new framework crates do not depend on PyO3.
-      - name: Set up Python 3.12 for the legacy PyO3 member
-        id: py
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -46,14 +37,10 @@ jobs:
 
       - name: Build all workspace members
         working-directory: rust
-        env:
-          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo build --all
 
       - name: Test all workspace members
         working-directory: rust
-        env:
-          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         # The W4-2 non-media differential gate needs the Python oracle
         # (`src/paradl/**` + `parallel-dl.py`) deleted in W5-1. Its GREEN
         # evidence is captured pre-cutover at c4e271a. Skip ONLY that test;
@@ -62,26 +49,14 @@ jobs:
 
       - name: Clippy (deny warnings)
         working-directory: rust
-        env:
-          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo clippy --all -- -D warnings
 
-      # Scoped to the framework crates: the legacy `rapids`/`paradl-rs`
-      # sources are formatted by their owning waves (W1-2/W4-1).
-      - name: rustfmt check (framework crates)
+      - name: rustfmt check
         working-directory: rust
-        run: >-
-          cargo fmt --check
-          -p paradl -p paradl-store -p paradl-net -p paradl-engine
-          -p paradl-watchdog -p paradl-throttle -p paradl-postproc
-          -p paradl-platform -p paradl-media -p paradl-events
-          -p paradl-ui -p paradl-api -p paradl-cli
-          -p paradl-app -p paradl-parity
+        run: cargo fmt --check --all
 
       - name: Version smoke test
         working-directory: rust
-        env:
-          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo run -p paradl -- --version
 
       # Distribution builds (Formula + install scripts) now pass --features
@@ -89,8 +64,6 @@ jobs:
       # it paradl-app returns missing_dependency for every media route.
       - name: Distribution binary exposes media feature
         working-directory: rust
-        env:
-          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: |
           cargo build -p paradl --bin paradl --features media
           ./target/debug/paradl doctor | tee doctor.txt
