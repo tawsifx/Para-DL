@@ -1704,6 +1704,19 @@ mod progress_sink_tests {
     }
 
     #[test]
+    fn watchdog_action_is_rendered_in_plain_mode() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_action_sink(false);
+        let mut action = WatchdogAction::new(WatchdogActionType::PauseUnpause);
+        action.reason = "low speed".to_owned();
+        sink.on_watchdog_action(&action);
+        let text = lines.lock().unwrap().clone();
+        assert!(text.starts_with("watchdog: "), "missing plain watchdog line: {text:?}");
+        assert!(text.contains("tier2_pause_unpause"), "missing action: {text:?}");
+        assert!(text.ends_with('\n'));
+    }
+
+    #[test]
     fn none_watchdog_action_is_not_emitted() {
         use paradl_watchdog::{WatchdogAction, WatchdogActionType};
         let (mut sink, lines) = watchdog_action_sink(true);

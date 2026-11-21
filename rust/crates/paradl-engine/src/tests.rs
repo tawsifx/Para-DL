@@ -1507,10 +1507,13 @@ fn doh_config_uses_endpoint_host_as_tls_server_name() {
 // ---------------------------------------------------------------------------
 // Watchdog activation: the engine must observe every tick and recycle sockets.
 
-use paradl_watchdog::{WatchdogAction, WatchdogConfig, WatchdogMode};
+use paradl_watchdog::{WatchdogAction, WatchdogActionType, WatchdogConfig, WatchdogMode};
 
 /// Range server that dribbles each chunk so a watchdog tick can fire mid-transfer.
-async fn spawn_slow_range_server(payload: Arc<Vec<u8>>) -> (String, JoinHandle<()>) {
+async fn spawn_slow_range_server(
+    payload: Arc<Vec<u8>>,
+    connections: Arc<AtomicUsize>,
+) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let task = tokio::spawn(async move {
@@ -1520,6 +1523,8 @@ async fn spawn_slow_range_server(payload: Arc<Vec<u8>>) -> (String, JoinHandle<(
                 Err(_) => return,
             };
             let payload = payload.clone();
+            let connections = connections.clone();
+            connections.fetch_add(1, Ordering::SeqCst);
             tokio::spawn(async move {
                 let mut req = Vec::new();
                 let mut byte = [0u8; 1];
@@ -1612,14 +1617,17 @@ fn fast_recycle_config() -> WatchdogConfig {
 
 #[tokio::test]
 async fn watchdog_actions_drive_recycle_and_preserve_bytes() {
-    let payload: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
-    let (url, server) = spawn_slow_range_server(Arc::new(payload.clone())).await;
+    let payload: Vec<u8> = (0..512 * 1024).map(|i| (i % 251) as u8).collect();
+    let connections = Arc::new(AtomicUsize::new(0));
+    let (url, server) =
+        spawn_slow_range_server(Arc::new(payload.clone()), connections.clone()).await;
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("f.bin");
     let target = Target {
         url: url.parse().unwrap(),
         dest: dest.clone(),
-        connections: 4,
+        connections: 1,
+        min_split: 1024 * 1024,
         watchdog: Some(fast_recycle_config()),
         ..Target::default()
     };
@@ -1633,6 +1641,11 @@ async fn watchdog_actions_drive_recycle_and_preserve_bytes() {
         sink.actions.iter().any(|action| action.is_recycle()),
         "watchdog actions must drive recycle, got {:?}",
         sink.actions
+    );
+    assert!(
+        connections.load(Ordering::SeqCst) > 2,
+        "recycle must create fresh connections (got {}); a sink-only implementation cannot do this",
+        connections.load(Ordering::SeqCst)
     );
     assert_eq!(std::fs::read(&dest).unwrap(), payload);
     server.abort();
@@ -1661,8 +1674,10 @@ async fn close_delimited_watchdog_never_recycles() {
     let result = engine.download(plan, &mut sink).await.unwrap();
     assert!(result.success, "download must succeed: {result:?}");
     assert!(
-        sink.actions.iter().all(|action| !action.is_recycle()),
-        "no-Range transfer must not recycle: {:?}",
+        sink.actions
+            .iter()
+            .all(|action| action.action == WatchdogActionType::None),
+        "no-Range transfer must emit no watchdog actions: {:?}",
         sink.actions
     );
     server.abort();
