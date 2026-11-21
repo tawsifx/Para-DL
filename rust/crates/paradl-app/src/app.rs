@@ -711,7 +711,7 @@ impl App {
                 None,
             );
             let rendered = ProgressDisplay::new().renderable(&event);
-            (output)(&format!("\r{rendered}"));
+            (output)(&format!("{rendered}\n"));
         }
     }
 
@@ -756,9 +756,6 @@ impl App {
             let plan = engine.plan(&engine_target).await?;
             engine.download(plan, &mut sink).await
         })?;
-        if render_progress {
-            (self.output)("\n");
-        }
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
         let path = outcome.file_path.map(|path| path.to_string_lossy().into_owned());
         let success = outcome.success;
@@ -1623,6 +1620,14 @@ mod progress_sink_tests {
         assert!(
             rendered.contains("50.0%"),
             "later snapshots must update the bar, got {rendered:?}"
+        );
+        assert!(
+            !rendered.contains('\r'),
+            "progress must not use carriage-return overwrites: {rendered:?}"
+        );
+        assert!(
+            rendered.ends_with('\n'),
+            "each progress tick must end its own line: {rendered:?}"
         );
         let telemetry = captured.lock().unwrap().unwrap();
         assert_eq!(telemetry.downloaded, 100, "telemetry must stay the first snapshot");
