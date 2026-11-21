@@ -46,8 +46,11 @@ fi
 # ------------------------------------------------------------------------------
 # 1. Native binary (owns BOTH `paradl` and `parallel-dl`)
 # ------------------------------------------------------------------------------
-echo "==> Building native binary (release)"
-cargo build --release --manifest-path "${RUST_DIR}/Cargo.toml" --bin paradl
+echo "==> Building native binary (release, media routes enabled)"
+# Media routes are advertised by this script (it creates the worker venv), so
+# compile the `media` feature in; without it paradl-app returns
+# missing_dependency instead of spawning the worker.
+cargo build --release --features media --manifest-path "${RUST_DIR}/Cargo.toml" --bin paradl
 
 mkdir -p "${BIN_DIR}"
 install -m 0755 "${RUST_DIR}/target/release/paradl" "${BIN_DIR}/paradl"

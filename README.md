@@ -68,13 +68,21 @@ Windows).
 
 ### Option 3: Build from source
 
-Requires the Rust toolchain (1.98+):
+Requires the Rust toolchain (1.98+). The distribution build enables the
+`media` feature so the binary can spawn the Python worker for media routes
+(the install scripts above do the same):
 
 ```bash
 cd rust
-cargo build --release --bin paradl
+cargo build --release --bin paradl --features media
 # binary: rust/target/release/paradl
+# verify: rust/target/release/paradl doctor   -> "media enabled  yes"
 ```
+
+For a media-free build (no Python anywhere, matching `PARADL_SKIP_MEDIA=1`),
+omit the feature: `cargo build --release --bin paradl`. `paradl doctor` then
+reports `media enabled  no`. The `tui` and `api` features remain opt-in; see
+their sections below.
 
 ### Prerequisites
 

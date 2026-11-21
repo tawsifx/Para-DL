@@ -5,7 +5,7 @@
 //! stderr. Every exit path kills and reaps the child (no orphan processes),
 //! forwards SIGINT/SIGTERM, and applies an inactivity timeout.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -199,15 +199,20 @@ impl WorkerMediaResolver {
     }
 
     /// Ask the worker for claims plus the metadata from its terminal frame.
+    ///
+    /// The worker validates a non-empty absolute `out_dir` on **every** op,
+    /// including the read-only `claims` op (charter §4), so callers must pass a
+    /// real directory here rather than an empty placeholder.
     async fn claims_with_meta(
         &self,
         url: &str,
+        out_dir: &Path,
     ) -> Result<(bool, WorkerVersions, Vec<String>), Error> {
         let (versions, caps, data) = self
             .send(
                 ProtocolOp::Claims,
                 url,
-                Path::new(""),
+                out_dir,
                 &MediaOptions::default(),
                 &mut NoopProgressSink,
             )
@@ -243,6 +248,23 @@ impl WorkerMediaResolver {
     }
 }
 
+/// Absolute scratch directory used by the read-only [`MediaResolver::claims`]
+/// API.
+///
+/// `claims` never writes files, but the worker validates a non-empty absolute
+/// `out_dir` on every op (charter §4). We hand it the process temp directory
+/// as a neutral placeholder. `std::env::temp_dir()` is absolute in normal
+/// configurations; if a relative `TMPDIR` is supplied we fall back to the
+/// current working directory, which is absolute by contract.
+fn claims_scratch_dir() -> PathBuf {
+    let temp = std::env::temp_dir();
+    if temp.is_absolute() {
+        temp
+    } else {
+        std::env::current_dir().unwrap_or(temp)
+    }
+}
+
 #[async_trait]
 impl MediaResolver for WorkerMediaResolver {
     fn domains(&self) -> &'static [&'static str] {
@@ -250,7 +272,9 @@ impl MediaResolver for WorkerMediaResolver {
     }
 
     async fn resolve(&self, request: MediaRequest) -> Result<MediaResult, Error> {
-        let (claimed, claim_versions, claim_caps) = self.claims_with_meta(&request.target).await?;
+        let (claimed, claim_versions, claim_caps) = self
+            .claims_with_meta(&request.target, &request.out_dir)
+            .await?;
         if !claimed {
             return Ok(MediaResult {
                 route: MediaRoute::Direct,
@@ -281,7 +305,9 @@ impl MediaResolver for WorkerMediaResolver {
         request: MediaRequest,
         sink: &mut dyn ProgressSink,
     ) -> Result<MediaResult, Error> {
-        let (claimed, claim_versions, claim_caps) = self.claims_with_meta(&request.target).await?;
+        let (claimed, claim_versions, claim_caps) = self
+            .claims_with_meta(&request.target, &request.out_dir)
+            .await?;
         if !claimed {
             return Ok(MediaResult {
                 route: MediaRoute::Direct,
@@ -308,7 +334,7 @@ impl MediaResolver for WorkerMediaResolver {
     }
 
     async fn claims(&self, url: &str) -> Result<bool, Error> {
-        Ok(self.claims_with_meta(url).await?.0)
+        Ok(self.claims_with_meta(url, &claims_scratch_dir()).await?.0)
     }
 }
 
@@ -572,5 +598,24 @@ mod signal_tests {
             .unwrap();
         wait_for_reap(pid).await;
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod claims_scratch_tests {
+    use super::claims_scratch_dir;
+
+    #[test]
+    fn claims_scratch_dir_is_absolute_and_nonempty() {
+        let dir = claims_scratch_dir();
+        assert!(
+            dir.is_absolute(),
+            "claims out_dir must be absolute: {}",
+            dir.display()
+        );
+        assert!(
+            !dir.as_os_str().is_empty(),
+            "claims out_dir must be non-empty"
+        );
     }
 }

@@ -60,8 +60,11 @@ if (-not $env:PYO3_PYTHON) {
 # ------------------------------------------------------------------------------
 # 1. Native binary (owns BOTH `paradl` and `parallel-dl`)
 # ------------------------------------------------------------------------------
-Write-Host "==> Building native binary (release)" -ForegroundColor Green
-& cargo build --release --manifest-path (Join-Path $RustDir "Cargo.toml") --bin paradl
+Write-Host "==> Building native binary (release, media routes enabled)" -ForegroundColor Green
+# Media routes are advertised by this script (it creates the worker venv), so
+# compile the `media` feature in; without it paradl-app returns
+# missing_dependency instead of spawning the worker.
+& cargo build --release --features media --manifest-path (Join-Path $RustDir "Cargo.toml") --bin paradl
 Assert-LastExitCode
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null

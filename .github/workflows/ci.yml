@@ -84,6 +84,18 @@ jobs:
           PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
         run: cargo run -p paradl -- --version
 
+      # Distribution builds (Formula + install scripts) now pass --features
+      # media. Gate that the binary actually compiled the feature in: without
+      # it paradl-app returns missing_dependency for every media route.
+      - name: Distribution binary exposes media feature
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+        run: |
+          cargo build -p paradl --bin paradl --features media
+          ./target/debug/paradl doctor | tee doctor.txt
+          grep -q 'media enabled  *yes' doctor.txt
+
 
   media-package:
     name: Media package (Python ${{ matrix.python-version }})
@@ -167,6 +179,16 @@ jobs:
             echo "::error::media/ package is missing; it is required by the cutover"
             exit 1
           fi
+
+      # The stub tests ignore `out_dir`, which hid the empty-out_dir defect.
+      # This runs the Rust client against the ACTUAL `python -m paradl_media`
+      # worker and asserts a non-empty out_dir is accepted and claims parses.
+      - name: Rust client against real Python worker
+        working-directory: rust
+        env:
+          PYO3_PYTHON: ${{ steps.py.outputs.python-path }}
+          PARADL_TEST_MEDIA_PY: ${{ github.workspace }}/.venv-media/bin/python
+        run: cargo test -p paradl-media --test real_worker -- --nocapture
 
       - name: Happy-path handshake (`paradl-media/1`)
         shell: bash

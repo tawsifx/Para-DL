@@ -28,7 +28,10 @@ class ParallelDl < Formula
 
   def install
     # One native binary owns both command names.
-    system "cargo", "build", "--release", "--manifest-path", "rust/Cargo.toml", "--bin", "paradl"
+    # The formula installs a media venv and advertises media routes, so the
+    # binary must be built with the `media` feature (paradl-app otherwise
+    # returns missing_dependency and media routes cannot spawn the worker).
+    system "cargo", "build", "--release", "--features", "media", "--manifest-path", "rust/Cargo.toml", "--bin", "paradl"
     bin.install "rust/target/release/paradl" => "paradl"
     bin.install_symlink bin/"paradl" => "parallel-dl" unless (bin/"parallel-dl").exist?
 
