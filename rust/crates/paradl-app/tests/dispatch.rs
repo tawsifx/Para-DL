@@ -34,7 +34,8 @@ const CASES: &[(&str, &[&str], ExitCode, Option<&str>)] = &[
     ("C02 auth set", &["auth", "set", "github"], ExitCode::Ok, Some("\"event\": \"auth_set\"")),
     ("C03 auth status", &["auth", "status"], ExitCode::Ok, Some("\"event\": \"auth_status\"")),
     ("C05 doctor", &["doctor"], ExitCode::Ok, Some("\"event\": \"doctor\"")),
-    ("C06 install", &["install", "astral-sh/uv"], ExitCode::Ok, Some("\"event\": \"result\"")),
+    // Offline install refuses to fake success: it emits an error and a non-Ok code.
+    ("C06 install", &["install", "astral-sh/uv"], ExitCode::Failure, Some("\"event\": \"error\"")),
     ("C07 info", &["info", "https://example.com/f.zip"], ExitCode::Ok, Some("\"event\": \"info\"")),
     ("C08 hash", &["hash", "Cargo.toml"], ExitCode::Ok, Some("\"event\": \"hashes\"")),
     ("C11 history", &["history", "5"], ExitCode::Ok, Some("\"event\": \"history\"")),

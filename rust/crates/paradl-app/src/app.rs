@@ -1322,14 +1322,162 @@ impl App {
         ExitCode::Ok
     }
 
-    fn install(&self, command: &InstallCommand, json: bool) -> ExitCode {
-        let decision = classify_target(&command.target, None, &PureClaimsChecker);
-        self.publish(
-            json,
-            Event::Result(result_line("install", &command.target, true, None)),
+    fn install(&mut self, command: &InstallCommand, json: bool) -> ExitCode {
+        if self.offline {
+            return self.fail(json, &Error::failure("install requires network"));
+        }
+        match self.install_release(&command.target, json) {
+            Ok(installed) => {
+                self.publish(
+                    json,
+                    Event::Result(ResultEvent::new(
+                        now_timestamp(),
+                        Some("install".to_string()),
+                        Some(command.target.clone()),
+                        true,
+                        Some(installed.to_string_lossy().into_owned()),
+                        None,
+                        None,
+                        0,
+                        None, None, None, None, None, None, None, None, None,
+                    )),
+                );
+                ExitCode::Ok
+            }
+            Err(error) => self.fail(json, &error),
+        }
+    }
+
+    /// Resolve, download, verify, extract and install one release asset.
+    ///
+    /// Returns the path of the installed binary only after the copy succeeded;
+    /// every earlier failure is an `Error` so the caller never reports success.
+    fn install_release(&mut self, target: &str, json: bool) -> Result<PathBuf, Error> {
+        use paradl_engine::{DownloadEngine, Hash, NdEngine, Target as EngineTarget, headers_from_pairs};
+        use paradl_net::{
+            EnvSecretProvider, GithubResolver, HttpClient, HttpClientConfig, HttpSiteHttp,
+            ResolveContext, TargetResolver,
+        };
+        use paradl_postproc::archive;
+
+        let normalized = normalize_install_target(target);
+        let client = HttpClient::new(HttpClientConfig {
+            doh_endpoint: self.config.doh_endpoint.clone(),
+            ..HttpClientConfig::default()
+        })?;
+        let resolver = GithubResolver::new(
+            HttpSiteHttp::new(client),
+            Arc::new(EnvSecretProvider::from_process()),
         );
-        let _ = decision;
-        ExitCode::Ok
+        let context = ResolveContext {
+            doh_endpoint: self.config.doh_endpoint.clone(),
+            timeout: std::time::Duration::from_secs(15),
+            ..ResolveContext::default()
+        };
+        let assets = self.runtime().block_on(resolver.resolve(&normalized, &context))?;
+        let asset = assets
+            .into_iter()
+            .find(|asset| !asset.url.trim().is_empty())
+            .ok_or_else(|| Error::failure(format!("no downloadable release asset for {target}")))?;
+
+        let url = url::Url::parse(&asset.url).map_err(|error| {
+            Error::failure(format!("invalid release asset URL {:?}: {error}", asset.url))
+        })?;
+        // RAII: every exit path below (including `?`) removes the temp files.
+        let temp = tempfile::tempdir()
+            .map_err(|error| Error::failure(format!("cannot create install temp dir: {error}")))?;
+        let asset_name = paradl_core::sanitize_filename(
+            asset.filename.as_deref().unwrap_or("release-asset"),
+        );
+        let archive_path = temp.path().join(asset_name);
+        let host = url.host_str().unwrap_or("github.com").to_owned();
+        let local_hour = chrono::Local::now().hour() as i32;
+        let watchdog = watchdog_config_for(&self.config, local_hour, &host, 16, 0.0, true);
+
+        let engine_target = EngineTarget {
+            url,
+            dest: archive_path.clone(),
+            connections: 16,
+            headers: headers_from_pairs(Some(&asset.headers)),
+            checksum: asset.digest.as_deref().and_then(Hash::parse),
+            watchdog: Some(watchdog),
+            cancel: self.cancel.clone(),
+            ..EngineTarget::default()
+        };
+        let engine = NdEngine::default();
+        let captured: Arc<Mutex<Option<ProgressTelemetry>>> = Arc::new(Mutex::new(None));
+        let plan = self.runtime().block_on(async { engine.plan(&engine_target).await })?;
+        let mut sink = AppProgressSink {
+            title: archive_path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| target.to_owned()),
+            output: Arc::clone(&self.output),
+            captured: Arc::clone(&captured),
+            known_total: plan.size,
+            render: !json,
+            json,
+        };
+        let outcome = self.runtime().block_on(async { engine.download(plan, &mut sink).await })?;
+        if !outcome.success {
+            let message = outcome
+                .error
+                .unwrap_or_else(|| format!("download failed for {}", asset.url));
+            return Err(match outcome.exit_code {
+                3 => Error::verification_failed(message),
+                4 => Error::missing_dependency(message),
+                130 => Error::interrupted(message),
+                _ => Error::failure(message),
+            });
+        }
+
+        let extract_dir = temp.path().join("extracted");
+        let (extracted, files) = archive::extract(&archive_path, &extract_dir, false)?;
+        if !extracted {
+            return Err(Error::failure(format!(
+                "unsupported release archive format: {}",
+                archive_path.display()
+            )));
+        }
+        let repo_name = paradl_net::sites::github::GithubTarget::parse(&normalized)
+            .repo()
+            .unwrap_or_default()
+            .to_owned();
+        let binary = find_install_binary(&files, &repo_name).ok_or_else(|| {
+            let candidates = files
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Error::failure(format!(
+                "no installable binary in {} archive (expected gh or {repo_name}); candidates: {candidates}",
+                archive_path.display()
+            ))
+        })?;
+
+        let bin_dir = expand_bin_dir(&self.config.bin_dir);
+        std::fs::create_dir_all(&bin_dir).map_err(|error| {
+            Error::failure(format!("cannot create bin dir {}: {error}", bin_dir.display()))
+        })?;
+        let file_name = binary
+            .file_name()
+            .ok_or_else(|| Error::failure("installed binary has no file name"))?;
+        let installed = bin_dir.join(file_name);
+        std::fs::copy(binary, &installed).map_err(|error| {
+            Error::failure(format!("cannot install binary to {}: {error}", installed.display()))
+        })?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&installed, std::fs::Permissions::from_mode(0o755))
+                .map_err(|error| {
+                    Error::failure(format!(
+                        "cannot mark {} executable: {error}",
+                        installed.display()
+                    ))
+                })?;
+        }
+        Ok(installed)
     }
 
     fn server(&mut self, command: &ServerCommand, json: bool) -> ExitCode {
@@ -1523,6 +1671,71 @@ fn result_line(subcommand: &str, target: &str, success: bool, error: Option<Stri
         if success { 0 } else { 1 },
         None, None, None, None, None, None, None, None, None,
     )
+}
+
+/// Bare `owner/repo` shorthand becomes `gh:owner/repo`. URLs, dotted names and
+/// already-prefixed targets are left alone so `gh:` remains the explicit way to
+/// address repository names that are not bare shorthand.
+fn normalize_install_target(target: &str) -> String {
+    let trimmed = target.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("gh:") || lower.starts_with("github:") || trimmed.contains("://") {
+        return trimmed.to_owned();
+    }
+    let mut parts = trimmed.split('/');
+    let (Some(owner), Some(repo), None) = (parts.next(), parts.next(), parts.next()) else {
+        return trimmed.to_owned();
+    };
+    let bare = |part: &str| {
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    };
+    if bare(owner) && bare(repo) {
+        format!("gh:{owner}/{repo}")
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+/// Choose the executable to install: exact `gh`/`gh.exe` first (the `cli/cli`
+/// case), then a file named after the repository (`uv`, `uv.exe`). The name is
+/// intentionally left as-is so `uv` installs as `uv` and `gh` as `gh`.
+fn find_install_binary<'a>(candidates: &'a [PathBuf], repo_name: &str) -> Option<&'a Path> {
+    let by_name = |name: &str| {
+        candidates
+            .iter()
+            .find(|path| path.file_name() == Some(std::ffi::OsStr::new(name)))
+            .map(PathBuf::as_path)
+    };
+    if let Some(path) = by_name("gh").or_else(|| by_name("gh.exe")) {
+        return Some(path);
+    }
+    if !repo_name.is_empty()
+        && let Some(path) = by_name(repo_name).or_else(|| by_name(&format!("{repo_name}.exe")))
+    {
+        return Some(path);
+    }
+    None
+}
+
+/// Expand a configured `~` / `~/…` bin directory without invoking a shell.
+fn expand_bin_dir(dir: &str) -> PathBuf {
+    let trimmed = dir.trim();
+    let Some(relative) = trimmed
+        .strip_prefix("~/")
+        .or_else(|| trimmed.strip_prefix("~\\"))
+    else {
+        if trimmed == "~" {
+            let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+            return std::env::var_os(key).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        }
+        return PathBuf::from(trimmed);
+    };
+    let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    let home = std::env::var_os(key).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    home.join(relative)
 }
 
 fn auth_service(record: Option<&paradl_resilience::auth::TokenRecord>) -> Value {
@@ -1722,5 +1935,94 @@ mod progress_sink_tests {
         let (mut sink, lines) = watchdog_action_sink(true);
         sink.on_watchdog_action(&WatchdogAction::new(WatchdogActionType::None));
         assert!(lines.lock().unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod install_tests {
+    use super::*;
+    use paradl_cli::InstallCommand;
+
+    #[test]
+    fn normalize_bare_owner_repo_to_gh_prefix() {
+        assert_eq!(normalize_install_target("cli/cli"), "gh:cli/cli");
+        assert_eq!(normalize_install_target("astral-sh/uv"), "gh:astral-sh/uv");
+    }
+
+    #[test]
+    fn normalize_install_target_keeps_prefixed_and_non_bare_targets() {
+        assert_eq!(normalize_install_target("gh:cli/cli"), "gh:cli/cli");
+        assert_eq!(normalize_install_target("github.com/cli/cli"), "github.com/cli/cli");
+        assert_eq!(normalize_install_target("foo/bar.py"), "foo/bar.py");
+        assert_eq!(
+            normalize_install_target("https://github.com/cli/cli"),
+            "https://github.com/cli/cli"
+        );
+    }
+
+    #[test]
+    fn find_install_binary_prefers_exact_gh() {
+        let candidates = [
+            PathBuf::from("extract/README.md"),
+            PathBuf::from("extract/gh.exe"),
+            PathBuf::from("extract/gh"),
+        ];
+        assert_eq!(
+            find_install_binary(&candidates, "cli"),
+            Some(Path::new("extract/gh")),
+            "an exact `gh` binary wins over other extracted files"
+        );
+        let exe_only = [PathBuf::from("extract/README.md"), PathBuf::from("extract/gh.exe")];
+        assert_eq!(find_install_binary(&exe_only, "cli"), Some(Path::new("extract/gh.exe")));
+    }
+
+    #[test]
+    fn find_install_binary_falls_back_to_repo_name() {
+        let candidates = [PathBuf::from("extract/README.md"), PathBuf::from("extract/uv")];
+        assert_eq!(find_install_binary(&candidates, "uv"), Some(Path::new("extract/uv")));
+        let exe = [PathBuf::from("extract/uv.exe")];
+        assert_eq!(find_install_binary(&exe, "uv"), Some(Path::new("extract/uv.exe")));
+    }
+
+    #[test]
+    fn find_install_binary_returns_none_when_no_candidate_matches() {
+        let candidates = [PathBuf::from("extract/README.md"), PathBuf::from("extract/LICENSE")];
+        assert_eq!(find_install_binary(&candidates, "uv"), None);
+        assert_eq!(find_install_binary(&[], "uv"), None);
+    }
+
+    #[test]
+    fn expand_bin_dir_expands_tilde_and_leaves_absolute_paths() {
+        let home = std::env::var_os("HOME").expect("HOME is set on the test host");
+        assert_eq!(expand_bin_dir("~/bin"), PathBuf::from(home).join("bin"));
+        assert_eq!(expand_bin_dir("/opt/pdl/bin"), PathBuf::from("/opt/pdl/bin"));
+    }
+
+    #[test]
+    fn offline_install_fails_with_error_event_never_success() {
+        let lines = Arc::new(Mutex::new(String::new()));
+        let sink = {
+            let lines = Arc::clone(&lines);
+            Arc::new(move |line: &str| lines.lock().unwrap().push_str(line))
+        };
+        let mut app = App::new_offline().with_output(sink);
+        let command = InstallCommand {
+            target: "cli/cli".to_owned(),
+        };
+        let code = app.install(&command, true);
+        assert_ne!(code, ExitCode::Ok, "offline install must not report success");
+        let output = lines.lock().unwrap().clone();
+        assert!(
+            output.contains("\"event\": \"error\""),
+            "offline install must emit an error event, got {output}"
+        );
+        assert!(
+            output.contains("install requires network"),
+            "error event must explain why install failed, got {output}"
+        );
+        assert!(
+            !output.contains("\"event\": \"result\""),
+            "offline install must not emit a success result event, got {output}"
+        );
     }
 }
