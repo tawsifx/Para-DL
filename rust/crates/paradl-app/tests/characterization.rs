@@ -1,11 +1,16 @@
 //! Characterization snapshot for the C2 `app.rs` split.
 //!
 //! Every `dispatch.rs` CASES argv is dispatched in `--json` mode through an
-//! injected sink. The ordered JSONL lines are compared byte-for-byte after
-//! scrubbing only the wall-clock timestamp, so moving a handler between modules
-//! cannot silently reorder events, drop explicit nulls, or change a field's
-//! name. This snapshot was captured on the post-C1 tree and must never be
-//! re-blessed after the split.
+//! injected sink. Portable cases are compared byte-for-byte after scrubbing
+//! clock-derived values, so moving a handler between modules cannot silently
+//! reorder events, drop explicit nulls, or change a field's name.
+//!
+//! Cases whose payload embeds live host state (doctor/diagnose tool probes and
+//! keychain, `config show`'s home dir, `launchd-plist`'s logs dir) are captured
+//! only as exit code + ordered event names. Their byte-exact field golden lives
+//! in `tests/doctor.rs` with a hand-built `DoctorReport`, not a live probe.
+//! This snapshot was captured on the post-C1 tree and must never be re-blessed
+//! after the split.
 
 use std::sync::{Arc, Mutex};
 
@@ -44,24 +49,69 @@ const CASES: &[(&str, &[&str])] = &[
     ("resume", &["resume", "--all"]),
 ];
 
-/// Replace the value of one `": "`-separated key while preserving every other
-/// byte. The emitter uses Python-style separators, so the key includes the
-/// trailing space (otherwise the numeric value would survive).
-fn scrub_field(line: &str, key: &str, token: &str) -> String {
-    let Some(i) = line.find(key) else { return line.to_owned() };
-    let rest = &line[i + key.len()..];
-    let n = rest.bytes().take_while(|b| b.is_ascii_digit() || *b == b'.' || *b == b'-' || *b == b'e' || *b == b'+').count();
-    format!("{}{token}{}", &line[..i + key.len()], &rest[n..])
+/// Length of the JSON scalar at the start of `rest`: a quoted string (with
+/// escapes) or a bare number/boolean/null token.
+fn value_len(rest: &str) -> usize {
+    let bytes = rest.as_bytes();
+    if bytes.first() == Some(&b'"') {
+        let mut i = 1;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\\' => i += 2,
+                b'"' => return i + 1,
+                _ => i += 1,
+            }
+        }
+        return bytes.len();
+    }
+    rest.bytes()
+        .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+'))
+        .count()
 }
 
-/// Normalize values that come from the clock rather than the oracle contract.
-/// `timestamp` is the wall clock; `duration` is an `Instant` elapsed time;
-/// `age_days` is derived from today's date in the doctor probe. Every other
-/// byte — field names, order, explicit nulls, digests, paths — is snapshotted.
+/// Replace the value of every `": "`-separated key while preserving every
+/// other byte. The emitter uses Python-style separators, so the key includes
+/// the trailing space (otherwise the numeric value would survive).
+fn scrub_field(line: &str, key: &str, token: &str) -> String {
+    let mut out = line.to_owned();
+    let mut from = 0;
+    while let Some(rel) = out[from..].find(key) {
+        let i = from + rel;
+        let rest = &out[i + key.len()..];
+        let n = value_len(rest);
+        assert!(n > 0, "no JSON value after {key} in {line}");
+        out = format!("{}{token}{}", &out[..i + key.len()], &rest[n..]);
+        from = i + key.len() + token.len();
+    }
+    out
+}
+
+/// Cases that must not be byte-snapshotted: their JSON embeds the host's tool
+/// paths/versions, keychain state or home directory. Still dispatched, but only
+/// exit code and ordered event names are recorded.
+const ENV_SENSITIVE: &[&str] = &[
+    "C05 doctor", "C22 diagnose", "C16 config show", "C44 queue launchd",
+];
+
+/// Normalize values that come from the clock or the host credential store
+/// rather than the oracle contract. `timestamp` is the wall clock; `duration`
+/// is an `Instant` elapsed time; `age_days` is date-derived; `configured` and
+/// `source` reflect the live env/keychain token lookup. Every other byte —
+/// field names, order, explicit nulls, digests, paths — is snapshotted.
 fn scrub(line: &str) -> String {
     let line = scrub_field(line, "\"timestamp\": ", "<TS>");
     let line = scrub_field(&line, "\"duration\": ", "<DUR>");
-    scrub_field(&line, "\"age_days\": ", "<AGE>")
+    let line = scrub_field(&line, "\"age_days\": ", "<AGE>");
+    let line = scrub_field(&line, "\"configured\": ", "<AUTH>");
+    scrub_field(&line, "\"source\": ", "<AUTH>")
+}
+
+/// Pull the event name out of one emitter line without parsing its payload.
+fn event_name(line: &str) -> &str {
+    let key = "\"event\": \"";
+    let start = line.find(key).expect("emitter line has an event field") + key.len();
+    let rest = &line[start..];
+    &rest[..rest.find('"').expect("event field has a closing quote")]
 }
 
 fn dispatch_case(argv: &[&str]) -> (ExitCode, String) {
@@ -89,9 +139,15 @@ fn snapshot() -> String {
         args.push("--json");
         let (code, output) = dispatch_case(&args);
         out.push_str(&format!("=== {name} [{}] -> {code}\n", argv.join(" ")));
-        for line in output.lines() {
-            out.push_str(&scrub(line));
-            out.push('\n');
+        if ENV_SENSITIVE.contains(name) {
+            for line in output.lines() {
+                out.push_str(&format!("event={}\n", event_name(line)));
+            }
+        } else {
+            for line in output.lines() {
+                out.push_str(&scrub(line));
+                out.push('\n');
+            }
         }
     }
     out
@@ -103,10 +159,10 @@ const EXPECTED: &str = r#"=== C01 download [https://example.com/f.zip] -> 0
 === C02 auth set [auth set github] -> 0
 {"event": "auth_set", "timestamp": <TS>, "service": "github", "success": true}
 === C03 auth status [auth status] -> 0
-{"event": "auth_status", "timestamp": <TS>, "services": {"github": {"configured": false, "source": "none"}, "hf": {"configured": false, "source": "none"}}}
+{"event": "auth_status", "timestamp": <TS>, "services": {"github": {"configured": <AUTH>, "source": <AUTH>}, "hf": {"configured": <AUTH>, "source": <AUTH>}}}
 === C05 doctor [doctor] -> 0
-{"event": "doctor", "timestamp": <TS>, "version": "1.0.0", "ytdlp": {"version": "2026.10.26", "age_days": <AGE>, "outdated": false, "path": "/opt/homebrew/bin/yt-dlp"}, "ytdlp_ejs": {"version": null}, "rust_engine": {"available": false, "version": null}, "npm": {"version": "12.2.2", "path": "/Users/tawsifx/.npm-global/bin/npm"}, "auth": {"hf": {"service": "hf", "label": "Hugging Face Hub", "configured": true, "source": "keychain"}, "github": {"service": "github", "label": "GitHub API", "configured": false, "source": "none"}}, "platform_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "macos_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "core_tools": {"GitHub PowerSuite (httpx)": {"status": "ready", "detail": "ready", "fix": null}, "Hugging Face Hub Engine": {"status": "ready", "detail": "ready (Aria2 RPC)", "fix": null}, "Rust Engine (native rapids)": {"status": "optional_missing", "detail": "not built (HTTP(S) falls back to --engine aria2)", "fix": null}, "aria2c (legacy JSON-RPC fallback)": {"status": "ready", "detail": "/opt/homebrew/bin/aria2c", "fix": null}, "yt-dlp (Media Stream Resolver)": {"status": "ready", "detail": "v2026.10.26 (26d old)", "fix": null}, "yt-dlp-ejs (JS Challenge Pkg)": {"status": "missing", "detail": "not found", "fix": null}, "JS Runtime (for EJS)": {"status": "ready", "detail": "deno (/opt/homebrew/bin/deno)", "fix": null}, "npm (Node Package Manager)": {"status": "ready", "detail": "v12.2.2 (/Users/tawsifx/.npm-global/bin/npm)", "fix": null}, "ffmpeg (AV Transcoder)": {"status": "ready", "detail": "/opt/homebrew/bin/ffmpeg", "fix": null}, "afconvert (CoreAudio)": {"status": "ready", "detail": "/usr/bin/afconvert", "fix": null}}, "fixes": ["paradl auth set github  # or: export GITHUB_TOKEN=<token>"]}
-{"event": "diagnose", "timestamp": <TS>, "version": "1.0.0", "ytdlp": {"version": "2026.10.26", "age_days": <AGE>, "outdated": false, "path": "/opt/homebrew/bin/yt-dlp"}, "ytdlp_ejs": {"version": null}, "rust_engine": {"available": false, "version": null}, "npm": {"version": "12.2.2", "path": "/Users/tawsifx/.npm-global/bin/npm"}, "auth": {"hf": {"service": "hf", "label": "Hugging Face Hub", "configured": true, "source": "keychain"}, "github": {"service": "github", "label": "GitHub API", "configured": false, "source": "none"}}, "platform_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "macos_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "core_tools": {"GitHub PowerSuite (httpx)": {"status": "ready", "detail": "ready", "fix": null}, "Hugging Face Hub Engine": {"status": "ready", "detail": "ready (Aria2 RPC)", "fix": null}, "Rust Engine (native rapids)": {"status": "optional_missing", "detail": "not built (HTTP(S) falls back to --engine aria2)", "fix": null}, "aria2c (legacy JSON-RPC fallback)": {"status": "ready", "detail": "/opt/homebrew/bin/aria2c", "fix": null}, "yt-dlp (Media Stream Resolver)": {"status": "ready", "detail": "v2026.10.26 (26d old)", "fix": null}, "yt-dlp-ejs (JS Challenge Pkg)": {"status": "missing", "detail": "not found", "fix": null}, "JS Runtime (for EJS)": {"status": "ready", "detail": "deno (/opt/homebrew/bin/deno)", "fix": null}, "npm (Node Package Manager)": {"status": "ready", "detail": "v12.2.2 (/Users/tawsifx/.npm-global/bin/npm)", "fix": null}, "ffmpeg (AV Transcoder)": {"status": "ready", "detail": "/opt/homebrew/bin/ffmpeg", "fix": null}, "afconvert (CoreAudio)": {"status": "ready", "detail": "/usr/bin/afconvert", "fix": null}}, "fixes": ["paradl auth set github  # or: export GITHUB_TOKEN=<token>"]}
+event=doctor
+event=diagnose
 === C06 install [install astral-sh/uv] -> 0
 {"event": "result", "timestamp": <TS>, "subcommand": "install", "target": "astral-sh/uv", "success": true, "exit_code": 0}
 === C07 info [info https://example.com/f.zip] -> 0
@@ -125,7 +181,7 @@ const EXPECTED: &str = r#"=== C01 download [https://example.com/f.zip] -> 0
 === C15 clean [clean .] -> 0
 {"event": "clean", "timestamp": <TS>, "directory": ".", "removed": []}
 === C16 config show [config show] -> 0
-{"event": "config", "timestamp": <TS>, "config": {"adb_download_dir": "/storage/emulated/0/Download", "adb_music_dir": "/storage/emulated/0/Music", "anti_throttle": "4MBps", "anti_throttle_grace": 5, "audio_codec": "aac", "auto_adb_push": false, "auto_extract": false, "bin_dir": "/Users/tawsifx/.local/bin", "caffeinate": true, "connections": 16, "doh_endpoint": null, "engine": "rust", "history_limit": 50, "isp": "auto", "max_download_limit": null, "net_watch": true, "output_dir": ".", "pause_on_low_power": false, "require_ac": false, "schema_version": 2, "stall_timeout": 30.0, "video_quality": "best", "watchdog": "v2", "ytdlp_player_client": null}}
+event=config
 === C16 config set [config set connections 8] -> 0
 {"event": "config_updated", "timestamp": <TS>, "key": "connections", "value": "8"}
 === C17 netprobe [netprobe https://example.com/f.zip] -> 0
@@ -133,8 +189,8 @@ const EXPECTED: &str = r#"=== C01 download [https://example.com/f.zip] -> 0
 === C18 bench [bench https://example.com/f.zip] -> 0
 {"event": "bench", "timestamp": <TS>, "url": "https://example.com/f.zip", "duration_limit_sec": 60.0, "results": {"modes": [], "watchdog": "v1,v2,off"}}
 === C22 diagnose [diagnose] -> 0
-{"event": "doctor", "timestamp": <TS>, "version": "1.0.0", "ytdlp": {"version": "2026.10.26", "age_days": <AGE>, "outdated": false, "path": "/opt/homebrew/bin/yt-dlp"}, "ytdlp_ejs": {"version": null}, "rust_engine": {"available": false, "version": null}, "npm": {"version": "12.2.2", "path": "/Users/tawsifx/.npm-global/bin/npm"}, "auth": {"hf": {"service": "hf", "label": "Hugging Face Hub", "configured": true, "source": "keychain"}, "github": {"service": "github", "label": "GitHub API", "configured": false, "source": "none"}}, "platform_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "macos_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "core_tools": {"GitHub PowerSuite (httpx)": {"status": "ready", "detail": "ready", "fix": null}, "Hugging Face Hub Engine": {"status": "ready", "detail": "ready (Aria2 RPC)", "fix": null}, "Rust Engine (native rapids)": {"status": "optional_missing", "detail": "not built (HTTP(S) falls back to --engine aria2)", "fix": null}, "aria2c (legacy JSON-RPC fallback)": {"status": "ready", "detail": "/opt/homebrew/bin/aria2c", "fix": null}, "yt-dlp (Media Stream Resolver)": {"status": "ready", "detail": "v2026.10.26 (26d old)", "fix": null}, "yt-dlp-ejs (JS Challenge Pkg)": {"status": "missing", "detail": "not found", "fix": null}, "JS Runtime (for EJS)": {"status": "ready", "detail": "deno (/opt/homebrew/bin/deno)", "fix": null}, "npm (Node Package Manager)": {"status": "ready", "detail": "v12.2.2 (/Users/tawsifx/.npm-global/bin/npm)", "fix": null}, "ffmpeg (AV Transcoder)": {"status": "ready", "detail": "/opt/homebrew/bin/ffmpeg", "fix": null}, "afconvert (CoreAudio)": {"status": "ready", "detail": "/usr/bin/afconvert", "fix": null}}, "fixes": ["paradl auth set github  # or: export GITHUB_TOKEN=<token>"]}
-{"event": "diagnose", "timestamp": <TS>, "version": "1.0.0", "ytdlp": {"version": "2026.10.26", "age_days": <AGE>, "outdated": false, "path": "/opt/homebrew/bin/yt-dlp"}, "ytdlp_ejs": {"version": null}, "rust_engine": {"available": false, "version": null}, "npm": {"version": "12.2.2", "path": "/Users/tawsifx/.npm-global/bin/npm"}, "auth": {"hf": {"service": "hf", "label": "Hugging Face Hub", "configured": true, "source": "keychain"}, "github": {"service": "github", "label": "GitHub API", "configured": false, "source": "none"}}, "platform_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "macos_utilities": {"caffeinate": {"available": true, "path": "/usr/bin/caffeinate", "fix": "Built-in macOS binary (/usr/bin/caffeinate)"}, "scutil": {"available": true, "path": "/usr/sbin/scutil", "fix": "Built-in macOS binary (/usr/sbin/scutil)"}, "pmset": {"available": true, "path": "/usr/bin/pmset", "fix": "Built-in macOS binary (/usr/bin/pmset)"}, "security": {"available": true, "path": "/usr/bin/security", "fix": "Built-in macOS binary (/usr/bin/security)"}, "codesign": {"available": true, "path": "/usr/bin/codesign", "fix": "Run 'xcode-select --install' to install macOS developer tools"}, "spctl": {"available": true, "path": "/usr/sbin/spctl", "fix": "Built-in macOS binary (/usr/sbin/spctl)"}, "xattr": {"available": true, "path": "/usr/bin/xattr", "fix": "Built-in macOS binary (/usr/bin/xattr)"}}, "core_tools": {"GitHub PowerSuite (httpx)": {"status": "ready", "detail": "ready", "fix": null}, "Hugging Face Hub Engine": {"status": "ready", "detail": "ready (Aria2 RPC)", "fix": null}, "Rust Engine (native rapids)": {"status": "optional_missing", "detail": "not built (HTTP(S) falls back to --engine aria2)", "fix": null}, "aria2c (legacy JSON-RPC fallback)": {"status": "ready", "detail": "/opt/homebrew/bin/aria2c", "fix": null}, "yt-dlp (Media Stream Resolver)": {"status": "ready", "detail": "v2026.10.26 (26d old)", "fix": null}, "yt-dlp-ejs (JS Challenge Pkg)": {"status": "missing", "detail": "not found", "fix": null}, "JS Runtime (for EJS)": {"status": "ready", "detail": "deno (/opt/homebrew/bin/deno)", "fix": null}, "npm (Node Package Manager)": {"status": "ready", "detail": "v12.2.2 (/Users/tawsifx/.npm-global/bin/npm)", "fix": null}, "ffmpeg (AV Transcoder)": {"status": "ready", "detail": "/opt/homebrew/bin/ffmpeg", "fix": null}, "afconvert (CoreAudio)": {"status": "ready", "detail": "/usr/bin/afconvert", "fix": null}}, "fixes": ["paradl auth set github  # or: export GITHUB_TOKEN=<token>"]}
+event=doctor
+event=diagnose
 === C23 pip [pip install requests] -> 0
 {"event": "result", "timestamp": <TS>, "subcommand": "pip", "target": "pip:requests", "success": true, "exit_code": 0}
 === C24 brew [brew install wget] -> 0
@@ -151,7 +207,7 @@ const EXPECTED: &str = r#"=== C01 download [https://example.com/f.zip] -> 0
 === C43 queue run [queue run] -> 0
 {"event": "queue_job_started", "timestamp": <TS>, "job_id": 0, "target": "", "priority": 0, "connections": 16}
 === C44 queue launchd [queue launchd-plist] -> 0
-{"event": "launchd_plist_generated", "timestamp": <TS>, "path": "queue.plist", "label": "com.paradl.queue", "logs_dir": "/Users/tawsifx/.config/paradl/logs", "lint": "OK"}
+event=launchd_plist_generated
 === extract [extract missing.zip] -> 1
 {"event": "result", "timestamp": <TS>, "subcommand": "extract", "target": "missing.zip", "success": false, "error": "I/O error: No such file or directory (os error 2)", "exit_code": 1}
 === resume [resume --all] -> 0
