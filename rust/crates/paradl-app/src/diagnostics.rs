@@ -30,9 +30,6 @@ pub const NOT_FOUND: &str = "not found";
 const LABEL_WIDTH: usize = 18;
 /// Fixed section separator (no terminal-width detection).
 const SEPARATOR: &str = "------------------";
-/// Fix string for the legacy PyO3 module (deleted in W0-1, never reintroduced).
-const RUST_ENGINE_FIX: &str =
-    "maturin develop --release  # build rust/paradl-rs into this venv";
 
 /// Versions and paths of the external tools `doctor` reports, gathered
 /// without Python. Each field is `None` when the native tool is absent.
@@ -150,7 +147,7 @@ pub struct UtilityRow {
 /// The complete `doctor` / `diagnose` payload, independent of stdout.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoctorReport {
-    /// Reference-binary crate version (`CARGO_PKG_VERSION`, currently `0.1.0`).
+    /// Reference-binary crate version (`CARGO_PKG_VERSION`, currently `1.0.0`).
     pub binary_version: String,
     /// Python oracle version reported in `--json` (`src/paradl/__init__.py`).
     pub oracle_version: String,
@@ -346,7 +343,9 @@ impl<'a> DoctorJson<'a> {
                 rust_engine: ToolRow {
                     status: "optional_missing".to_owned(),
                     detail: "not built (HTTP(S) falls back to --engine aria2)".to_owned(),
-                    fix: Some(RUST_ENGINE_FIX.to_owned()),
+                    // The legacy PyO3 module was deleted in W0-1 and is never
+                    // reintroduced, so there is no build command to recommend.
+                    fix: None,
                 },
                 aria2c: path_row(probe.aria2c_path.as_deref()),
                 ytdlp: status_detail_row(report.yt_dlp_version.is_some(), Some(&ytdlp_detail)),
@@ -602,7 +601,7 @@ fn dist_info_version(venv: &Path) -> Option<String> {
 }
 
 fn fixes_for(tools: &ToolProbe, env: &DoctorEnv) -> Vec<String> {
-    let mut fixes = vec![RUST_ENGINE_FIX.to_owned()];
+    let mut fixes = Vec::new();
     if auth_source(&env.auth, "hf") == "none" {
         fixes.push("paradl auth set hf  # or: export HF_TOKEN=<token>".to_owned());
     }

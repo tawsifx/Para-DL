@@ -12,7 +12,7 @@
 
 ## 1. Workspace crates
 
-Every crate: `version = "0.1.0"` during development, crate-level `//!` docs, `README.md`, at least one runnable `examples/` target, `#![warn(missing_docs)]` on public items, and a `tests/` or `#[cfg(test)]` suite. Workspace root: `rust/Cargo.toml` (edition 2024, rust-version 1.98 — existing values kept).
+Every crate: `version = "0.1.0"` during development and `version = "1.0.0"` at the Wave 5 release (inherited from `workspace.package.version`), crate-level `//!` docs, `README.md`, at least one runnable `examples/` target, `#![warn(missing_docs)]` on public items, and a `tests/` or `#[cfg(test)]` suite. Workspace root: `rust/Cargo.toml` (edition 2024, rust-version 1.98 — existing values kept). Published crates carry docs.rs metadata (`documentation`, `repository`, `homepage`, `keywords`, `categories`).
 
 | Crate | Public role | Extension traits | Feature flags | Oracle |
 |---|---|---|---|---|
@@ -26,6 +26,7 @@ Every crate: `version = "0.1.0"` during development, crate-level `//!` docs, `RE
 | `paradl-postproc` | checksum (blake2b, GNU/BSD text, companion), ZIP/tar security, ADB | `PostProcessor` | — | checksum/archive tests |
 | `paradl-platform` | macOS/Windows byte-exact metadata + keychain | `Platform` | `platform-macos`, `platform-windows` | `macos_fake.py` goldens, `test_platform_windows.py` |
 | `paradl-media` | Rust-side protocol client/router only — NO extractor logic | `MediaResolver` | `media` | media protocol contract tests |
+| `paradl-resilience` | queue scheduling, launchd plists, isolated hooks, resilience event source, auth | — | — | queue/plist/hook/auth goldens; `auth_status` event |
 | `paradl-events` | **only** JSONL emitter: ~48 event shapes + redaction + version constant | — | — | golden shapes over all events |
 | `paradl-ui` | progress display + ratatui TUI consuming `paradl-events` | — | `tui` | golden output tests |
 | `paradl-api` | axum server, 7 endpoints, serde validation, task store/runner | — | `api` | `test_api_optional_pydantic.py` |
@@ -193,8 +194,8 @@ Default build: `cargo build` compiles with NO optional system tools. `paradl --v
 ## 6. Semver policy
 
 - Development: `0.1.0` across all crates. Breaking changes allowed freely.
-- Release (Wave 5): `1.0.0` for the framework and binary; CHANGELOG, LICENSE headers, docs.rs metadata.
-- Public API stability begins at `1.0.0`. The media protocol version `paradl-media/1` is independent of crate semver.
+- Release (Wave 5): `1.0.0` for the framework and binary; CHANGELOG, LICENSE headers, docs.rs metadata. Released 2026-11-21 — all framework crates and the `paradl` binary inherit `1.0.0` from `workspace.package.version`; dev-only crates (`paradl-oracle`, `paradl-parity`) carry the same version but are not published.
+- Public API stability begins at `1.0.0`. The media protocol version `paradl-media/1` is independent of crate semver. The optional Python media package (`media/pyproject.toml`) and its reported `worker_version` are also independent of crate semver.
 
 ---
 
@@ -204,4 +205,5 @@ Default build: `cargo build` compiles with NO optional system tools. `paradl --v
 - `cargo test --doc` green for every crate.
 - Each crate's `README.md`: one-line role, public trait list, feature flags, link to example.
 - Each crate's `examples/` has ≥1 runnable target (`cargo run -p <crate> --example <name>`).
-- Benchmarks: cold medians, identical URLs, pinning/sentinels, ≥3 reps, CPU/RSS; warm-cache and ~1.2–1.3× drift are NOT wins; unmeasurable metrics use `{"value": null, "reason": "..."}`. Media process-startup measured on the media lane only.
+- Benchmarks: cold medians, identical URLs, pinning/sentinels, ≥3 reps, CPU/RSS; warm-cache and ~1.2–1.3× drift are NOT wins; unmeasurable metrics use `{"value": null, "reason": "..."}`. Media process-startup measured on the media lane only. After the W5-1 cutover the Python oracle these harnesses compare against is deleted, so both harnesses are **retired**: they emit null+reason rows and preserve all honesty/drift caveats rather than crashing on missing imports.
+- Human `doctor` output (W4-1) is a zero-dependency **deterministic fixed-width renderer** (`format!("{:<w$}")`, stable ordering, no ANSI, no terminal-width detection) — a Rich/comfy-table alternative that is byte-identical in pipes and TTYs and golden-testable. `doctor --json` keeps the oracle-aligned typed field order; the stale PyO3 `maturin develop --release` fix hint was removed at release hygiene (W5-2).

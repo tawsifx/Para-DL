@@ -13,7 +13,7 @@ use serde_json::json;
 /// A fully fixed report: no real system tools and no wall-clock-derived values.
 fn fixed_report() -> DoctorReport {
     DoctorReport {
-        binary_version: "0.1.0".into(),
+        binary_version: "1.0.0".into(),
         oracle_version: "1.0.0".into(),
         media_protocol: MEDIA_PROTOCOL.into(),
         media_package_version: MEDIA_PACKAGE_VERSION.into(),
@@ -48,7 +48,7 @@ fn fixed_report() -> DoctorReport {
             rust_engine_version: None,
             npm_version: Some("10.2.4".into()),
             npm_path: Some("/opt/homebrew/bin/npm".into()),
-            fixes: vec!["maturin develop --release  # build rust/paradl-rs into this venv".into()],
+            fixes: vec![],
         },
     }
 }
@@ -71,7 +71,7 @@ fn doctor_report_has_all_required_fields_without_probing_python() {
     unsafe { std::env::remove_var("PARADL_MEDIA_PY") };
 
     assert!(!report.python_probed, "non-media doctor must not probe Python");
-    assert_eq!(report.binary_version, "0.1.0");
+    assert_eq!(report.binary_version, "1.0.0");
     assert_eq!(report.oracle_version, "1.0.0");
     assert_eq!(report.media_protocol, MEDIA_PROTOCOL);
     assert_eq!(MEDIA_PROTOCOL, "paradl-media/1");

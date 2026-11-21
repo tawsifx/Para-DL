@@ -423,3 +423,30 @@ Seeded P01–P12 preserved; P13+ enumerate every field of all four frame types p
 | X05 | non-media paths spawn no Python (`PARADL_ASSERT_NO_PYTHON=1`) | W4-2 | non-media lane |
 | X06 | Python spawned only via `python -m paradl_media` for media | W4-2 | process guard |
 | X07 | Homebrew formula + install scripts work clean | W0-1/W5-2 | fresh-machine test |
+
+---
+
+## 9. W5-2 post-cutover provability note (informational — lead owns final sign-off)
+
+The W5-1 cutover deleted the Python oracle (`src/paradl/**`, bulk `tests/**`,
+`parallel-dl.py`). Row provability after cutover:
+
+- **Non-media differential rows** (C01–C52 where "parity non-media lane" is the
+  proving test, plus X05 `PARADL_ASSERT_NO_PYTHON=1`) are proven by the final
+  GREEN run captured at commit `c4e271a`: exit `0`, 6/6 cases CLEAN. The harness
+  test `full_non_media_gate_is_clean` is now `#[ignore]`d because it invokes the
+  deleted oracle; it is **retired historical evidence**, not a re-runnable gate.
+- **Boundary lane rows** P02, P04, P06, P08, P09, P10, P15, P17, P20, P22 stay
+  fully live and oracle-free; `cargo run -p paradl-parity -- boundary --case
+  version-mismatch` exits `4`. Protocol matrix N / N−1 / N+1 / unknown / missing
+  is covered by `protocol_version_matrix_matches_oracle` and the boundary tests.
+- **Media golden-replay rows** P03, P16 stay live because `media/` was retained:
+  `PYTHONPATH=media .venv/bin/python -m pytest media/tests -q`.
+- **X04 / C20** (`parallel-dl.py`, dual binary names): `parallel-dl.py` is
+  deleted; the native `paradl` binary owns both `paradl` and `parallel-dl`.
+- **C18 / E21** (`bench` subcommand / bench event): the subcommand remains
+  implemented, but the two *Python benchmark harnesses* that compared against
+  the deleted oracle are retired — they emit `{"value": null, "reason": "..."}`
+  with all honesty/drift caveats preserved instead of crashing on stale imports.
+- **X01 / X03 / X06 / X07** remain provable from the tree, `media/pyproject.toml`,
+  the process guard, and the Formula/install scripts respectively.

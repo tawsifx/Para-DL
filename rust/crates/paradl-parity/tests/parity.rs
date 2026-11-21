@@ -287,7 +287,15 @@ fn loopback_server_serves_deterministic_bytes() {
     assert!(response.contains("200 OK"));
 }
 
+// This differential test invoked the Python CLI oracle under `src/paradl/**`
+// plus `parallel-dl.py`, both deleted in the W5-1 cutover. It is retired, not
+// broken: the final GREEN evidence is preserved in the ledger — full non-media
+// gate EXIT 0 with 6/6 cases CLEAN at commit c4e271a (lead independently
+// verified, 2026-11-20). `#[ignore]` keeps the code as a historical record and
+// allows bare `cargo test --all` to stay green post-cutover; the boundary lane
+// (which needs no oracle) remains fully live.
 #[test]
+#[ignore = "Python CLI oracle deleted in W5-1 cutover; GREEN at c4e271a preserved in ledger"]
 fn full_non_media_gate_is_clean() {
     // (c) The complete gate (5 corpus cases + interrupt/resume) must exit 0.
     let gate = run_full_nonmedia_gate(&repo_root()).unwrap();

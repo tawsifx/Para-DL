@@ -71,6 +71,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+# W5-2 cutover retirement: the five `from paradl...` imports in this harness
+# target the Python engine/oracle deleted in W5-1 (`src/paradl/**`). When that
+# tree is absent the harness is retired: every measurement is written as
+# null+reason, the honesty block and all drift caveats below are preserved
+# verbatim, and the process exits 0 instead of crashing on a missing import.
+ORACLE_DIR = REPO_ROOT / "src" / "paradl"
+ORACLE_RETIRED_REASON = (
+    "Retired in the W5-1 cutover: src/paradl/** (the Python engine/oracle these "
+    "comparisons require) was deleted; the native Rust framework now owns these "
+    "paths. No engine numbers are reported because there is no Python engine "
+    "left to compare against. The Rust binary itself is verified by the cargo "
+    "gate and the boundary lane, not by this retired Python harness."
+)
+
 PY = sys.executable
 MB = 1024 * 1024
 PAYLOAD_SIZE = 32 * MB
@@ -413,6 +427,9 @@ def self_test_pin() -> int:
     rejected via AssertionError.  Called with --self-test-pin; raw output is
     captured in the task-4 report as the RED/GREEN proof.
     """
+    if not ORACLE_DIR.is_dir():
+        print(f"SKIP: oracle retired in W5-1 cutover: {ORACLE_RETIRED_REASON}")
+        return 0
     t = _target_info("http://127.0.0.1/file")
     a2 = importlib.import_module("paradl.engines.aria2")
     re_mod = importlib.import_module("paradl.engines.rust_engine")
@@ -487,6 +504,9 @@ def _execute(engine: str, url: str, out_dir: Path) -> Any:
 
 
 def worker(kind: str, url: str = "") -> None:
+    if not ORACLE_DIR.is_dir():
+        print("RESULT_ERROR=oracle retired in W5-1 cutover; no Python engine to benchmark")
+        return
     if kind == "import_aria2":
         t0 = time.perf_counter()
         importlib.import_module("paradl.engines.aria2").Aria2Engine()
@@ -1024,6 +1044,68 @@ def compute_variance(runs: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def run_benchmark_suite(root: Path) -> dict[str, Any]:
+    if not ORACLE_DIR.is_dir():
+        # Retired post-cutover. Honesty block and drift caveats are byte-for-byte
+        # the same texts used by the live suite below; only measurements change.
+        unavailable = _unmeasurable(ORACLE_RETIRED_REASON)
+        return {
+            "environment": {
+                "python": sys.version.split()[0],
+                "platform": platform.platform(),
+                "aria2c": shutil.which("aria2c"),
+                "native_extension_present": False,
+                "rust_adapter_present": False,
+                "oracle_present": False,
+            },
+            "methodology": {"retirement": ORACLE_RETIRED_REASON},
+            "honesty": {
+                "codeload": _unmeasurable(CODELOAD_REASON),
+                "warm_cache": (
+                    "Warm throughput includes daemon/socket reuse + page-cache hits and is "
+                    "NOT presented as a general speedup; cold-vs-cold is the engine comparison."
+                ),
+                "drift": (
+                    "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md "
+                    "sec.7 is measurement noise, NOT a code-attributable win. See variance."
+                ),
+                "unfair_metrics": (
+                    "Metrics that cannot be measured fairly are written as "
+                    "{'value': null, 'reason': '...'} and never invented."
+                ),
+            },
+            "framework_honesty": {
+                "framework_transfer": _unmeasurable(FRAMEWORK_TRANSFER_REASON),
+                "media_process_startup": _unmeasurable(MEDIA_BOUNDARY_REASON),
+                "cold_start": FRAMEWORK_COLD_START_SCOPE,
+                "drift": (
+                    "Differences within ~1.2-1.3x are measurement drift, not wins; "
+                    "warm-cache effects are never presented as speedups."
+                ),
+            },
+            "engine_pinning": {
+                "method": "Oracle retired in W5-1 cutover; no pinning evidence to collect.",
+                "assertions_passed": None,
+            },
+            "benchmarks": {
+                "startup_overhead": {"aria2": unavailable, "native": unavailable},
+                "throughput_16_stream": {"aria2": unavailable, "native": unavailable},
+                "socket_recycle_latency": {"native": unavailable, "aria2": unavailable},
+                "cpu_usage": {"aria2": unavailable, "native": unavailable},
+                "peak_rss": {"aria2": unavailable, "native": unavailable},
+                "checksum_large_file": unavailable,
+                "framework_comparison": {
+                    "cold_start": {"python_cli": unavailable, "rust_binary": unavailable},
+                    "transfer": {
+                        "identical_url": None,
+                        "python_cli": unavailable,
+                        "rust_binary": unavailable,
+                    },
+                    "media_process_startup": unavailable,
+                },
+            },
+            "retired": True,
+            "retirement_reason": ORACLE_RETIRED_REASON,
+        }
     srv = Loopback()
     srv.start()
     try:

@@ -8,6 +8,8 @@ license.workspace = true
 authors.workspace = true
 readme = "README.md"
 repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-resilience"
 keywords = ["paradl", "resilience", "queue", "auth", "hooks"]
 categories = ["command-line-utilities"]
 

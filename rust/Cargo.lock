@@ -1366,7 +1366,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "paradl"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "paradl-app",
  "paradl-cli",
@@ -1374,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-api"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1390,7 +1390,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-app"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1417,7 +1417,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "paradl-core",
@@ -1425,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1459,7 +1459,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-events"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "paradl-watchdog",
  "regex",
@@ -1469,7 +1469,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-media"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -1483,7 +1483,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-net"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "hickory-resolver",
@@ -1501,16 +1501,19 @@ dependencies = [
 
 [[package]]
 name = "paradl-oracle"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "paradl-parity"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
+ "paradl-app",
+ "paradl-cli",
  "paradl-core",
+ "paradl-engine",
  "paradl-events",
  "paradl-media",
  "serde",
@@ -1521,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-platform"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "hex",
  "paradl-core",
@@ -1531,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-postproc"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "blake2",
  "hex",
@@ -1547,7 +1550,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-resilience"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "paradl-core",
@@ -1561,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-rs"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "pyo3",
  "rapids",
@@ -1571,7 +1574,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-store"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "paradl-core",
@@ -1582,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-throttle"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "paradl-core",
  "regex",
@@ -1593,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-ui"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "paradl-core",
  "paradl-events",
@@ -1603,7 +1606,7 @@ dependencies = [
 
 [[package]]
 name = "paradl-watchdog"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "paradl-core",
  "serde",
@@ -1885,7 +1888,7 @@ dependencies = [
 
 [[package]]
 name = "rapids"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",

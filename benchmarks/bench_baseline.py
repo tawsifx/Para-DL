@@ -50,6 +50,18 @@ if str(SRC) not in sys.path:
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
+# W5-2 cutover retirement: every `from paradl...` import below targets the pure
+# Python oracle deleted in W5-1 (`src/paradl/**`). There is no Python
+# implementation left to microbenchmark, so those imports are intentionally
+# unreachable and the harness emits null+reason rows instead of crashing. The
+# honesty block (including the drift caveats) is preserved verbatim below.
+ORACLE_DIR = SRC / "paradl"
+ORACLE_RETIRED_REASON = (
+    "Retired in the W5-1 cutover: src/paradl/** (the Python oracle these pure-Python "
+    "microbenchmarks measure) was deleted; the Rust framework now owns these paths. "
+    "No value is reported because there is no implementation left to time."
+)
+
 # Scales: (label, size) -- small / medium / high-concurrency-stress analogue
 SCALES: list[tuple[str, int]] = [("small", 200), ("medium", 2_000), ("stress", 20_000)]
 
@@ -302,6 +314,24 @@ def run(tag: str, only: str | None, reps: int = 3) -> dict[str, Any]:
         "honesty": HONESTY,
         "results": [],
     }
+    if not ORACLE_DIR.is_dir():
+        result["status"] = "retired"
+        result["reason"] = ORACLE_RETIRED_REASON
+        for name in BUILDERS:
+            for label, size in SCALES:
+                result["results"].append({
+                    "case": name,
+                    "scale": size,
+                    "label": label,
+                    "value": None,
+                    "reason": ORACLE_RETIRED_REASON,
+                })
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        out = RESULTS_DIR / f"{tag}.json"
+        out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        print(f"ORACLE RETIRED (W5-1 cutover): {ORACLE_RETIRED_REASON}")
+        print(f"Saved -> {out}")
+        return result
     for name, builder in BUILDERS.items():
         if only and only not in name:
             continue
@@ -332,7 +362,7 @@ def compare(path: Path, current: dict[str, Any]) -> None:
     print("-" * 84)
     for r in current["results"]:
         o = old.get((r["case"], r["label"]))
-        if not o or r["p50_ms"] == 0:
+        if not o or not r.get("p50_ms"):
             continue
         sp = o["p50_ms"] / r["p50_ms"]
         print(

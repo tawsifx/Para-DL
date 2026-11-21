@@ -1,7 +1,7 @@
 [package]
 name = "paradl-oracle"
 description = "Dev-only golden fixtures and contract tests mirroring the Python oracle for byte-exact parity"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.98"
 license = "MIT"

@@ -1,6 +1,6 @@
 [package]
 name = "paradl-core"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.98"
 license = "MIT"
@@ -8,6 +8,8 @@ authors = ["Tawsif Rahman"]
 description = "Shared models, byte-exact helpers, configuration, paths, clock, and the single Error->ExitCode model for the paraDL framework."
 readme = "README.md"
 repository = "https://github.com/tawsifx/parallel-dl"
+homepage = "https://github.com/tawsifx/parallel-dl#readme"
+documentation = "https://docs.rs/paradl-core"
 keywords = ["paradl", "download", "core", "models"]
 categories = ["data-structures"]
 
