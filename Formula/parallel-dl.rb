@@ -13,7 +13,7 @@ class ParallelDl < Formula
   # aria2 dependency, and no Python on any non-media path.
   depends_on "rust" => :build
   depends_on "python@3.12" => :recommended # media routes only
-  depends_on "ffmpeg"                      # media routes only
+  depends_on "ffmpeg" => :recommended       # media routes only
 
   # Optional JavaScript runtime for YouTube challenge solving.
   depends_on "deno" => :recommended
