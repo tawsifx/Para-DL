@@ -249,7 +249,7 @@ fn classify_image(url: &str, probe: Option<&HttpProbeResult>, fallback_name: Str
 /// Bare repository shorthand (`owner/repo`). Dots are excluded so file paths
 /// and URLs cannot be swallowed; dotted names use the explicit `gh:` prefix.
 static BARE_REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^[A-Za-z0-9_]+/[A-Za-z0-9_]+$").expect("bare repo regex must compile")
+    Regex::new(r"^[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$").expect("bare repo regex must compile")
 });
 
 fn shortcut_type(lower: &str) -> Option<TargetType> {
@@ -789,6 +789,21 @@ mod tests {
                 }
             ),
             "{dotted:?}"
+        );
+    }
+
+    #[test]
+    fn bare_owner_repo_with_hyphen_is_github() {
+        let decision = classify_target("astral-sh/uv", None, &PureClaimsChecker);
+        assert!(
+            matches!(
+                decision,
+                RouteDecision::Site {
+                    target_type: TargetType::Github,
+                    ..
+                }
+            ),
+            "{decision:?}"
         );
     }
 }

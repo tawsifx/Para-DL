@@ -48,7 +48,7 @@ static REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("repo regex must compile")
 });
 static BARE_REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([A-Za-z0-9_]+)/([A-Za-z0-9_]+)$").expect("bare repo regex must compile")
+    Regex::new(r"^([A-Za-z0-9_-]+)/([A-Za-z0-9_-]+)$").expect("bare repo regex must compile")
 });
 
 fn basename(path: &str) -> String {
@@ -810,5 +810,14 @@ mod tests {
         let url = GithubTarget::parse("github.com/cli/cli");
         assert_eq!(url.owner(), Some("cli"));
         assert_eq!(url.repo(), Some("cli"));
+    }
+
+    #[test]
+    fn bare_repo_with_hyphen_parses() {
+        let target = GithubTarget::parse("astral-sh/uv");
+        assert_eq!(target.kind(), "repo");
+        assert_eq!(target.owner(), Some("astral-sh"));
+        assert_eq!(target.repo(), Some("uv"));
+        assert_eq!(target.url(), "https://github.com/astral-sh/uv");
     }
 }
