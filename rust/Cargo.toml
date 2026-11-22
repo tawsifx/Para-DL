@@ -13,6 +13,7 @@ default-members = [
     "crates/paradl-events",
     "crates/paradl-media",
     "crates/paradl-net",
+    "crates/paradl-package",
     "crates/paradl-platform",
     "crates/paradl-postproc",
     "crates/paradl-resilience",

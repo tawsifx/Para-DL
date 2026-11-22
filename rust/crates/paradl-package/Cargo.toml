@@ -1,0 +1,20 @@
+[package]
+name = "paradl-package"
+description = "Package-manager install orchestration: prefetch artifacts then install offline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+paradl-core = { path = "../paradl-core" }
+paradl-net = { path = "../paradl-net" }
+paradl-engine = { path = "../paradl-engine" }
+paradl-postproc = { path = "../paradl-postproc" }
+tokio.workspace = true
+async-trait.workspace = true
+tempfile.workspace = true
+url.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
