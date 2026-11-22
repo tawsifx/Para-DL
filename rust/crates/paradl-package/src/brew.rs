@@ -64,6 +64,9 @@ async fn download_asset(
     asset: &ResolvedAsset,
     dest: &Path,
 ) -> Result<(), Error> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let outcome = ctx
         .downloader
         .download(
@@ -321,7 +324,7 @@ mod tests {
                 });
             }
             if let Some(parent) = dest.parent() {
-                std::fs::create_dir_all(parent)?;
+                assert!(parent.exists(), "caller must create cache parent: {parent:?}");
             }
             std::fs::write(dest, b"bottle")?;
             Ok(DownloadOutcome {
@@ -359,6 +362,7 @@ mod tests {
 
     #[tokio::test]
     async fn brew_install_prefetches_bottle_then_pours() {
+        let _ = std::fs::remove_dir_all(std::env::temp_dir().join("pdl-brew-test"));
         let runner = happy_runner();
         let downloader = Arc::new(ScriptedDownloader::default());
         let outcome = brew_install(&context(runner.clone(), downloader.clone()), "wget", BrewAction::Install)

@@ -24,6 +24,16 @@ fn run(ctx: &PackageContext, program: &str, args: &[&str]) -> Result<ProcessOutc
     })
 }
 
+fn normalize_package(raw: &str) -> &str {
+    let lower = raw.to_ascii_lowercase();
+    for prefix in ["pip:", "pip/", "pypi:", "pypi/"] {
+        if lower.starts_with(prefix) {
+            return &raw[prefix.len()..];
+        }
+    }
+    raw
+}
+
 fn requirement_name(spec: &str) -> String {
     let name: String = spec
         .chars()
@@ -33,12 +43,12 @@ fn requirement_name(spec: &str) -> String {
 }
 
 fn installed_packages(ctx: &PackageContext, installer: &str, python: &str) -> HashSet<String> {
-    let args: Vec<&str> = if installer == "uv" {
-        vec!["pip", "list"]
+    let (program, args): (&str, Vec<&str>) = if installer == "uv" {
+        ("uv", vec!["pip", "list", "--python", python])
     } else {
-        vec!["-m", "pip", "list"]
+        (python, vec!["-m", "pip", "list"])
     };
-    let Ok(outcome) = run(ctx, python, &args) else {
+    let Ok(outcome) = run(ctx, program, &args) else {
         return HashSet::new();
     };
     outcome
@@ -128,9 +138,10 @@ async fn prefetch_wheel(
 /// wheelhouse, then install offline with `uv pip` (or `python -m pip`).
 pub async fn pip_install(
     ctx: &PackageContext,
-    package: &str,
+    raw_package: &str,
     action: PipAction,
 ) -> Result<InstallOutcome, Error> {
+    let package = normalize_package(raw_package);
     let uv_available = run(ctx, "uv", &["--version"])
         .map(|outcome| outcome.status == 0)
         .unwrap_or(false);
@@ -420,6 +431,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pip_install_strips_pip_prefix_from_installer_command() {
+        let runner = Arc::new(ScriptedRunner {
+            python_version: "3.12".to_owned(),
+            ..Default::default()
+        });
+        pip_install(
+            &context(runner.clone(), Arc::new(ScriptedHttp { requested: Arc::new(Mutex::new(vec![])), cp311: false }), Arc::new(ScriptedDownloader::default())),
+            "pip:requests",
+            PipAction::Install,
+        )
+        .await
+        .expect("pip install succeeds");
+        let install = runner.install_key().expect("install command");
+        assert!(install.ends_with(" requests"), "installer got raw target: {install}");
+        assert!(!install.contains("pip:requests"), "{install}");
+    }
+
+    #[tokio::test]
     async fn pip_upgrade_re_resolves_installed_package() {
         let runner = Arc::new(ScriptedRunner {
             python_version: "3.12".to_owned(),
@@ -437,6 +466,11 @@ mod tests {
         assert!(outcome.success);
         assert_eq!(downloader.calls.lock().unwrap().len(), 2);
         assert!(runner.install_key().unwrap().contains("--upgrade"));
+        assert!(
+            runner.calls().iter().any(|call| call.starts_with("uv pip list")),
+            "installed-package detection must use uv pip list: {:?}",
+            runner.calls()
+        );
     }
 
     #[tokio::test]
