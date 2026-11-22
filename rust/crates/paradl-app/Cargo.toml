@@ -51,4 +51,5 @@ tempfile = { workspace = true }
 # Protocol handshake is asserted in the handoff tests even when the binary's
 # `media` feature is off; the client itself has no optional system tools.
 paradl-media = { path = "../paradl-media" }
+async-trait = { workspace = true }
 tempfile = { workspace = true }

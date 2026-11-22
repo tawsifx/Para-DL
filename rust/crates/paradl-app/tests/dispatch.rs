@@ -5,10 +5,129 @@
 //! injected output sink so they can assert which single-emitter JSONL event a
 //! handler produced without touching the process stdout.
 
+use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use paradl_app::App;
 use paradl_cli::{Cli, Command, Dispatch, ExitCode, ParseOutcome};
+use paradl_core::PDLConfig;
+use paradl_net::Result as NetResult;
+use paradl_net::sites::{JsonResponse, RedirectInfo, SiteHttp};
+use paradl_package::{
+    ArtifactDownloader, CommandSpec, DownloadOutcome, ProcessOutcome, ProcessRunner,
+};
+
+struct FakeRunner {
+    fail_install: bool,
+    calls: Arc<Mutex<Vec<String>>>,
+}
+impl ProcessRunner for FakeRunner {
+    fn run(&self, spec: &CommandSpec) -> Result<ProcessOutcome, paradl_core::Error> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("{} {}", spec.program, spec.args.join(" ")));
+        let stdout = if spec.args.first().map(String::as_str) == Some("--cache") {
+            format!(
+                "{}",
+                std::env::temp_dir()
+                    .join("pdl-dispatch-test")
+                    .join("wget-1.21.4.arm64_sequoia.bottle.tar.gz")
+                    .display()
+            )
+        } else {
+            String::new()
+        };
+        let status = if self.fail_install && spec.args.first().map(String::as_str) == Some("install")
+        {
+            1
+        } else {
+            0
+        };
+        Ok(ProcessOutcome {
+            status,
+            stdout,
+            stderr: String::new(),
+        })
+    }
+}
+
+struct FakeHttp;
+#[async_trait]
+impl SiteHttp for FakeHttp {
+    async fn fetch_json(
+        &self,
+        _url: &str,
+        _headers: &HashMap<String, String>,
+        _timeout: std::time::Duration,
+    ) -> NetResult<JsonResponse> {
+        Ok(JsonResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body: serde_json::json!({
+                "versions": { "stable": "1.21.4" },
+                "dependencies": [],
+                "bottle": { "stable": { "files": {
+                    "arm64_sequoia": {
+                        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "url": "https://example.com/wget.bottle.tar.gz"
+                    }
+                }}}
+            }),
+        })
+    }
+    async fn redirect(
+        &self,
+        _url: &str,
+        _headers: &HashMap<String, String>,
+        _timeout: std::time::Duration,
+    ) -> NetResult<Option<RedirectInfo>> {
+        Ok(None)
+    }
+}
+
+struct FakeDownloader;
+#[async_trait]
+impl ArtifactDownloader for FakeDownloader {
+    async fn download(
+        &self,
+        _url: &str,
+        _dest: &Path,
+        _expected: Option<&str>,
+        _connections: u32,
+    ) -> Result<DownloadOutcome, paradl_core::Error> {
+        Ok(DownloadOutcome {
+            success: true,
+            bytes: 6,
+            error: None,
+            exit_code: ExitCode::Ok,
+        })
+    }
+}
+
+fn package_dispatch(argv: &[&str], fail_install: bool) -> (ExitCode, String, Vec<String>) {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let runner = FakeRunner {
+        fail_install,
+        calls: Arc::clone(&calls),
+    };
+    let argv: Vec<String> = argv.iter().map(|s| (*s).to_string()).collect();
+    let outcome = Cli::parse_command_line(argv.clone()).expect("parse succeeds");
+    let ParseOutcome::Command(cli) = outcome else { panic!("expected command") };
+    let command = Command::from_cli(&cli).expect("classification succeeds");
+    let buffer = Arc::new(Mutex::new(String::new()));
+    let sink = {
+        let buffer = Arc::clone(&buffer);
+        Arc::new(move |line: &str| buffer.lock().unwrap().push_str(line))
+    };
+    let mut app = App::with_config(PDLConfig::default())
+        .with_output(sink)
+        .with_package_context(Arc::new(runner), Arc::new(FakeHttp), Arc::new(FakeDownloader));
+    let code = app.handle(&command, &cli);
+    (code, buffer.lock().unwrap().clone(), calls.lock().unwrap().clone())
+}
 
 fn dispatch(argv: &[&str]) -> (ExitCode, String) {
     let argv: Vec<String> = argv.iter().map(|s| (*s).to_string()).collect();
@@ -161,6 +280,24 @@ fn extensionless_direct_url_falls_back_without_media_worker() {
     assert!(lines[0].contains("\"event\": \"target_classified\""), "{}", lines[0]);
     assert!(lines[1].contains("\"event\": \"result\""), "{}", lines[1]);
     assert!(!output.contains("missing dependency"), "{output}");
+}
+
+#[test]
+fn brew_dispatch_success_emits_result() {
+    let (code, output, calls) = package_dispatch(&["brew", "install", "wget", "--json"], false);
+    assert_eq!(code, ExitCode::Ok, "{output}");
+    assert!(output.contains("\"event\": \"result\""), "{output}");
+    assert!(output.contains("\"success\": true"), "{output}");
+    assert!(!output.contains("\"event\": \"error\""), "{output}");
+    assert!(calls.contains(&"brew install wget".to_owned()), "{calls:?}");
+}
+
+#[test]
+fn brew_dispatch_runner_failure_emits_error() {
+    let (code, output, _calls) = package_dispatch(&["brew", "install", "wget", "--json"], true);
+    assert_eq!(code, ExitCode::Failure, "{output}");
+    assert!(output.contains("\"event\": \"error\""), "{output}");
+    assert!(!output.contains("\"success\": true"), "{output}");
 }
 
 #[test]

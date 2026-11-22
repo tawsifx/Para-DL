@@ -9,7 +9,7 @@ use chrono::Timelike;
 use std::time::Instant;
 
 use paradl_cli::{
-    AuthAction, AuthCommand, BenchCommand, BrewCommand, Cli, CleanCommand, ConfigAction,
+    AuthAction, AuthCommand, BenchCommand, BrewAction as CliBrewAction, BrewCommand, Cli, CleanCommand, ConfigAction,
     ConfigCommand, ExitCode, ExtractCommand, HashCommand, InfoCommand, InstallCommand,
     NetprobeCommand, PipCommand, ProfilesAction, ProfilesCommand, QueueAction, QueueCommand,
     ResumeCommand, ServerCommand,
@@ -23,6 +23,7 @@ use paradl_events::{
     QueueRemovedEvent, QueueResumedEvent, ResultEvent, emit_jsonl, now_timestamp,
 };
 use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
+use paradl_package::{BrewAction as PackageBrewAction, brew_install};
 use paradl_postproc::{PostProcessor, checksum};
 use paradl_resilience::auth::{OsEnv, Service, TokenSource, lookup_token};
 use paradl_store::{QueueJob, SqliteStore, Store};
@@ -567,11 +568,36 @@ impl App {
         if self.offline {
             return self.fail(json, &Error::failure("brew install requires network"));
         }
-        if matches!(command.action, paradl_cli::BrewAction::Targets) {
+        if matches!(command.action, CliBrewAction::Targets) {
             return self.fail(json, &Error::usage("use `paradl brew install <formula>`"));
         }
-        // Wired to the install engine in a later task.
-        self.fail(json, &Error::missing_dependency("brew install engine not yet wired"))
+        let context = match self.package_context() {
+            Ok(context) => context,
+            Err(error) => return self.fail(json, &error),
+        };
+        let action = match command.action {
+            CliBrewAction::Install => PackageBrewAction::Install,
+            CliBrewAction::Upgrade => PackageBrewAction::Upgrade,
+            CliBrewAction::Update => PackageBrewAction::Update,
+            CliBrewAction::Targets => unreachable!("handled above"),
+        };
+        let formula = command.formula.clone().unwrap_or_default();
+        match self.runtime().block_on(brew_install(&context, &formula, action)) {
+            Ok(outcome) => {
+                let code = outcome.exit_code;
+                self.publish(
+                    json,
+                    Event::Result(result_line(
+                        "brew",
+                        &formula,
+                        outcome.success,
+                        outcome.error,
+                    )),
+                );
+                code
+            }
+            Err(error) => self.fail(json, &error),
+        }
     }
 
     pub(super) fn install(&mut self, command: &InstallCommand, json: bool) -> ExitCode {
