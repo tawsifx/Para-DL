@@ -191,10 +191,10 @@ event=config
 === C22 diagnose [diagnose] -> 0
 event=doctor
 event=diagnose
-=== C23 pip [pip install requests] -> 0
-{"event": "result", "timestamp": <TS>, "subcommand": "pip", "target": "pip:requests", "success": true, "exit_code": 0}
-=== C24 brew [brew install wget] -> 0
-{"event": "result", "timestamp": <TS>, "subcommand": "brew", "target": "wget", "success": true, "exit_code": 0}
+=== C23 pip [pip install requests] -> 4
+{"event": "error", "timestamp": <TS>, "message": "missing dependency: paradl pip is not implemented in the native binary; use `uv pip install <package>` (or `pip install <package>`) instead"}
+=== C24 brew [brew install wget] -> 4
+{"event": "error", "timestamp": <TS>, "message": "missing dependency: paradl brew is not implemented in the native binary; use `NONINTERACTIVE=1 brew install <formula>` instead"}
 === C27 server [server] -> 0
 {"event": "api_server_started", "timestamp": <TS>, "host": "127.0.0.1", "port": 8000}
 === C28 tui [tui] -> 0

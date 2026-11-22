@@ -48,8 +48,10 @@ const CASES: &[(&str, &[&str], ExitCode, Option<&str>)] = &[
     ("C17 netprobe", &["netprobe", "https://example.com/f.zip"], ExitCode::Ok, Some("\"event\": \"netprobe\"")),
     ("C18 bench", &["bench", "https://example.com/f.zip"], ExitCode::Ok, Some("\"event\": \"bench\"")),
     ("C22 diagnose", &["diagnose"], ExitCode::Ok, Some("\"event\": \"diagnose\"")),
-    ("C23 pip", &["pip", "install", "requests"], ExitCode::Ok, Some("\"event\": \"result\"")),
-    ("C24 brew", &["brew", "install", "wget"], ExitCode::Ok, Some("\"event\": \"result\"")),
+    // C23/C24: the old stubs reported success without installing anything.
+    // They must now fail honestly and point at the real package managers.
+    ("C23 pip", &["pip", "install", "requests"], ExitCode::MissingDependency, Some("\"event\": \"error\"")),
+    ("C24 brew", &["brew", "install", "wget"], ExitCode::MissingDependency, Some("\"event\": \"error\"")),
     ("C27 server", &["server"], ExitCode::Ok, Some("\"event\": \"api_server_started\"")),
     ("C28 tui", &["tui"], ExitCode::Ok, None),
     ("C38 queue pause", &["queue", "pause", "1"], ExitCode::Ok, Some("\"event\": \"queue_paused\"")),

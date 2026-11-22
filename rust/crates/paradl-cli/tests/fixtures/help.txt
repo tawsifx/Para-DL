@@ -185,8 +185,7 @@ Recipes:
   paradl --quality 4k "https://www.youtube.com/watch?v=..."
   paradl gh:BurntSushi/ripgrep
   paradl install astral-sh/uv
-  paradl pip install requests
-  paradl brew install wget
+  # package installs: uv pip install <pkg> / NONINTERACTIVE=1 brew install <formula>
   paradl hf:TheBloke/Llama-2-7B-GGUF --asset "*Q4_K_M.gguf"
   paradl ipsw:iPhone14,5 -c 16 -o ~/Downloads
   paradl "https://releases.ubuntu.com/24.04/ubuntu-24.04.1-desktop-amd64.iso" -c 16

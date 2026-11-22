@@ -550,30 +550,27 @@ impl App {
         ExitCode::Ok
     }
 
+    /// The native binary does not implement the Python package-install engine.
+    /// Reporting success here was a false positive: nothing was installed.
     pub(super) fn pip(&mut self, command: &PipCommand, json: bool) -> ExitCode {
-        for package in &command.packages {
-            self.publish(
-                json,
-                Event::Result(result_line(
-                    "pip",
-                    package,
-                    true,
-                    None,
-                )),
-            );
-        }
-        let _ = command.alias_pypi;
-        ExitCode::Ok
+        let _ = command;
+        self.fail(
+            json,
+            &Error::missing_dependency(
+                "paradl pip is not implemented in the native binary; use `uv pip install <package>` (or `pip install <package>`) instead",
+            ),
+        )
     }
 
+    /// Same for Homebrew: the native binary never invokes `brew`.
     pub(super) fn brew(&mut self, command: &BrewCommand, json: bool) -> ExitCode {
-        let target = command
-            .formula
-            .clone()
-            .unwrap_or_else(|| "brew".to_string());
-        let _ = command.action;
-        self.publish(json, Event::Result(result_line("brew", &target, true, None)));
-        ExitCode::Ok
+        let _ = command;
+        self.fail(
+            json,
+            &Error::missing_dependency(
+                "paradl brew is not implemented in the native binary; use `NONINTERACTIVE=1 brew install <formula>` instead",
+            ),
+        )
     }
 
     pub(super) fn install(&mut self, command: &InstallCommand, json: bool) -> ExitCode {
