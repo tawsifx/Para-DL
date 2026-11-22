@@ -77,6 +77,8 @@ tempfile = "3"
 #   platform-windows -> paradl-platform, paradl     (Windows metadata/keychain)
 #   doh              -> paradl-net, paradl-engine   (DNS-over-HTTPS)
 #   server           -> paradl-throttle             (VPS tokio server)
+# Always-on (no feature flag):
+#   package          -> paradl-package              (pip/brew install engines)
 # A default `cargo build` compiles without optional system tools.
 
 [profile.release]

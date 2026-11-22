@@ -8,6 +8,8 @@ the byte-exact `paradl-cli` parser for the `paradl` reference binary.
 - `App` — implements `paradl_cli::Dispatch` and routes **every** `Command`
   variant to a thin adapter over the owning crate. `App::new_offline()` disables
   network/process side effects and is used by the dispatch tests.
+  `App::with_package_context(runner, http, downloader)` injects the seams used by
+  the `pip`/`brew` install engines so dispatch tests never spawn a real tool.
 - `Capture` / `OutputSink` — injectable output sink so no subcommand writes to a
   real terminal in tests.
 - `DoctorReport` / `ToolProbe` / `DoctorEnv` — `doctor` diagnostics: binary
@@ -24,6 +26,7 @@ the byte-exact `paradl-cli` parser for the `paradl` reference binary.
 | `paradl-core` | config, paths, `Error`/`ExitCode` | config / download / netprobe |
 | `paradl-cli` | parser, help/version bytes, dispatch | `App` |
 | `paradl-net` | routing, probes, ISP | download / info / netprobe / `resolve_isp` |
+| `paradl-package` | wheelhouse/bottle prefetch, offline install | `pip` / `brew` |
 | `paradl-engine` | planner, transfer, clamp | download |
 | `paradl-store` | history v4, `queue_jobs` | history / queue |
 | `paradl-watchdog` | v1/v2 controller, hour bucket | `watchdog_config_for` |

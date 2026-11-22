@@ -41,10 +41,10 @@ Legend: W0..W5 = owning wave. `—` = no Python oracle (new surface). "NEW GOLDE
 | C20 | `--version` (both `paradl`/`parallel-dl`) | W0-1 | install scripts test |
 | C21 | `auth` (bare → defaults to `status`) — `parser.py` SUBCOMMANDS set | W2-4 | `auth_status` golden |
 | C22 | `diagnose [--json]` (explicit alias for `doctor`) | W4-1 | `diagnose` event golden (emitted alongside `doctor`, `doctor.py:374–375`) |
-| C23 | `pip install <pkg>` / `pip upgrade <pkg>` (alias `pypi`) | W2-3 | `test_pypi_transitive.py` |
-| C24 | `brew install <formula>` | W2-3 | brew resolver golden |
-| C25 | `brew update` | W2-3 | brew resolver golden (`NONINTERACTIVE=1 brew update`) |
-| C26 | `brew upgrade [formula]` | W2-3 | brew resolver golden |
+| C23 | `pip install <pkg>` / `pip upgrade <pkg>` (alias `pypi`) | W2-3 | `test_pypi_transitive.py`; Rust: `paradl-package` wheelhouse tests + dispatch |
+| C24 | `brew install <formula>` | W2-3 | brew resolver golden; Rust: `paradl-package` bottle tests + dispatch |
+| C25 | `brew update` | W2-3 | brew resolver golden (`NONINTERACTIVE=1 brew update`); Rust: `brew_update_runs_update_without_resolution` |
+| C26 | `brew upgrade [formula]` | W2-3 | brew resolver golden; Rust: `brew_upgrade_forwards_formula` / `brew_upgrade_without_formula_upgrades_everything` |
 | C27 | `server [--host 127.0.0.1] [--port 8000] [--reload]` | W3-3 | `test_api_optional_pydantic.py`; `api_server_started` golden |
 | C28 | `tui` | W3-2 | golden output tests |
 | C29 | `throttle` (bare → defaults to `quick`) — `throttle/cli.py:55–64,73–79` | W2-1 | `test_classifier.py` |

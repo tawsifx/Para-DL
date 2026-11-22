@@ -21,7 +21,8 @@
 | **Anti-Throttle Watchdog** | Detects ISP shaping and recycles connections in-process (no daemon restart) to restore full speed. On no-Range single-stream servers it stays active for telemetry but does not cycle sockets. |
 | **SHA-256 Verification** | Cryptographically validates every download before writing to disk. |
 | **Cross-Platform** | Native Windows 10/11 and macOS (Intel & Apple Silicon) support. |
-| **Python Packages** | `paradl pip install <pkg>` — resolves and installs wheels with transitive deps via `uv`. |
+| **Python Packages** | `paradl pip install <pkg>` / `pip upgrade <pkg>` — prefetches the wheelhouse (root + transitive wheels) with 16 channels, then installs offline via `uv` (or `python -m pip`). |
+| **Homebrew Formulae** | `paradl brew install <formula>` / `upgrade` / `update` — prefetches verified bottles into Homebrew's cache, then pours non-interactively. |
 | **GitHub Releases** | `paradl install <owner/repo>` — downloads and verifies release binaries. |
 | **Media & Audio** | YouTube/yt-dlp downloads with ID3 tagging, cover art, and 256kbps AAC extraction. |
 | **Hugging Face Models** | `hf:` prefixed downloads for GGUF weights, safetensors, and AI models. |
@@ -148,7 +149,29 @@ paradl "https://example.com/large-file.zip" -c 16 -o ./downloads
 ```bash
 paradl pip install requests
 paradl pip install fastapi
+paradl pip upgrade requests
 ```
+
+`paradl pip` resolves the package and its transitive dependencies, downloads the
+wheels into a temporary wheelhouse with up to 16 parallel channels, verifies
+their SHA-256 digests, then runs `uv pip install --no-index --find-links
+<wheelhouse>` (falling back to `python -m pip`). An active `VIRTUAL_ENV` is
+honoured; without `uv` or a Python interpreter the command fails with exit code
+4 and an actionable message.
+
+### Install a Homebrew formula
+
+```bash
+paradl brew install wget
+paradl brew upgrade wget
+paradl brew update
+```
+
+`paradl brew` resolves the bottle and its uninstalled dependencies, prefetches
+them into Homebrew's download cache, verifies digests, then pours with
+`NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install`. `brew upgrade` without
+a formula upgrades all outdated formulae; `brew update` refreshes the metadata
+catalog. Both need `brew` on `PATH`.
 
 ### Install a GitHub release binary
 

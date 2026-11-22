@@ -1,7 +1,9 @@
 # Repair PATH wrapper and make `install` real
 
 **Date:** 2026-11-22
-**Status:** Design proposed — full install chosen by lead, direct-to-`main` delivery
+**Status:** Implemented. Superseded for pip/brew by
+`2026-11-23-package-install-engines-design.md` — the "no pip/brew install
+implementation" non-goal below no longer holds.
 
 ## Intent and why
 

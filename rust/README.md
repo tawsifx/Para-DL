@@ -20,6 +20,8 @@ cargo build --release -p paradl      # -> rust/target/release/paradl
 ./target/release/paradl doctor       # deterministic, Python-free diagnostics
 ./target/release/paradl doctor --json
 ./target/release/paradl https://example.com/file.zip -o ./downloads
+./target/release/paradl pip install requests          # wheelhouse prefetch → offline install
+./target/release/paradl brew install wget             # bottle prefetch → non-interactive pour
 ```
 
 The binary also answers to `parallel-dl` (same command, installed as a second
@@ -118,6 +120,7 @@ Formula automate exactly this layout (native binary in `bin/`, media venv in
 | `crates/paradl-core` | models, helpers, config, paths, clock, `Error`→`ExitCode` |
 | `crates/paradl-store` | `history.db` v4, WAL, device+inode guard |
 | `crates/paradl-net` / `paradl-engine` | HTTP/DNS/routing, site resolvers, transfer engine |
+| `crates/paradl-package` | pip/brew install engines: resolve → prefetch → verify → install offline |
 | `crates/paradl-watchdog` / `paradl-throttle` | anti-throttle state machine, classifier/reports |
 | `crates/paradl-postproc` / `paradl-platform` | checksums/archive/ADB, OS metadata/keychain |
 | `crates/paradl-resilience` / `paradl-events` | queue/hooks/auth, the sole JSONL emitter |

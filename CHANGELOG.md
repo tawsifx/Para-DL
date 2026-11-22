@@ -5,6 +5,28 @@ All notable changes to paraDL are documented here. This file follows
 semantic-versioning policy (framework charter §6). The media protocol version
 `paradl-media/1` is independent of crate semver.
 
+## [Unreleased]
+
+### Added
+
+- **Package install engines** (`rust/crates/paradl-package`): `paradl pip
+  install|upgrade` and `paradl brew install|upgrade|update` now resolve artifacts
+  through the existing site engines, prefetch wheels/bottles (and transitive
+  dependencies) with 16 parallel channels, verify SHA-256 digests, and invoke
+  the real installer offline (`uv pip install --no-index --find-links …` or
+  `NONINTERACTIVE=1 brew install`). Process, HTTP and download boundaries are
+  injectable so the pipeline is testable without side effects.
+
+### Fixed
+
+- `pip`/`brew` handlers no longer report `success` without doing any work; they
+  return real exit codes and actionable errors (exit 4 for a missing installer).
+- Extension-less direct-download URLs (for example APK endpoints) are classified
+  with an HTTP probe and downloaded directly instead of being routed to the media
+  worker; stream delegates with `claims=false` now fall back to a direct download.
+- Transfers use the probe-resolved URL, so redirect-based download endpoints no
+  longer fail with HTTP 403.
+
 ## [1.0.0] - 2026-11-21
 
 First stable release of the paraDL framework. The Python application has been
