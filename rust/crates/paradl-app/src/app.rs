@@ -27,6 +27,8 @@ use paradl_cli::{Cli, Command, Dispatch, ExitCode};
 use paradl_core::{Error, PDLConfig};
 use paradl_events::{ErrorEvent, Event, emit_jsonl, now_timestamp};
 use paradl_net::routing::{PureClaimsChecker, classify_target};
+use paradl_net::{HttpClient, HttpClientConfig, HttpSiteHttp, SiteHttp};
+use paradl_package::{PackageContext, ProcessRunner, SystemProcessRunner};
 use paradl_ui::event_summary;
 
 use crate::handoffs::{api_resolve_failure_status, normalise_resolve_failure};
@@ -130,6 +132,10 @@ pub struct App {
     /// polluting the byte-exact oracle `info` event.
     last_info_isp: Option<String>,
     record_history: bool,
+    /// Injectable process seam for package-manager installs.
+    package_runner: Arc<dyn ProcessRunner>,
+    /// Injectable HTTP seam for package-manager resolvers (`None` = real).
+    package_http: Option<Arc<dyn SiteHttp>>,
 }
 
 impl Default for App {
@@ -160,6 +166,8 @@ impl App {
             last_transfer: None,
             last_info_isp: None,
             record_history: true,
+            package_runner: Arc::new(SystemProcessRunner),
+            package_http: None,
         }
     }
 
@@ -174,6 +182,8 @@ impl App {
             last_transfer: None,
             last_info_isp: None,
             record_history: true,
+            package_runner: Arc::new(SystemProcessRunner),
+            package_http: None,
         }
     }
 
@@ -193,6 +203,8 @@ impl App {
             last_transfer: None,
             last_info_isp: None,
             record_history: true,
+            package_runner: Arc::new(SystemProcessRunner),
+            package_http: None,
         }
     }
 
@@ -200,6 +212,39 @@ impl App {
     pub fn with_output(mut self, sink: OutputSink) -> Self {
         self.output = sink;
         self
+    }
+
+    /// Inject both package-manager seams (tests only).
+    pub fn with_package_context(
+        mut self,
+        runner: Arc<dyn ProcessRunner>,
+        http: Arc<dyn SiteHttp>,
+    ) -> Self {
+        self.package_runner = runner;
+        self.package_http = Some(http);
+        self
+    }
+
+    /// Build the context for a package-manager install from config, honouring
+    /// an injected HTTP seam when present.
+    pub(super) fn package_context(&self) -> Result<PackageContext, Error> {
+        let http = match &self.package_http {
+            Some(http) => Arc::clone(http),
+            None => {
+                let client = HttpClient::new(HttpClientConfig {
+                    doh_endpoint: self.config.doh_endpoint.clone(),
+                    ..HttpClientConfig::default()
+                })?;
+                Arc::new(HttpSiteHttp::new(client))
+            }
+        };
+        Ok(PackageContext {
+            runner: Arc::clone(&self.package_runner),
+            http,
+            proxy: None,
+            doh_endpoint: self.config.doh_endpoint.clone(),
+            connections: self.config.connections.max(1) as u32,
+        })
     }
 
     /// Whether this app disables network and process side effects.

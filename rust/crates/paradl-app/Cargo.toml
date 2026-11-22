@@ -27,6 +27,7 @@ platform-windows = ["paradl-platform/platform-windows"]
 paradl-core = { path = "../paradl-core" }
 paradl-cli = { path = "../paradl-cli" }
 paradl-net = { path = "../paradl-net" }
+paradl-package = { path = "../paradl-package" }
 paradl-engine = { path = "../paradl-engine" }
 paradl-store = { path = "../paradl-store" }
 paradl-watchdog = { path = "../paradl-watchdog" }

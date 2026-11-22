@@ -169,7 +169,7 @@ event=diagnose
 {"event": "target_classified", "timestamp": <TS>, "target": "https://example.com/f.zip", "target_type": "direct", "clean_url": "https://example.com/f.zip", "filename_hint": "f.zip", "content_length": null, "accept_ranges": null}
 {"event": "info", "timestamp": <TS>, "target": "https://example.com/f.zip", "properties": {"Classification": "DIRECT", "Resolved URL": "https://example.com/f.zip", "Filename Hint": "f.zip"}}
 === C08 hash [hash Cargo.toml] -> 0
-{"event": "hashes", "timestamp": <TS>, "file": "Cargo.toml", "filename": "Cargo.toml", "size": 2119, "duration": <DUR>, "hashes": {"blake2b": "efda750dc7867d55bf453681cbdb12865f9be6b941254fbe0b1e61a54095d2680370d11563d5bfd1b4622c4dbb945e5f95ce0e26da449489b1274fcc30721c26", "md5": "94385ad0a4b5e56a8517e2742348c72a", "sha1": "1aab7e3d2fc830c8ad2c8cdbc38d2a73ad93026b", "sha256": "ff6ca5a3ce7f015332d6c6694dafd3ec09db989399a92fa04b421e4318034815", "sha512": "74304036d01bce923219231d16257cecff0f4e4a5d62fda77a5bee7ed4bb0700941009f0c8e2c2e88d9f70dfbb59906abfeebce866c9f9ce88849dac148b97b1"}}
+{"event": "hashes", "timestamp": <TS>, "file": "Cargo.toml", "filename": "Cargo.toml", "size": 2167, "duration": <DUR>, "hashes": {"blake2b": "07d804eded9b2e878bd4d71fff62e2e6dec844a333c208f6336f42b9a63022e5f0df9eccc273f3a32270281c576e13e96a56cff3e6861a0475872aa365b0083b", "md5": "83492fcff05eb2621265d333cc399a6c", "sha1": "903b1b9c19de93d3eb3333a60900934ade86f45e", "sha256": "b07beaa06a08debfd7e9c9142b517ff3c4e4ffccb5ec9f85d1659d3e9cba7d74", "sha512": "b94f02d22b1105c53a38c88bddb27369df6a2dce600bd16c9f3ecf5c6d7a73bb97fc776f82bc6556e3881be1de27c61afa0c1a78fe1893d77d1e03dc3234a354"}}
 === C11 history [history 5] -> 0
 {"event": "history", "timestamp": <TS>, "entries": [], "count": 0}
 === C12 profiles [profiles] -> 0
@@ -191,10 +191,10 @@ event=config
 === C22 diagnose [diagnose] -> 0
 event=doctor
 event=diagnose
-=== C23 pip [pip install requests] -> 4
-{"event": "error", "timestamp": <TS>, "message": "missing dependency: paradl pip is not implemented in the native binary; use `uv pip install <package>` (or `pip install <package>`) instead"}
-=== C24 brew [brew install wget] -> 4
-{"event": "error", "timestamp": <TS>, "message": "missing dependency: paradl brew is not implemented in the native binary; use `NONINTERACTIVE=1 brew install <formula>` instead"}
+=== C23 pip [pip install requests] -> 1
+{"event": "error", "timestamp": <TS>, "message": "pip install requires network"}
+=== C24 brew [brew install wget] -> 1
+{"event": "error", "timestamp": <TS>, "message": "brew install requires network"}
 === C27 server [server] -> 0
 {"event": "api_server_started", "timestamp": <TS>, "host": "127.0.0.1", "port": 8000}
 === C28 tui [tui] -> 0

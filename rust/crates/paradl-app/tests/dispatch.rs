@@ -48,10 +48,9 @@ const CASES: &[(&str, &[&str], ExitCode, Option<&str>)] = &[
     ("C17 netprobe", &["netprobe", "https://example.com/f.zip"], ExitCode::Ok, Some("\"event\": \"netprobe\"")),
     ("C18 bench", &["bench", "https://example.com/f.zip"], ExitCode::Ok, Some("\"event\": \"bench\"")),
     ("C22 diagnose", &["diagnose"], ExitCode::Ok, Some("\"event\": \"diagnose\"")),
-    // C23/C24: the old stubs reported success without installing anything.
-    // They must now fail honestly and point at the real package managers.
-    ("C23 pip", &["pip", "install", "requests"], ExitCode::MissingDependency, Some("\"event\": \"error\"")),
-    ("C24 brew", &["brew", "install", "wget"], ExitCode::MissingDependency, Some("\"event\": \"error\"")),
+    // C23/C24: offline install is rejected explicitly, never faked as success.
+    ("C23 pip", &["pip", "install", "requests"], ExitCode::Failure, Some("\"event\": \"error\"")),
+    ("C24 brew", &["brew", "install", "wget"], ExitCode::Failure, Some("\"event\": \"error\"")),
     ("C27 server", &["server"], ExitCode::Ok, Some("\"event\": \"api_server_started\"")),
     ("C28 tui", &["tui"], ExitCode::Ok, None),
     ("C38 queue pause", &["queue", "pause", "1"], ExitCode::Ok, Some("\"event\": \"queue_paused\"")),
@@ -162,6 +161,15 @@ fn extensionless_direct_url_falls_back_without_media_worker() {
     assert!(lines[0].contains("\"event\": \"target_classified\""), "{}", lines[0]);
     assert!(lines[1].contains("\"event\": \"result\""), "{}", lines[1]);
     assert!(!output.contains("missing dependency"), "{output}");
+}
+
+#[test]
+fn targets_routes_are_explicit_errors() {
+    for argv in [&["pip", "pip:foo", "--json"][..], &["brew", "brew:foo", "--json"][..]] {
+        let (code, output) = dispatch(argv);
+        assert_ne!(code, ExitCode::Ok, "{output}");
+        assert!(output.contains("\"event\": \"error\""), "{output}");
+    }
 }
 
 #[test]

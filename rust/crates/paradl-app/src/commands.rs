@@ -550,27 +550,28 @@ impl App {
         ExitCode::Ok
     }
 
-    /// The native binary does not implement the Python package-install engine.
-    /// Reporting success here was a false positive: nothing was installed.
+    /// Install Python packages: prefetch wheels, then install offline.
     pub(super) fn pip(&mut self, command: &PipCommand, json: bool) -> ExitCode {
-        let _ = command;
-        self.fail(
-            json,
-            &Error::missing_dependency(
-                "paradl pip is not implemented in the native binary; use `uv pip install <package>` (or `pip install <package>`) instead",
-            ),
-        )
+        if self.offline {
+            return self.fail(json, &Error::failure("pip install requires network"));
+        }
+        if matches!(command.action, paradl_cli::PipAction::Targets) {
+            return self.fail(json, &Error::usage("use `paradl pip install <package>`"));
+        }
+        // Wired to the install engine in a later task.
+        self.fail(json, &Error::missing_dependency("pip install engine not yet wired"))
     }
 
-    /// Same for Homebrew: the native binary never invokes `brew`.
+    /// Install Homebrew formulae: prefetch bottles, then pour offline.
     pub(super) fn brew(&mut self, command: &BrewCommand, json: bool) -> ExitCode {
-        let _ = command;
-        self.fail(
-            json,
-            &Error::missing_dependency(
-                "paradl brew is not implemented in the native binary; use `NONINTERACTIVE=1 brew install <formula>` instead",
-            ),
-        )
+        if self.offline {
+            return self.fail(json, &Error::failure("brew install requires network"));
+        }
+        if matches!(command.action, paradl_cli::BrewAction::Targets) {
+            return self.fail(json, &Error::usage("use `paradl brew install <formula>`"));
+        }
+        // Wired to the install engine in a later task.
+        self.fail(json, &Error::missing_dependency("brew install engine not yet wired"))
     }
 
     pub(super) fn install(&mut self, command: &InstallCommand, json: bool) -> ExitCode {
