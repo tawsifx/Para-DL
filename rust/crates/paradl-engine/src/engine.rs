@@ -11,7 +11,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use paradl_core::TransferResult;
+use paradl_core::{SystemClock, TransferResult};
+use paradl_watchdog::{WatchdogAction, WatchdogConfig, WatchdogController, ThroughputSample};
 use reqwest::header::HeaderMap;
 use url::Url;
 
@@ -78,6 +79,9 @@ pub struct Target {
     /// `TransferResult` with `ExitCode::Interrupted` (130); the part file and
     /// `.pdl.json` sidecar are preserved for resume.
     pub cancel: Option<Arc<AtomicBool>>,
+    /// Optional anti-throttle watchdog configuration. `None` (the default)
+    /// preserves the original behavior: no observations and no socket cycling.
+    pub watchdog: Option<WatchdogConfig>,
 }
 
 impl Default for Target {
@@ -99,6 +103,7 @@ impl Default for Target {
             cookie_hosts: Vec::new(),
             http3: false,
             cancel: None,
+            watchdog: None,
         }
     }
 }
@@ -139,6 +144,12 @@ pub struct Plan {
 pub trait ProgressSink: Send {
     /// Called with a point-in-time progress view.
     fn on_progress(&mut self, snapshot: &Snapshot);
+
+    /// Called with each watchdog decision when a watchdog is configured.
+    ///
+    /// Defaulted to a no-op so existing `FnMut(&Snapshot)` sinks keep working.
+    /// Implementors may forward the action to the single JSONL emitter.
+    fn on_watchdog_action(&mut self, _action: &WatchdogAction) {}
 }
 
 /// A [`ProgressSink`] that discards every update.
@@ -326,12 +337,33 @@ impl DownloadEngine for NdEngine {
 
         let wait = download.wait();
         tokio::pin!(wait);
+        // The engine owns the authoritative Range/connection facts; the app may
+        // hardcode them, so override the config before constructing the controller.
+        let mut watchdog = t.watchdog.clone().map(|config| {
+            let mut config = config;
+            config.supports_range = plan.resumable;
+            config.connections = clamp_connections(t.connections) as i32;
+            WatchdogController::with_clock(config, Arc::new(SystemClock))
+        });
         let mut tick = tokio::time::interval(self.effective_progress_interval());
         let outcome = loop {
             tokio::select! {
                 result = &mut wait => break result,
                 _ = tick.tick() => {
-                    sink.on_progress(&download.poll_snapshot());
+                    let snapshot = download.poll_snapshot();
+                    sink.on_progress(&snapshot);
+                    if let Some(controller) = watchdog.as_mut() {
+                        let action = controller.observe(ThroughputSample::new(
+                            started.elapsed().as_secs_f64(),
+                            snapshot.speed_bps as f64,
+                        ));
+                        sink.on_watchdog_action(&action);
+                        if action.is_recycle()
+                            && let Err(error) = download.recycle_connections().await
+                        {
+                            tracing::warn!("watchdog recycle failed: {error}");
+                        }
+                    }
                     if cancel.as_ref().is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                         // Cancel workers so the part file and sidecar stay on disk, then
                         // surface the interrupt as a failed TransferResult (exit 130).

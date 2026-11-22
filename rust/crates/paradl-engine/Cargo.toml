@@ -21,6 +21,7 @@ doh = ["dep:hickory-resolver"]
 
 [dependencies]
 paradl-core = { path = "../paradl-core" }
+paradl-watchdog = { path = "../paradl-watchdog" }
 tokio.workspace = true
 reqwest.workspace = true
 serde.workspace = true

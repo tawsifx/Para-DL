@@ -1437,6 +1437,7 @@ dependencies = [
  "httpdate",
  "md-5",
  "paradl-core",
+ "paradl-watchdog",
  "reqwest",
  "serde",
  "serde_json",

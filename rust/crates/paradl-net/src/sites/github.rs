@@ -47,6 +47,9 @@ static REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"github\.com/([^/]+)/([^/?#]+?)(?:\.git)?(?:/)?(?:\?[^#]*)?(?:#.*)?$")
         .expect("repo regex must compile")
 });
+static BARE_REPO_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([A-Za-z0-9_-]+)/([A-Za-z0-9_-]+)$").expect("bare repo regex must compile")
+});
 
 fn basename(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_owned()
@@ -218,6 +221,13 @@ impl GithubTarget {
                 owner: caps[1].to_owned(),
                 url: format!("https://github.com/{}/{}", &caps[1], repo),
                 repo,
+            };
+        }
+        if let Some(caps) = BARE_REPO_RE.captures(t) {
+            return Self::Repo {
+                owner: caps[1].to_owned(),
+                repo: caps[2].to_owned(),
+                url: format!("https://github.com/{}/{}", &caps[1], &caps[2]),
             };
         }
         Self::Generic { url: t.to_owned() }
@@ -776,5 +786,38 @@ impl TargetResolver for GithubResolver {
                 }])
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_repo_parses() {
+        let target = GithubTarget::parse("cli/cli");
+        assert_eq!(target.kind(), "repo");
+        assert_eq!(target.owner(), Some("cli"));
+        assert_eq!(target.repo(), Some("cli"));
+        assert_eq!(target.url(), "https://github.com/cli/cli");
+
+        // Dotted names are not bare shorthand: files/paths stay generic.
+        let dotted = GithubTarget::parse("foo/bar.py");
+        assert_eq!(dotted.kind(), "generic");
+
+        // A github.com URL is still handled by REPO_RE, not the bare branch:
+        // owner/repo come from the URL rather than a "github.com" owner.
+        let url = GithubTarget::parse("github.com/cli/cli");
+        assert_eq!(url.owner(), Some("cli"));
+        assert_eq!(url.repo(), Some("cli"));
+    }
+
+    #[test]
+    fn bare_repo_with_hyphen_parses() {
+        let target = GithubTarget::parse("astral-sh/uv");
+        assert_eq!(target.kind(), "repo");
+        assert_eq!(target.owner(), Some("astral-sh"));
+        assert_eq!(target.repo(), Some("uv"));
+        assert_eq!(target.url(), "https://github.com/astral-sh/uv");
     }
 }

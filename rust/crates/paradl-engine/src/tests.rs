@@ -1524,3 +1524,182 @@ fn doh_config_uses_endpoint_host_as_tls_server_name() {
     assert_eq!(ns.tls_dns_name.as_deref(), Some("my-dns.example"));
     assert_eq!(ns.http_endpoint.as_deref(), Some("/custom-path"));
 }
+
+// ---------------------------------------------------------------------------
+// Watchdog activation: the engine must observe every tick and recycle sockets.
+
+use paradl_watchdog::{WatchdogAction, WatchdogActionType, WatchdogConfig, WatchdogMode};
+
+/// Range server that dribbles each chunk so a watchdog tick can fire mid-transfer.
+async fn spawn_slow_range_server(
+    payload: Arc<Vec<u8>>,
+    connections: Arc<AtomicUsize>,
+) -> (String, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let task = tokio::spawn(async move {
+        loop {
+            let (mut sock, _) = match listener.accept().await {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+            let payload = payload.clone();
+            let connections = connections.clone();
+            connections.fetch_add(1, Ordering::SeqCst);
+            tokio::spawn(async move {
+                let mut req = Vec::new();
+                let mut byte = [0u8; 1];
+                for _ in 0..8192 {
+                    match sock.read(&mut byte).await {
+                        Ok(0) | Err(_) => return,
+                        Ok(_) => {
+                            req.push(byte[0]);
+                            if req.ends_with(b"\r\n\r\n") {
+                                break;
+                            }
+                        }
+                    }
+                }
+                let req = String::from_utf8_lossy(&req);
+                let range = req.lines().find_map(|l| {
+                    let l = l.trim();
+                    l.strip_prefix("Range: ")
+                        .or_else(|| l.strip_prefix("range: "))
+                        .and_then(|v| v.strip_prefix("bytes="))
+                });
+                let n = payload.len();
+                let (status, start, end) = match range {
+                    Some(r) => {
+                        let mut it = r.splitn(2, '-');
+                        let s: usize = it.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                        let e: usize = it
+                            .next()
+                            .and_then(|v| v.parse().ok())
+                            .unwrap_or(n - 1)
+                            .min(n - 1);
+                        if s >= n || s > e {
+                            let _ = sock
+                                .write_all(b"HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                                .await;
+                            return;
+                        }
+                        ("206 Partial Content", s, e)
+                    }
+                    None => ("200 OK", 0, n - 1),
+                };
+                let chunk = &payload[start..=end];
+                let head = format!(
+                    "HTTP/1.1 {status}\r\nAccept-Ranges: bytes\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    chunk.len()
+                );
+                if sock.write_all(head.as_bytes()).await.is_err() {
+                    return;
+                }
+                for part in chunk.chunks(4096) {
+                    if sock.write_all(part).await.is_err() {
+                        return;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            });
+        }
+    });
+    (format!("http://{addr}/file.bin"), task)
+}
+
+#[derive(Default)]
+struct ActionSink {
+    actions: Vec<WatchdogAction>,
+    ticks: usize,
+}
+
+impl ProgressSink for ActionSink {
+    fn on_progress(&mut self, _snapshot: &Snapshot) {
+        self.ticks += 1;
+    }
+
+    fn on_watchdog_action(&mut self, action: &WatchdogAction) {
+        self.actions.push(action.clone());
+    }
+}
+
+fn fast_recycle_config() -> WatchdogConfig {
+    WatchdogConfig {
+        mode: WatchdogMode::V2,
+        user_floor_bps: 10.0,
+        grace_period: 2,
+        min_cooldown_sec: 0.0,
+        recycle_interval_sec: 0.05,
+        apply_learned_profile: false,
+        supports_range: true,
+        ..WatchdogConfig::default()
+    }
+}
+
+#[tokio::test]
+async fn watchdog_actions_drive_recycle_and_preserve_bytes() {
+    let payload: Vec<u8> = (0..512 * 1024).map(|i| (i % 251) as u8).collect();
+    let connections = Arc::new(AtomicUsize::new(0));
+    let (url, server) =
+        spawn_slow_range_server(Arc::new(payload.clone()), connections.clone()).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("f.bin");
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        connections: 1,
+        min_split: 1024 * 1024,
+        watchdog: Some(fast_recycle_config()),
+        ..Target::default()
+    };
+    let engine = NdEngine::new();
+    let plan = engine.plan(&target).await.unwrap();
+    let mut sink = ActionSink::default();
+    let result = engine.download(plan, &mut sink).await.unwrap();
+    assert!(result.success, "download must succeed: {result:?}");
+    assert!(sink.ticks > 0, "engine must emit progress ticks");
+    assert!(
+        sink.actions.iter().any(|action| action.is_recycle()),
+        "watchdog actions must drive recycle, got {:?}",
+        sink.actions
+    );
+    assert!(
+        connections.load(Ordering::SeqCst) > 2,
+        "recycle must create fresh connections (got {}); a sink-only implementation cannot do this",
+        connections.load(Ordering::SeqCst)
+    );
+    assert_eq!(std::fs::read(&dest).unwrap(), payload);
+    server.abort();
+}
+
+#[tokio::test]
+async fn close_delimited_watchdog_never_recycles() {
+    let payload: Vec<u8> = (0..16 * 1024).map(|i| (i % 251) as u8).collect();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let (url, server) =
+        spawn_slow_close_delimited_server(Arc::new(payload.clone()), requests.clone()).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("f.bin");
+    let target = Target {
+        url: url.parse().unwrap(),
+        dest: dest.clone(),
+        connections: 4,
+        // The app hardcodes supports_range=true; the engine must override it
+        // from plan.resumable so this no-Range transfer emits no recycle actions.
+        watchdog: Some(fast_recycle_config()),
+        ..Target::default()
+    };
+    let engine = NdEngine::new();
+    let plan = engine.plan(&target).await.unwrap();
+    let mut sink = ActionSink::default();
+    let result = engine.download(plan, &mut sink).await.unwrap();
+    assert!(result.success, "download must succeed: {result:?}");
+    assert!(
+        sink.actions
+            .iter()
+            .all(|action| action.action == WatchdogActionType::None),
+        "no-Range transfer must emit no watchdog actions: {:?}",
+        sink.actions
+    );
+    server.abort();
+}

@@ -44,6 +44,7 @@ chrono = { workspace = true }
 url = { workspace = true }
 paradl-api = { path = "../paradl-api", optional = true }
 async-trait = { workspace = true, optional = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
 # Protocol handshake is asserted in the handoff tests even when the binary's
