@@ -14,12 +14,13 @@ use std::path::PathBuf;
 use chrono::Timelike;
 
 use paradl_cli::{Cli, ExitCode};
-use paradl_core::{Error, SystemClock, WatchdogMode, format_speed, parse_rate};
+use paradl_core::{Error, WatchdogMode, format_speed, parse_rate};
 use paradl_events::{Event, ProgressEvent, ResultEvent, emit_jsonl, now_timestamp};
 use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
 use paradl_store::{SqliteStore, Store, TransferRecord};
 use paradl_ui::ProgressDisplay;
-use paradl_watchdog::{ThroughputSample, WatchdogController, py_round};
+use paradl_engine::ProgressSink;
+use paradl_watchdog::{WatchdogAction, WatchdogActionType, WatchdogConfig, py_round};
 
 use crate::events::{ProgressRow, ResultRow, TargetClassifiedRow};
 use crate::handoffs::{resolve_isp, watchdog_config_for};
@@ -28,22 +29,34 @@ use crate::handoffs::map_media_error_kind;
 
 use super::{App, naming::{classification_info, decision_filename, decision_name, destination, url_host}};
 
-/// Build the engine's progress sink. It always captures the first snapshot as
-/// transfer telemetry (used by the single JSON `progress` event), and in plain
-/// mode renders each tick as a live bar with a percentage. When a snapshot has
-/// no total yet (typical of the first tick), the plan's `Content-Length` is used
-/// so the percentage and bar are real from the start. JSON and `--quiet` runs
-/// render nothing here, keeping stdout parseable.
-fn make_progress_sink(
-    title: String,
-    output: crate::app::OutputSink,
-    captured: Arc<Mutex<Option<ProgressTelemetry>>>,
-    known_total: Option<u64>,
-    render: bool,
-) -> impl FnMut(&paradl_engine::Snapshot) {
-    move |snapshot| {
+/// Progress sink used by real transfers: renders the bar/percentage in plain
+/// mode and forwards watchdog decisions to the single JSONL emitter.
+pub(crate) struct AppProgressSink {
+    pub(crate) title: String,
+    pub(crate) output: crate::app::OutputSink,
+    pub(crate) captured: Arc<Mutex<Option<ProgressTelemetry>>>,
+    pub(crate) known_total: Option<u64>,
+    pub(crate) render: bool,
+    pub(crate) json: bool,
+}
+
+impl AppProgressSink {
+    pub(crate) fn new(
+        title: String,
+        output: crate::app::OutputSink,
+        captured: Arc<Mutex<Option<ProgressTelemetry>>>,
+        known_total: Option<u64>,
+        render: bool,
+        json: bool,
+    ) -> Self {
+        Self { title, output, captured, known_total, render, json }
+    }
+}
+
+impl ProgressSink for AppProgressSink {
+    fn on_progress(&mut self, snapshot: &paradl_engine::Snapshot) {
         {
-            let mut guard = captured.lock().unwrap();
+            let mut guard = self.captured.lock().unwrap();
             if guard.is_none() {
                 *guard = Some(ProgressTelemetry {
                     downloaded: snapshot.downloaded,
@@ -52,13 +65,13 @@ fn make_progress_sink(
                 });
             }
         }
-        if !render {
+        if !self.render {
             return;
         }
         let downloaded = i64::try_from(snapshot.downloaded).unwrap_or(i64::MAX);
         let total = snapshot
             .total
-            .or(known_total)
+            .or(self.known_total)
             .and_then(|value| i64::try_from(value).ok());
         let percent = total
             .filter(|&value| value > 0)
@@ -71,7 +84,7 @@ fn make_progress_sink(
         };
         let event = ProgressEvent::new(
             now_timestamp(),
-            title.clone(),
+            self.title.clone(),
             downloaded,
             total,
             percent,
@@ -84,7 +97,18 @@ fn make_progress_sink(
             None,
         );
         let rendered = ProgressDisplay::new().renderable(&event);
-        (output)(&format!("{rendered}\n"));
+        (self.output)(&format!("{rendered}\n"));
+    }
+
+    fn on_watchdog_action(&mut self, action: &WatchdogAction) {
+        if action.action == WatchdogActionType::None {
+            return;
+        }
+        if self.json {
+            (self.output)(&emit_jsonl(&Event::WatchdogAction(action.to_event())));
+        } else if self.render {
+            (self.output)(&format!("watchdog: {} — {}\n", action.action, action.reason));
+        }
     }
 }
 
@@ -231,8 +255,7 @@ impl App {
         let mut watchdog_config =
             watchdog_config_for(&self.config, local_hour, &host, cli.connections as i32, 0.0, true);
         watchdog_config.network_id = Some(isp.to_owned());
-        let mut watchdog = WatchdogController::with_clock(watchdog_config, Arc::new(SystemClock));
-        let hour_bucket = watchdog.state().hour_bucket;
+        let hour_bucket = watchdog_config.hour_bucket.unwrap_or(-1);
 
         let outcome = if self.offline {
             EngineOutcome {
@@ -245,7 +268,7 @@ impl App {
                 progress: None,
             }
         } else {
-            self.run_engine(target, cli, &dest)?
+            self.run_engine(target, cli, &dest, watchdog_config.clone())?
         };
         let EngineOutcome {
             success,
@@ -256,13 +279,6 @@ impl App {
             avg_speed_bps: avg_speed,
             progress,
         } = outcome;
-
-        // Exercise the v1/v2 controller with the observed transfer speed so the
-        // wired configuration is actually consumed on the production path.
-        let _action = watchdog.observe(ThroughputSample::new(
-            started.elapsed().as_secs_f64().max(0.001),
-            avg_speed,
-        ));
 
         self.last_transfer = Some(TransferSetup {
             isp: isp.to_owned(),
@@ -406,6 +422,7 @@ impl App {
         target: &str,
         cli: &Cli,
         dest: &Path,
+        watchdog_config: WatchdogConfig,
     ) -> Result<EngineOutcome, Error> {
         use paradl_engine::{DownloadEngine, NdEngine, Target as EngineTarget};
         use url::Url;
@@ -417,6 +434,7 @@ impl App {
             dest: dest.to_path_buf(),
             connections: paradl_engine::clamp_connections(cli.connections.max(0) as u32),
             cancel: self.cancel.clone(),
+            watchdog: Some(watchdog_config),
             ..EngineTarget::default()
         };
         engine_target.mirrors = cli
@@ -437,12 +455,13 @@ impl App {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| target.to_owned());
         let plan = runtime.block_on(async { engine.plan(&engine_target).await })?;
-        let mut sink = make_progress_sink(
+        let mut sink = AppProgressSink::new(
             title,
             output,
             Arc::clone(&captured),
             plan.size,
             render_progress,
+            cli.json,
         );
         let outcome = runtime.block_on(async { engine.download(plan, &mut sink).await })?;
         let bytes = i64::try_from(outcome.bytes_downloaded).unwrap_or(i64::MAX);
@@ -510,9 +529,9 @@ mod progress_tests {
         let captured = Arc::new(Mutex::new(None));
         let (output, lines) = capturing_output();
         // First tick has no snapshot total; the plan's Content-Length supplies it.
-        let mut sink = make_progress_sink("file.zip".to_owned(), output, Arc::clone(&captured), Some(1000), true);
-        sink(&snapshot(100, None));
-        sink(&snapshot(500, Some(1000)));
+        let mut sink = AppProgressSink::new("file.zip".to_owned(), output, Arc::clone(&captured), Some(1000), true, false);
+        sink.on_progress(&snapshot(100, None));
+        sink.on_progress(&snapshot(500, Some(1000)));
         let rendered = lines.lock().unwrap().clone();
         assert!(rendered.contains('█') || rendered.contains('░'), "no bar: {rendered:?}");
         assert!(rendered.contains("10.0%"), "first tick must show a real percentage: {rendered:?}");
@@ -526,8 +545,56 @@ mod progress_tests {
     fn json_and_quiet_runs_render_no_plain_progress() {
         let captured = Arc::new(Mutex::new(None));
         let (output, lines) = capturing_output();
-        let mut sink = make_progress_sink("file.zip".to_owned(), output, captured, Some(1000), false);
-        sink(&snapshot(500, Some(1000)));
+        let mut sink = AppProgressSink::new("file.zip".to_owned(), output, captured, Some(1000), false, true);
+        sink.on_progress(&snapshot(500, Some(1000)));
         assert!(lines.lock().unwrap().is_empty());
     }
+    fn watchdog_sink(json: bool) -> (AppProgressSink, Arc<Mutex<String>>) {
+        let (output, lines) = capturing_output();
+        (
+            AppProgressSink::new(
+                "file.zip".to_owned(),
+                output,
+                Arc::new(Mutex::new(None)),
+                Some(1000),
+                !json,
+                json,
+            ),
+            lines,
+        )
+    }
+
+    #[test]
+    fn watchdog_action_is_emitted_as_jsonl_line() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_sink(true);
+        let mut action = WatchdogAction::new(WatchdogActionType::PauseUnpause);
+        action.reason = "low speed".to_owned();
+        action.timestamp = 1.0;
+        sink.on_watchdog_action(&action);
+        let text = lines.lock().unwrap().clone();
+        assert!(text.contains("\"event\": \"watchdog_action\""), "{text:?}");
+        assert!(text.contains("tier2_pause_unpause"), "{text:?}");
+    }
+
+    #[test]
+    fn watchdog_action_is_rendered_in_plain_mode() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_sink(false);
+        let mut action = WatchdogAction::new(WatchdogActionType::PauseUnpause);
+        action.reason = "low speed".to_owned();
+        sink.on_watchdog_action(&action);
+        let text = lines.lock().unwrap().clone();
+        assert!(text.starts_with("watchdog: "), "{text:?}");
+        assert!(text.contains("tier2_pause_unpause"), "{text:?}");
+    }
+
+    #[test]
+    fn none_watchdog_action_is_not_emitted() {
+        use paradl_watchdog::{WatchdogAction, WatchdogActionType};
+        let (mut sink, lines) = watchdog_sink(true);
+        sink.on_watchdog_action(&WatchdogAction::new(WatchdogActionType::None));
+        assert!(lines.lock().unwrap().is_empty());
+    }
+
 }

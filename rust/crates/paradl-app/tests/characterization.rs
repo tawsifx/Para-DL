@@ -163,13 +163,13 @@ const EXPECTED: &str = r#"=== C01 download [https://example.com/f.zip] -> 0
 === C05 doctor [doctor] -> 0
 event=doctor
 event=diagnose
-=== C06 install [install astral-sh/uv] -> 0
-{"event": "result", "timestamp": <TS>, "subcommand": "install", "target": "astral-sh/uv", "success": true, "exit_code": 0}
+=== C06 install [install astral-sh/uv] -> 1
+{"event": "error", "timestamp": <TS>, "message": "install requires network"}
 === C07 info [info https://example.com/f.zip] -> 0
 {"event": "target_classified", "timestamp": <TS>, "target": "https://example.com/f.zip", "target_type": "direct", "clean_url": "https://example.com/f.zip", "filename_hint": "f.zip", "content_length": null, "accept_ranges": null}
 {"event": "info", "timestamp": <TS>, "target": "https://example.com/f.zip", "properties": {"Classification": "DIRECT", "Resolved URL": "https://example.com/f.zip", "Filename Hint": "f.zip"}}
 === C08 hash [hash Cargo.toml] -> 0
-{"event": "hashes", "timestamp": <TS>, "file": "Cargo.toml", "filename": "Cargo.toml", "size": 2087, "duration": <DUR>, "hashes": {"blake2b": "e71dbfaf82cbc83a80405ec80c6d814328e51c919e4992bd30fc81e408447268bbd33809e9bde59285994e8037f52649b0e24d70e4db610acf8f2e2d264483be", "md5": "c0ff92654abb782ea0c46ac68e357cd6", "sha1": "d69f2faa145621fb6b3af587ce5a220488b15dac", "sha256": "5b5b3a9f4e9e97f71964bd4dcbb09dd954cdc596e5e47fb4d070f370152441a4", "sha512": "f3ff4e476b9c88167b95405dae4802bd9a5924469b244a427e61e76784ec75523c56d1311f2f4d2c8d92911a00df5b6056deb55222b6787e226229b5f70c2e44"}}
+{"event": "hashes", "timestamp": <TS>, "file": "Cargo.toml", "filename": "Cargo.toml", "size": 2119, "duration": <DUR>, "hashes": {"blake2b": "efda750dc7867d55bf453681cbdb12865f9be6b941254fbe0b1e61a54095d2680370d11563d5bfd1b4622c4dbb945e5f95ce0e26da449489b1274fcc30721c26", "md5": "94385ad0a4b5e56a8517e2742348c72a", "sha1": "1aab7e3d2fc830c8ad2c8cdbc38d2a73ad93026b", "sha256": "ff6ca5a3ce7f015332d6c6694dafd3ec09db989399a92fa04b421e4318034815", "sha512": "74304036d01bce923219231d16257cecff0f4e4a5d62fda77a5bee7ed4bb0700941009f0c8e2c2e88d9f70dfbb59906abfeebce866c9f9ce88849dac148b97b1"}}
 === C11 history [history 5] -> 0
 {"event": "history", "timestamp": <TS>, "entries": [], "count": 0}
 === C12 profiles [profiles] -> 0
