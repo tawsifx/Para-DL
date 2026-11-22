@@ -145,6 +145,33 @@ fn download_json_emits_target_classified_before_result() {
 }
 
 #[test]
+fn extensionless_direct_url_falls_back_without_media_worker() {
+    // A plain file URL with no recognised extension (e.g. an APK endpoint) is
+    // classified as a stream by pure routing. With no media feature/worker it
+    // must fall back to a direct download rather than emit a missing-dependency
+    // error (or silently do nothing).
+    let (code, output) = dispatch(&[
+        "https://d.apkpure.com/b/APK/com.android.chrome?version=latest",
+        "--json",
+    ]);
+    assert_eq!(code, ExitCode::Ok, "{output}");
+    let lines: Vec<&str> = output.lines().collect();
+    assert_eq!(lines.len(), 2, "{output}");
+    assert!(lines[0].contains("\"event\": \"target_classified\""), "{}", lines[0]);
+    assert!(lines[1].contains("\"event\": \"result\""), "{}", lines[1]);
+    assert!(!output.contains("missing dependency"), "{output}");
+}
+
+#[test]
+fn real_media_target_still_reports_missing_media_worker() {
+    // The direct-download fallback must not turn a YouTube page into a bogus
+    // "successful" HTML download when the binary has no media support.
+    let (code, output) = dispatch(&["https://www.youtube.com/watch?v=x", "--json"]);
+    assert_eq!(code, ExitCode::MissingDependency, "{output}");
+    assert!(output.contains("missing dependency"), "{output}");
+}
+
+#[test]
 fn usage_errors_keep_exit_code_two() {
     for argv in [
         &["install"][..],

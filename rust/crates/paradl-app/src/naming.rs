@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use paradl_cli::Cli;
+use paradl_core::TargetType;
 use paradl_net::routing::RouteDecision;
 
 pub(super) fn url_host(url: &str) -> String {
@@ -64,6 +65,22 @@ pub(super) fn decision_clean_url(decision: &RouteDecision, fallback: &str) -> St
         fallback.to_owned()
     } else {
         clean
+    }
+}
+
+/// Direct-download decision used when a stream-classified URL turns out not to
+/// be claimed by any media extractor (or no media worker is available).
+pub(super) fn direct_fallback(target: &str) -> RouteDecision {
+    RouteDecision::Direct {
+        target_type: TargetType::Direct,
+        clean_url: target.trim().to_owned(),
+        filename_hint: None,
+        content_length: None,
+        mime_type: None,
+        accept_ranges: None,
+        etag_sha256: None,
+        probe_error: None,
+        status_code: None,
     }
 }
 

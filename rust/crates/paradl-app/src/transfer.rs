@@ -6,7 +6,7 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[cfg(feature = "media")]
 use std::path::PathBuf;
@@ -16,7 +16,7 @@ use chrono::Timelike;
 use paradl_cli::{Cli, ExitCode};
 use paradl_core::{Error, WatchdogMode, format_speed, parse_rate};
 use paradl_events::{Event, ProgressEvent, ResultEvent, emit_jsonl, now_timestamp};
-use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
+use paradl_net::routing::{DelegateReason, PureClaimsChecker, RouteDecision, classify_target};
 use paradl_store::{SqliteStore, Store, TransferRecord};
 use paradl_ui::ProgressDisplay;
 use paradl_engine::ProgressSink;
@@ -27,7 +27,7 @@ use crate::handoffs::{resolve_isp, watchdog_config_for};
 #[cfg(feature = "media")]
 use crate::handoffs::map_media_error_kind;
 
-use super::{App, naming::{classification_info, decision_filename, decision_name, destination, url_host}};
+use super::{App, naming::{classification_info, decision_filename, decision_name, direct_fallback, destination, url_host}};
 
 /// Progress sink used by real transfers: renders the bar/percentage in plain
 /// mode and forwards watchdog decisions to the single JSONL emitter.
@@ -163,7 +163,11 @@ impl App {
         let isp = resolve_isp(&self.config);
         let mut code = ExitCode::Ok;
         for target in targets {
-            let decision = classify_target(&target, None, &PureClaimsChecker);
+            // The pure router expects the caller to supply the HEAD/Range probe
+            // for generic URLs. Without one, extension-less direct downloads
+            // (APK endpoints, binaries behind download URLs) look like streams.
+            let probe = self.probe_for_classification(&target, cli);
+            let decision = classify_target(&target, probe.as_ref(), &PureClaimsChecker);
             // The oracle emits target_classified for every target before it
             // decides whether to download, delegate to media, or fail.
             let info = classification_info(&target, &decision);
@@ -191,9 +195,21 @@ impl App {
                     )),
                 );
             }
-            if let RouteDecision::DelegateToWorker { .. } = decision {
-                if let Err(error) = self.media_route(&target, cli) {
-                    code = self.fail(cli.json, &error);
+            if let RouteDecision::DelegateToWorker { reason, .. } = &decision {
+                match self.media_route(&target, *reason, cli) {
+                    // A real media target: the worker owns the transfer.
+                    Ok(true) => {}
+                    // `claims=false`, no worker, or no `media` build: treat the
+                    // URL as an ordinary direct download instead of failing.
+                    Ok(false) => match self.transfer(&target, &direct_fallback(&target), cli, &isp) {
+                        Ok(exit_code) => {
+                            if exit_code != ExitCode::Ok {
+                                code = exit_code;
+                            }
+                        }
+                        Err(error) => code = self.fail(cli.json, &error),
+                    },
+                    Err(error) => code = self.fail(cli.json, &error),
                 }
                 continue;
             }
@@ -209,11 +225,24 @@ impl App {
         code
     }
 
-    pub(super) fn media_route(&mut self, target: &str, cli: &Cli) -> Result<(), Error> {
+    /// Resolve a stream-classified target with the media worker.
+    ///
+    /// Returns `true` when the worker claimed the target, and `false` when it
+    /// must be downloaded directly: no `media` build, offline mode, or the
+    /// worker reported `claims=false` (the documented direct-handoff case).
+    /// The caller performs that direct fallback.
+    pub(super) fn media_route(
+        &mut self,
+        target: &str,
+        reason: DelegateReason,
+        cli: &Cli,
+    ) -> Result<bool, Error> {
         #[cfg(feature = "media")]
         {
             if !self.offline {
-                use paradl_media::{MediaOptions, MediaRequest, MediaResolver, WorkerMediaResolver};
+                use paradl_media::{
+                    MediaOptions, MediaRequest, MediaResolver, MediaRoute, WorkerMediaResolver,
+                };
                 let resolver = WorkerMediaResolver::new();
                 let mut request = MediaRequest::new(
                     target,
@@ -224,16 +253,55 @@ impl App {
                     format: cli.format.clone(),
                     cookies_from_browser: cli.cookies_from_browser.clone(),
                 };
-                let result = self.runtime().block_on(resolver.resolve(request));
-                return result.map(|_| ()).map_err(|error| {
-                    map_media_error_kind(media_error_kind(&error), error.to_string())
-                });
+                let result = self
+                    .runtime()
+                    .block_on(resolver.resolve(request))
+                    .map_err(|error| {
+                        map_media_error_kind(media_error_kind(&error), error.to_string())
+                    })?;
+                return Ok(result.route.is_managed());
             }
         }
+        // No media build/worker. Only the "no direct signal" case is safely a
+        // plain file download; genuine media/search targets still need media.
         let _ = (target, cli);
+        if matches!(reason, DelegateReason::DefaultStream) {
+            return Ok(false);
+        }
         Err(Error::missing_dependency(
             "media routes require a media-enabled build (--features media) and the Python worker `python -m paradl_media`",
         ))
+    }
+
+    /// Best-effort HEAD/Range probe used to classify generic URLs before a
+    /// transfer. Failures are non-fatal: pure routing still decides, and an
+    /// unreachable host is reported by the engine itself.
+    fn probe_for_classification(
+        &mut self,
+        target: &str,
+        cli: &Cli,
+    ) -> Option<paradl_net::HttpProbeResult> {
+        if self.offline
+            || !(target.starts_with("http://") || target.starts_with("https://"))
+            || paradl_net::is_media_domain(target)
+        {
+            return None;
+        }
+        use paradl_net::{HttpClient, HttpClientConfig, probe_http_url};
+        let config = HttpClientConfig {
+            proxy: cli.proxy.clone(),
+            doh_endpoint: cli.doh_endpoint.clone(),
+            ..HttpClientConfig::default()
+        };
+        let client = HttpClient::new(config).ok()?;
+        self.runtime()
+            .block_on(probe_http_url(
+                &client,
+                target,
+                &Default::default(),
+                Duration::from_secs(10),
+            ))
+            .ok()
     }
 
     pub(super) fn transfer(
@@ -249,6 +317,12 @@ impl App {
         let target_type = decision_name(decision);
         let host = url_host(target);
         let local_hour = chrono::Local::now().hour() as i32;
+        // The probe may have followed redirects (e.g. an APK download endpoint
+        // -> its CDN). Hand the resolved URL to the engine, not the original.
+        let engine_target = match decision {
+            RouteDecision::Direct { clean_url, .. } if !clean_url.is_empty() => clean_url.as_str(),
+            _ => target,
+        };
 
         // Handoff (b): a real local-hour bucket replaces the `-1` sentinel,
         // and handoff (a)'s resolved ISP becomes the learned-profile network id.
@@ -268,7 +342,7 @@ impl App {
                 progress: None,
             }
         } else {
-            self.run_engine(target, cli, &dest, watchdog_config.clone())?
+            self.run_engine(engine_target, cli, &dest, watchdog_config.clone())?
         };
         let EngineOutcome {
             success,
