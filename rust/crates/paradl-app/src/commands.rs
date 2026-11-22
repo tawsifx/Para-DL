@@ -11,7 +11,7 @@ use std::time::Instant;
 use paradl_cli::{
     AuthAction, AuthCommand, BenchCommand, BrewAction as CliBrewAction, BrewCommand, Cli, CleanCommand, ConfigAction,
     ConfigCommand, ExitCode, ExtractCommand, HashCommand, InfoCommand, InstallCommand,
-    NetprobeCommand, PipCommand, ProfilesAction, ProfilesCommand, QueueAction, QueueCommand,
+    NetprobeCommand, PipAction as CliPipAction, PipCommand, ProfilesAction, ProfilesCommand, QueueAction, QueueCommand,
     ResumeCommand, ServerCommand,
 };
 use paradl_core::{Error, PDLConfig};
@@ -23,7 +23,9 @@ use paradl_events::{
     QueueRemovedEvent, QueueResumedEvent, ResultEvent, emit_jsonl, now_timestamp,
 };
 use paradl_net::routing::{PureClaimsChecker, RouteDecision, classify_target};
-use paradl_package::{BrewAction as PackageBrewAction, brew_install};
+use paradl_package::{
+    BrewAction as PackageBrewAction, PipAction as PackagePipAction, brew_install, pip_install,
+};
 use paradl_postproc::{PostProcessor, checksum};
 use paradl_resilience::auth::{OsEnv, Service, TokenSource, lookup_token};
 use paradl_store::{QueueJob, SqliteStore, Store};
@@ -556,11 +558,30 @@ impl App {
         if self.offline {
             return self.fail(json, &Error::failure("pip install requires network"));
         }
-        if matches!(command.action, paradl_cli::PipAction::Targets) {
+        if matches!(command.action, CliPipAction::Targets) {
             return self.fail(json, &Error::usage("use `paradl pip install <package>`"));
         }
-        // Wired to the install engine in a later task.
-        self.fail(json, &Error::missing_dependency("pip install engine not yet wired"))
+        let context = match self.package_context() {
+            Ok(context) => context,
+            Err(error) => return self.fail(json, &error),
+        };
+        let action = match command.action {
+            CliPipAction::Install => PackagePipAction::Install,
+            CliPipAction::Upgrade => PackagePipAction::Upgrade,
+            CliPipAction::Targets => unreachable!("handled above"),
+        };
+        let package = command.packages.first().cloned().unwrap_or_default();
+        match self.runtime().block_on(pip_install(&context, &package, action)) {
+            Ok(outcome) => {
+                let code = outcome.exit_code;
+                self.publish(
+                    json,
+                    Event::Result(result_line("pip", &package, outcome.success, outcome.error)),
+                );
+                code
+            }
+            Err(error) => self.fail(json, &error),
+        }
     }
 
     /// Install Homebrew formulae: prefetch bottles, then pour offline.

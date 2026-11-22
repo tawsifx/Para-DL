@@ -21,6 +21,7 @@ use paradl_package::{
 
 struct FakeRunner {
     fail_install: bool,
+    missing_tools: bool,
     calls: Arc<Mutex<Vec<String>>>,
 }
 impl ProcessRunner for FakeRunner {
@@ -29,7 +30,9 @@ impl ProcessRunner for FakeRunner {
             .lock()
             .unwrap()
             .push(format!("{} {}", spec.program, spec.args.join(" ")));
-        let stdout = if spec.args.first().map(String::as_str) == Some("--cache") {
+        let stdout = if spec.args.first().map(String::as_str) == Some("-c") {
+            "3.12".to_owned()
+        } else if spec.args.first().map(String::as_str) == Some("--cache") {
             format!(
                 "{}",
                 std::env::temp_dir()
@@ -40,8 +43,9 @@ impl ProcessRunner for FakeRunner {
         } else {
             String::new()
         };
-        let status = if self.fail_install && spec.args.first().map(String::as_str) == Some("install")
-        {
+        let status = if self.missing_tools && spec.args.iter().any(|arg| arg == "--version") {
+            1
+        } else if self.fail_install && spec.args.first().map(String::as_str) == Some("install") {
             1
         } else {
             0
@@ -59,14 +63,34 @@ struct FakeHttp;
 impl SiteHttp for FakeHttp {
     async fn fetch_json(
         &self,
-        _url: &str,
+        url: &str,
         _headers: &HashMap<String, String>,
         _timeout: std::time::Duration,
     ) -> NetResult<JsonResponse> {
-        Ok(JsonResponse {
-            status: 200,
-            headers: HashMap::new(),
-            body: serde_json::json!({
+        let body = if url.contains("pypi.org") {
+            if url.contains("/urllib3/") {
+                serde_json::json!({
+                    "urls": [serde_json::json!({
+                        "filename": "urllib3-2.0.0-py3-none-any.whl",
+                        "url": "https://files.example/urllib3.whl",
+                        "digests": { "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+                        "packagetype": "bdist_wheel"
+                    })],
+                    "info": { "requires_dist": [] }
+                })
+            } else {
+                serde_json::json!({
+                    "urls": [serde_json::json!({
+                        "filename": "requests-2.31.0-py3-none-any.whl",
+                        "url": "https://files.example/requests.whl",
+                        "digests": { "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+                        "packagetype": "bdist_wheel"
+                    })],
+                    "info": { "requires_dist": ["urllib3>=1.21.1"] }
+                })
+            }
+        } else {
+            serde_json::json!({
                 "versions": { "stable": "1.21.4" },
                 "dependencies": [],
                 "bottle": { "stable": { "files": {
@@ -75,7 +99,12 @@ impl SiteHttp for FakeHttp {
                         "url": "https://example.com/wget.bottle.tar.gz"
                     }
                 }}}
-            }),
+            })
+        };
+        Ok(JsonResponse {
+            status: 200,
+            headers: HashMap::new(),
+            body,
         })
     }
     async fn redirect(
@@ -107,10 +136,15 @@ impl ArtifactDownloader for FakeDownloader {
     }
 }
 
-fn package_dispatch(argv: &[&str], fail_install: bool) -> (ExitCode, String, Vec<String>) {
+fn package_dispatch(
+    argv: &[&str],
+    fail_install: bool,
+    missing_tools: bool,
+) -> (ExitCode, String, Vec<String>) {
     let calls = Arc::new(Mutex::new(Vec::new()));
     let runner = FakeRunner {
         fail_install,
+        missing_tools,
         calls: Arc::clone(&calls),
     };
     let argv: Vec<String> = argv.iter().map(|s| (*s).to_string()).collect();
@@ -283,8 +317,25 @@ fn extensionless_direct_url_falls_back_without_media_worker() {
 }
 
 #[test]
+fn pip_dispatch_success_emits_result() {
+    let (code, output, calls) = package_dispatch(&["pip", "install", "requests", "--json"], false, false);
+    assert_eq!(code, ExitCode::Ok, "{output}");
+    assert!(output.contains("\"event\": \"result\""), "{output}");
+    assert!(output.contains("\"success\": true"), "{output}");
+    assert!(!output.contains("\"event\": \"error\""), "{output}");
+    assert!(calls.iter().any(|call| call.contains(" install ")), "{calls:?}");
+}
+
+#[test]
+fn pip_dispatch_missing_tool_is_missing_dependency() {
+    let (code, output, _calls) = package_dispatch(&["pip", "install", "requests", "--json"], false, true);
+    assert_eq!(code, ExitCode::MissingDependency, "{output}");
+    assert!(output.contains("missing dependency"), "{output}");
+}
+
+#[test]
 fn brew_dispatch_success_emits_result() {
-    let (code, output, calls) = package_dispatch(&["brew", "install", "wget", "--json"], false);
+    let (code, output, calls) = package_dispatch(&["brew", "install", "wget", "--json"], false, false);
     assert_eq!(code, ExitCode::Ok, "{output}");
     assert!(output.contains("\"event\": \"result\""), "{output}");
     assert!(output.contains("\"success\": true"), "{output}");
@@ -294,7 +345,7 @@ fn brew_dispatch_success_emits_result() {
 
 #[test]
 fn brew_dispatch_runner_failure_emits_error() {
-    let (code, output, _calls) = package_dispatch(&["brew", "install", "wget", "--json"], true);
+    let (code, output, _calls) = package_dispatch(&["brew", "install", "wget", "--json"], true, false);
     assert_eq!(code, ExitCode::Failure, "{output}");
     assert!(output.contains("\"event\": \"error\""), "{output}");
     assert!(!output.contains("\"success\": true"), "{output}");
