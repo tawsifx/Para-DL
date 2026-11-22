@@ -13,12 +13,14 @@ use paradl_net::SiteHttp;
 pub mod brew;
 pub mod download;
 pub mod process;
+pub mod pypi;
 
 pub use brew::{brew_formula_dependencies, brew_install};
 pub use download::{
     ArtifactDownloader, DownloadOutcome, EngineArtifactDownloader,
 };
 pub use process::{CommandSpec, ProcessOutcome, ProcessRunner, SystemProcessRunner};
+pub use pypi::pip_install;
 
 /// Everything the install engines need, with both side-effect seams injectable.
 #[derive(Clone)]
