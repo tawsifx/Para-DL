@@ -1353,7 +1353,7 @@ impl App {
     /// Returns the path of the installed binary only after the copy succeeded;
     /// every earlier failure is an `Error` so the caller never reports success.
     fn install_release(&mut self, target: &str, json: bool) -> Result<PathBuf, Error> {
-        use paradl_engine::{DownloadEngine, Hash, NdEngine, Target as EngineTarget, headers_from_pairs};
+        use paradl_engine::{DownloadEngine, NdEngine, Target as EngineTarget, headers_from_pairs};
         use paradl_net::{
             EnvSecretProvider, GithubResolver, HttpClient, HttpClientConfig, HttpSiteHttp,
             ResolveContext, TargetResolver,
@@ -1399,7 +1399,7 @@ impl App {
             dest: archive_path.clone(),
             connections: 16,
             headers: headers_from_pairs(Some(&asset.headers)),
-            checksum: asset.digest.as_deref().and_then(Hash::parse),
+            checksum: parse_asset_digest(asset.digest.as_deref())?,
             watchdog: Some(watchdog),
             cancel: self.cancel.clone(),
             ..EngineTarget::default()
@@ -1671,6 +1671,19 @@ fn result_line(subcommand: &str, target: &str, success: bool, error: Option<Stri
         if success { 0 } else { 1 },
         None, None, None, None, None, None, None, None, None,
     )
+}
+
+/// Parse a release asset digest. A present-but-unparseable digest must fail the
+/// install instead of silently downgrading to an unverified download.
+fn parse_asset_digest(digest: Option<&str>) -> Result<Option<paradl_engine::Hash>, Error> {
+    match digest {
+        None => Ok(None),
+        Some(value) => paradl_engine::Hash::parse(value).map(Some).ok_or_else(|| {
+            Error::verification_failed(format!(
+                "release asset digest is not a valid checksum: {value}"
+            ))
+        }),
+    }
 }
 
 /// Bare `owner/repo` shorthand becomes `gh:owner/repo`. URLs, dotted names and
@@ -2024,5 +2037,18 @@ mod install_tests {
             !output.contains("\"event\": \"result\""),
             "offline install must not emit a success result event, got {output}"
         );
+    }
+
+    #[test]
+    fn parse_asset_digest_rejects_malformed_value() {
+        let error = parse_asset_digest(Some("not-a-digest")).unwrap_err();
+        assert_eq!(error.exit_code(), ExitCode::VerificationFailed);
+    }
+
+    #[test]
+    fn parse_asset_digest_accepts_valid_and_absent_values() {
+        assert!(parse_asset_digest(None).unwrap().is_none());
+        let valid = format!("sha256:{}", "a".repeat(64));
+        assert!(parse_asset_digest(Some(&valid)).unwrap().is_some());
     }
 }
