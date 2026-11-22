@@ -116,6 +116,33 @@ pub async fn brew_formula_dependencies(http: Arc<dyn paradl_net::SiteHttp>, form
         .unwrap_or_default()
 }
 
+fn pour(ctx: &PackageContext, args: &[&str]) -> Result<InstallOutcome, Error> {
+    let outcome = ctx.runner.run(&CommandSpec {
+        program: BREW.to_owned(),
+        args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+        env: vec![
+            ("NONINTERACTIVE".to_owned(), "1".to_owned()),
+            ("HOMEBREW_NO_AUTO_UPDATE".to_owned(), "1".to_owned()),
+        ],
+        cwd: None,
+    })?;
+    if outcome.status != 0 {
+        return Err(Error::failure(
+            if outcome.stderr.trim().is_empty() {
+                format!("brew {} failed with exit code {}", args.join(" "), outcome.status)
+            } else {
+                outcome.stderr.trim().to_owned()
+            },
+        ));
+    }
+    Ok(InstallOutcome {
+        success: true,
+        file_path: None,
+        error: None,
+        exit_code: ExitCode::Ok,
+    })
+}
+
 /// Prefetch the bottle (and missing dependency bottles) into Homebrew's cache,
 /// then pour the formula non-interactively.
 pub async fn brew_install(
@@ -123,6 +150,14 @@ pub async fn brew_install(
     formula: &str,
     action: BrewAction,
 ) -> Result<InstallOutcome, Error> {
+    // `brew update` and no-formula `brew upgrade` have no bottle to prefetch.
+    if formula.trim().is_empty() {
+        return match action {
+            BrewAction::Update => pour(ctx, &["update"]),
+            BrewAction::Upgrade => pour(ctx, &["upgrade"]),
+            BrewAction::Install => Err(Error::usage("brew install requires a formula")),
+        };
+    }
     let (cache_path, tag) = cache_path_and_tag(ctx, formula)?;
 
     let assets = resolver(ctx, &tag)
@@ -157,30 +192,9 @@ pub async fn brew_install(
         BrewAction::Upgrade => vec!["upgrade", formula],
         BrewAction::Update => vec!["update"],
     };
-    let outcome = ctx.runner.run(&CommandSpec {
-        program: BREW.to_owned(),
-        args: args.iter().map(|arg| (*arg).to_owned()).collect(),
-        env: vec![
-            ("NONINTERACTIVE".to_owned(), "1".to_owned()),
-            ("HOMEBREW_NO_AUTO_UPDATE".to_owned(), "1".to_owned()),
-        ],
-        cwd: None,
-    })?;
-    if outcome.status != 0 {
-        return Err(Error::failure(
-            if outcome.stderr.trim().is_empty() {
-                format!("brew {} failed with exit code {}", args.join(" "), outcome.status)
-            } else {
-                outcome.stderr.trim().to_owned()
-            },
-        ));
-    }
-    Ok(InstallOutcome {
-        success: true,
-        file_path: Some(cache_path),
-        error: None,
-        exit_code: ExitCode::Ok,
-    })
+    let mut outcome = pour(ctx, &args)?;
+    outcome.file_path = Some(cache_path);
+    Ok(outcome)
 }
 
 #[cfg(test)]
@@ -199,10 +213,8 @@ mod tests {
         ProcessRunner, brew_install,
     };
 
-    fn cache() -> PathBuf {
-        std::env::temp_dir()
-            .join("pdl-brew-test")
-            .join("wget-1.21.4.arm64_sequoia.bottle.tar.gz")
+    fn cache_in(dir: &Path) -> PathBuf {
+        dir.join("wget-1.21.4.arm64_sequoia.bottle.tar.gz")
     }
     const SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const API: &str = "https://formulae.brew.sh/api/formula/wget.json";
@@ -350,8 +362,8 @@ mod tests {
         }
     }
 
-    fn happy_runner() -> Arc<ScriptedRunner> {
-        let path = cache().to_string_lossy().into_owned();
+    fn happy_runner(cache: &Path) -> Arc<ScriptedRunner> {
+        let path = cache.to_string_lossy().into_owned();
         Arc::new(
             ScriptedRunner::default()
                 .respond("brew --cache wget", 0, &path)
@@ -362,14 +374,15 @@ mod tests {
 
     #[tokio::test]
     async fn brew_install_prefetches_bottle_then_pours() {
-        let _ = std::fs::remove_dir_all(std::env::temp_dir().join("pdl-brew-test"));
-        let runner = happy_runner();
+        let temp = tempfile::tempdir().expect("temp dir");
+        let cache = cache_in(temp.path());
+        let runner = happy_runner(&cache);
         let downloader = Arc::new(ScriptedDownloader::default());
         let outcome = brew_install(&context(runner.clone(), downloader.clone()), "wget", BrewAction::Install)
             .await
             .expect("brew install succeeds");
         assert!(outcome.success);
-        assert_eq!(outcome.file_path.as_deref(), Some(cache().as_path()));
+        assert_eq!(outcome.file_path.as_deref(), Some(cache.as_path()));
         let calls = runner.calls();
         assert_eq!(
             calls,
@@ -391,7 +404,8 @@ mod tests {
 
     #[tokio::test]
     async fn brew_install_digest_mismatch_fails_with_verification() {
-        let runner = happy_runner();
+        let temp = tempfile::tempdir().expect("temp dir");
+        let runner = happy_runner(&cache_in(temp.path()));
         let downloader = Arc::new(ScriptedDownloader {
             fail_verification: true,
             ..Default::default()
@@ -403,7 +417,8 @@ mod tests {
 
     #[tokio::test]
     async fn brew_upgrade_forwards_formula() {
-        let path = cache().to_string_lossy().into_owned();
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = cache_in(temp.path()).to_string_lossy().into_owned();
         let runner = Arc::new(
             ScriptedRunner::default()
                 .respond("brew --cache wget", 0, &path)
@@ -418,6 +433,36 @@ mod tests {
         .await;
         assert!(result.is_ok(), "{result:?}");
         assert!(runner.calls().contains(&"brew upgrade wget".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn brew_update_runs_update_without_resolution() {
+        let runner = Arc::new(
+            ScriptedRunner::default().respond("brew update", 0, ""),
+        );
+        let result = brew_install(
+            &context(runner.clone(), Arc::new(ScriptedDownloader::default())),
+            "",
+            BrewAction::Update,
+        )
+        .await;
+        assert!(matches!(result, Ok(ref outcome) if outcome.success), "{result:?}");
+        assert_eq!(runner.calls(), vec!["brew update".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn brew_upgrade_without_formula_upgrades_everything() {
+        let runner = Arc::new(
+            ScriptedRunner::default().respond("brew upgrade", 0, ""),
+        );
+        let result = brew_install(
+            &context(runner.clone(), Arc::new(ScriptedDownloader::default())),
+            "",
+            BrewAction::Upgrade,
+        )
+        .await;
+        assert!(matches!(result, Ok(ref outcome) if outcome.success), "{result:?}");
+        assert_eq!(runner.calls(), vec!["brew upgrade".to_owned()]);
     }
 
     #[tokio::test]

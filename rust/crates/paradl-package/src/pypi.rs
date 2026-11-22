@@ -184,7 +184,19 @@ pub async fn pip_install(
         if name != requirement_name(package) && installed.contains(&name) {
             continue;
         }
-        prefetch_wheel(ctx, &resolver, &resolve_context, &requirement, wheelhouse.path()).await?;
+        let is_root = name == requirement_name(package);
+        match prefetch_wheel(ctx, &resolver, &resolve_context, &requirement, wheelhouse.path()).await
+        {
+            Ok(()) => {}
+            // A dependency that cannot be resolved or downloaded is skipped;
+            // the root package and digest failures stay fatal (exit 3).
+            Err(error)
+                if !is_root && !matches!(error, Error::VerificationFailed(_)) =>
+            {
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
         for dep in requires_dist(ctx, &requirement).await {
             if !visited.contains(&requirement_name(&dep)) {
                 queue.push(dep);
@@ -489,6 +501,65 @@ mod tests {
         .expect("pip install succeeds");
         let calls = downloader.calls.lock().unwrap();
         assert_eq!(calls.first().map(String::as_str), Some("https://files.example/requests-cp311.whl"), "{calls:?}");
+    }
+
+    struct HttpWithMissingDep;
+    #[async_trait]
+    impl SiteHttp for HttpWithMissingDep {
+        async fn fetch_json(
+            &self,
+            url: &str,
+            _headers: &HashMap<String, String>,
+            _timeout: std::time::Duration,
+        ) -> NetResult<JsonResponse> {
+            if url.contains("/requests/") {
+                return Ok(JsonResponse {
+                    status: 200,
+                    headers: HashMap::new(),
+                    body: serde_json::json!({
+                        "urls": [serde_json::json!({
+                            "filename": "requests-2.31.0-py3-none-any.whl",
+                            "url": "https://files.example/requests.whl",
+                            "digests": { "sha256": SHA },
+                            "packagetype": "bdist_wheel"
+                        })],
+                        "info": { "requires_dist": ["missing-dep>=1.0"] }
+                    }),
+                });
+            }
+            Ok(JsonResponse {
+                status: 404,
+                headers: HashMap::new(),
+                body: serde_json::Value::Null,
+            })
+        }
+        async fn redirect(
+            &self,
+            _url: &str,
+            _headers: &HashMap<String, String>,
+            _timeout: std::time::Duration,
+        ) -> NetResult<Option<RedirectInfo>> {
+            Ok(None)
+        }
+    }
+
+    #[tokio::test]
+    async fn pip_install_skips_unresolvable_dependency() {
+        let runner = Arc::new(ScriptedRunner {
+            python_version: "3.12".to_owned(),
+            ..Default::default()
+        });
+        let downloader = Arc::new(ScriptedDownloader::default());
+        let outcome = pip_install(
+            &context(runner.clone(), Arc::new(HttpWithMissingDep), downloader.clone()),
+            "requests",
+            PipAction::Install,
+        )
+        .await
+        .expect("root install succeeds despite unresolvable dependency");
+        assert!(outcome.success);
+        assert_eq!(downloader.calls.lock().unwrap().len(), 1);
+        assert!(runner.install_key().is_some());
     }
 
     #[tokio::test]
