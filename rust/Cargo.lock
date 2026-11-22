@@ -1392,6 +1392,7 @@ dependencies = [
  "paradl-events",
  "paradl-media",
  "paradl-net",
+ "paradl-package",
  "paradl-platform",
  "paradl-postproc",
  "paradl-resilience",
@@ -1496,6 +1497,22 @@ name = "paradl-oracle"
 version = "1.0.0"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "paradl-package"
+version = "1.0.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "paradl-core",
+ "paradl-engine",
+ "paradl-net",
+ "paradl-postproc",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
