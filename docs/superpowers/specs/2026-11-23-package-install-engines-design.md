@@ -163,10 +163,44 @@ tokio runtime, as `install_release` already does.
    reason if the host blocks it.
 5. Commit and push to `main`; working tree clean.
 
+## Builder-check resolutions (lead calls)
+
+A fresh engineer reviewed the document and asked seven questions. All were
+technical rather than preference choices, so the lead settled them here:
+
+1. **HTTP/test seam (call):** `paradl-package` functions accept a
+   `PackageContext { runner: Arc<dyn ProcessRunner>, http: Arc<dyn SiteHttp> }`;
+   the crate builds its own `BrewResolver`/`PyPIResolver` from that `http`.
+   `App` gains this context through a single `App::with_package_context(...)`
+   test constructor (default: `SystemProcessRunner` + real `HttpSiteHttp`).
+   App-level dispatch tests inject both fakes; no loopback server needed.
+2. **`pip upgrade` (call):** the target package is always re-resolved and its
+   wheel prefetched even if `uv pip list` says it is installed; `--upgrade` is
+   passed to the final installer command. Dependencies still skip installed
+   packages. This makes `upgrade` meaningfully different from `install`.
+3. **Interpreter version (call):** preserve the old behavior — probe
+   `<venv>/bin/python` (or `python3`) with `-c "import sys; print(...)"` through
+   the runner, and set `ResolveContext.py_version` so wheel scoring picks the
+   right ABI. The probe is best-effort; failure leaves `py_version = None`.
+4. **`brew upgrade <formula>` (call):** forward the formula when
+   `BrewCommand.formula` is `Some`; only upgrade everything when it is absent.
+5. **Digest failure (call):** surface through `Error::verification_failed`
+   (exit code `3`), not generic `Failure`. The engine already produces a
+   verification failure; propagate it rather than downgrading it.
+6. **Offline C23/C24 goldens (call):** they will be re-blessed, not left
+   byte-for-byte. Offline now means `Error::failure("pip install requires
+   network")` / `("brew install requires network")` with exit code `1`
+   (`Failure`), matching `install_release`. The old "not implemented" string
+   disappears with the stub.
+7. **`Targets` routes (call):** `PipAction::Targets` and `BrewAction::Targets`
+   remain out of scope and emit an explicit error directing the user to
+   `paradl pip install <pkg>` / `paradl brew install <formula>`. Download-only
+   `pip:`/`brew:` shortcuts are a separate follow-up.
+
 ## What is left to the builder
 
-- Exact command-line argument order for `uv pip install` and `brew install`.
-- Whether to expose `formula_dependencies` on `BrewResolver` or read deps via
-  `brew deps` (lead prefers the resolver method; builder may choose `brew deps`
-  if it avoids an extra HTTP call, and must record the choice).
-- Module/crate naming (`paradl-package` proposed).
+- Exact argument order for `uv pip install` / `brew install` (record the final
+  command in tests).
+- `BrewResolver::formula_dependencies` vs `brew deps` via the runner — lead
+  prefers the resolver method, but either is acceptable if recorded.
+- Module naming (`paradl-package` proposed).
