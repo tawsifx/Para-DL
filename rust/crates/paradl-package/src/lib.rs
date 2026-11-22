@@ -10,8 +10,14 @@ use std::sync::Arc;
 use paradl_core::ExitCode;
 use paradl_net::SiteHttp;
 
+pub mod brew;
+pub mod download;
 pub mod process;
 
+pub use brew::{brew_formula_dependencies, brew_install};
+pub use download::{
+    ArtifactDownloader, DownloadOutcome, EngineArtifactDownloader,
+};
 pub use process::{CommandSpec, ProcessOutcome, ProcessRunner, SystemProcessRunner};
 
 /// Everything the install engines need, with both side-effect seams injectable.
@@ -27,6 +33,8 @@ pub struct PackageContext {
     pub doh_endpoint: Option<String>,
     /// Parallel connections used for prefetch.
     pub connections: u32,
+    /// Injectable artifact download boundary.
+    pub downloader: Arc<dyn ArtifactDownloader>,
 }
 
 /// Terminal result of an install operation.

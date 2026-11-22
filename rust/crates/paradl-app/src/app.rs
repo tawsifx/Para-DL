@@ -28,7 +28,9 @@ use paradl_core::{Error, PDLConfig};
 use paradl_events::{ErrorEvent, Event, emit_jsonl, now_timestamp};
 use paradl_net::routing::{PureClaimsChecker, classify_target};
 use paradl_net::{HttpClient, HttpClientConfig, HttpSiteHttp, SiteHttp};
-use paradl_package::{PackageContext, ProcessRunner, SystemProcessRunner};
+use paradl_package::{
+    ArtifactDownloader, EngineArtifactDownloader, PackageContext, ProcessRunner, SystemProcessRunner,
+};
 use paradl_ui::event_summary;
 
 use crate::handoffs::{api_resolve_failure_status, normalise_resolve_failure};
@@ -136,6 +138,8 @@ pub struct App {
     package_runner: Arc<dyn ProcessRunner>,
     /// Injectable HTTP seam for package-manager resolvers (`None` = real).
     package_http: Option<Arc<dyn SiteHttp>>,
+    /// Injectable artifact download seam (`None` = real engine).
+    package_downloader: Option<Arc<dyn ArtifactDownloader>>,
 }
 
 impl Default for App {
@@ -168,6 +172,7 @@ impl App {
             record_history: true,
             package_runner: Arc::new(SystemProcessRunner),
             package_http: None,
+            package_downloader: None,
         }
     }
 
@@ -184,6 +189,7 @@ impl App {
             record_history: true,
             package_runner: Arc::new(SystemProcessRunner),
             package_http: None,
+            package_downloader: None,
         }
     }
 
@@ -205,6 +211,7 @@ impl App {
             record_history: true,
             package_runner: Arc::new(SystemProcessRunner),
             package_http: None,
+            package_downloader: None,
         }
     }
 
@@ -219,9 +226,11 @@ impl App {
         mut self,
         runner: Arc<dyn ProcessRunner>,
         http: Arc<dyn SiteHttp>,
+        downloader: Arc<dyn ArtifactDownloader>,
     ) -> Self {
         self.package_runner = runner;
         self.package_http = Some(http);
+        self.package_downloader = Some(downloader);
         self
     }
 
@@ -244,6 +253,13 @@ impl App {
             proxy: None,
             doh_endpoint: self.config.doh_endpoint.clone(),
             connections: self.config.connections.max(1) as u32,
+            downloader: match &self.package_downloader {
+                Some(downloader) => Arc::clone(downloader),
+                None => Arc::new(EngineArtifactDownloader {
+                    proxy: None,
+                    doh_endpoint: self.config.doh_endpoint.clone(),
+                }),
+            },
         })
     }
 
