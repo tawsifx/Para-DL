@@ -1,7 +1,8 @@
 # paraDL → Rust Framework Parity Matrix
 
 Every row must be cleared by its owning wave before that wave is accepted. "Proving test" is the test that must pass for the row to count.
-Sources: `PARALLEL_DL_DEV_CONTEXT.md` §4, `tests/**`, `rust/rapids/src/tests.rs`, `docs/rust-replaceability-report.md`, FINAL master prompt §0.
+Sources: the pre-W5 Python oracle inventory (dev context, bulk `tests/**`, and
+replaceability report — all removed after the cutover), FINAL master prompt §0.
 
 Extraction for this inventory (W0-4, READ-ONLY, BASE `0ebb09e`):
 - CLI: `src/paradl/cli/parser.py:112–580` (79 `add_argument` calls), `src/paradl/cli/dispatch.py:34–226`, `src/paradl/throttle/cli.py:55–235` (24 `add_argument` calls).

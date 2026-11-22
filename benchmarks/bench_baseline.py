@@ -21,8 +21,8 @@ Honesty rules (W4-3)
   "identical URLs" requirement is N/A here; it is enforced in
   bench_rust_engine.py where both engines hit one loopback URL.
 * Warm-cache artifacts are NOT wins: the ~140,000x mirror cache-hit number in
-  PARALLEL_DL_DEV_CONTEXT.md sec.7 is a cache artifact, and the ~1.2-1.3x
-  cross-run drift on untouched cases is machine noise, not a code win.
+  warm-cache numbers are a cache artifact, and the ~1.2-1.3x cross-run drift
+  on untouched cases is machine noise, not a code win.
 * Unmeasurable metrics are written as {"value": null, "reason": "..."} and are
   never invented. Media process-startup belongs to the W4-2 media lane only.
 """
@@ -283,8 +283,8 @@ def measure_one(name: str, scale: int, fn, iters: int, units: int, reps: int = 3
 
 HONESTY = {
     "drift": (
-        "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md "
-        "sec.7 is measurement noise, NOT a code-attributable win."
+        "The ~1.2-1.3x cross-run drift is measurement noise, "
+        "NOT a code-attributable win."
     ),
     "warm_cache": (
         "Warm-cache effects are NOT wins: the ~140,000x mirror cache-hit number "

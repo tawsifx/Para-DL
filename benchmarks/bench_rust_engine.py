@@ -1065,8 +1065,8 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
                     "NOT presented as a general speedup; cold-vs-cold is the engine comparison."
                 ),
                 "drift": (
-                    "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md "
-                    "sec.7 is measurement noise, NOT a code-attributable win. See variance."
+                    "The ~1.2-1.3x cross-run drift is measurement noise, "
+                    "NOT a code-attributable win. See variance."
                 ),
                 "unfair_metrics": (
                     "Metrics that cannot be measured fairly are written as "
@@ -1180,8 +1180,8 @@ def run_benchmark_suite(root: Path) -> dict[str, Any]:
                 "NOT presented as a general speedup; cold-vs-cold is the engine comparison."
             ),
             "drift": (
-                "The ~1.2-1.3x cross-run drift documented in PARALLEL_DL_DEV_CONTEXT.md "
-                "sec.7 is measurement noise, NOT a code-attributable win. See variance."
+                "The ~1.2-1.3x cross-run drift is measurement noise, "
+                "NOT a code-attributable win. See variance."
             ),
             "unfair_metrics": (
                 "Metrics that cannot be measured fairly are written as "

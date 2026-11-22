@@ -25,7 +25,7 @@ Prior "no Python anywhere" criteria are void. See `docs/superpowers/framework-ch
 | `config_defaults.json` | `tests/unit/test_config.py`, `src/paradl/core/config.py` |
 | `classifier_seeded.json` | `tests/unit/test_classifier.py` (12 seeded cases), `report.json` §1.0 |
 | `watchdog.json` | `tests/unit/test_watchdog.py`, `src/paradl/engines/watchdog.py` |
-| `jsonl_events.json` | `src/paradl/ui/display.py` (43 event names), `PARALLEL_DL_DEV_CONTEXT.md` §4 |
+| `jsonl_events.json` | `src/paradl/ui/display.py` (43 event names), historical dev context §4 |
 | `redaction.json` | `src/paradl/ui/display.py::redact_secrets/_redact_obj` |
 | `sidecar.json` | `rust/rapids/src/state.rs`, `rust/rapids/src/tests.rs` |
 | `report_schema.json` | `src/paradl/throttle/models.py::ThrottleReport.to_dict` (schema 1.0, m0..m10) |
